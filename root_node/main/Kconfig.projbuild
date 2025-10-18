@@ -1,0 +1,16 @@
+menu "ROOT Node WiFi Configuration"
+
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "Yorick"
+        help
+            SSID (network name) for the WiFi router to connect to.
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "pro100parol"
+        help
+            WiFi password (WPA or WPA2) for the router.
+
+endmenu
+

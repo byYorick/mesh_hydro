@@ -1,5 +1,6 @@
 # ESP-IDF
 build/
+hydro1.0/
 sdkconfig
 sdkconfig.old
 *.bin

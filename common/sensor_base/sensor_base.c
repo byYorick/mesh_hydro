@@ -5,6 +5,8 @@
 
 #include "sensor_base.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string.h>
 
 static const char *TAG = "sensor_base";
@@ -20,7 +22,7 @@ static sensor_cache_entry_t s_cache[MAX_CACHE_ENTRIES];
 static int s_cache_count = 0;
 
 esp_err_t sensor_read_with_retry(esp_err_t (*read_fn)(float *value), float *value, int max_retries) {
-    esp_err_t err;
+    esp_err_t err = ESP_FAIL;
     
     for (int i = 0; i < max_retries; i++) {
         err = read_fn(value);

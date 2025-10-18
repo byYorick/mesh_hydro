@@ -32,10 +32,11 @@ typedef struct {
     mesh_mode_t mode;               ///< Режим работы (ROOT или NODE)
     const char *mesh_id;            ///< ID mesh-сети (6 байт)
     const char *mesh_password;      ///< Пароль mesh-сети
-    uint8_t channel;                ///< WiFi канал (1-13)
+    uint8_t channel;                ///< WiFi канал (1-13, 0=auto)
     uint8_t max_connection;         ///< Макс. подключений (для ROOT)
-    const char *router_ssid;        ///< SSID роутера (только для ROOT)
-    const char *router_password;    ///< Пароль роутера (только для ROOT)
+    const char *router_ssid;        ///< SSID роутера (нужен для ROOT и NODE!)
+    const char *router_password;    ///< Пароль роутера (нужен для ROOT и NODE!)
+    const uint8_t *router_bssid;    ///< BSSID роутера (NULL=auto)
 } mesh_manager_config_t;
 
 /**
