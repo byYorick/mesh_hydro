@@ -5,8 +5,12 @@
 
 #include "sht3x_driver.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+// MOCK MODE - отключить I2C, использовать моковые данные
+#define SHT3X_MOCK_MODE 1
 
 static const char *TAG = "sht3x";
 
@@ -39,6 +43,25 @@ esp_err_t sht3x_read(float *temperature, float *humidity) {
         return ESP_ERR_INVALID_ARG;
     }
 
+#if SHT3X_MOCK_MODE
+    // MOCK: Генерация реалистичных данных
+    static float base_temp = 22.0f;
+    static float base_hum = 60.0f;
+    
+    // Добавляем небольшие случайные колебания
+    float temp_variation = ((float)(esp_random() % 100) / 100.0f - 0.5f) * 2.0f; // ±1°C
+    float hum_variation = ((float)(esp_random() % 100) / 100.0f - 0.5f) * 4.0f;  // ±2%
+    
+    *temperature = base_temp + temp_variation;
+    *humidity = base_hum + hum_variation;
+    
+    // Ограничиваем значения
+    if (*humidity < 0.0f) *humidity = 0.0f;
+    if (*humidity > 100.0f) *humidity = 100.0f;
+    
+    ESP_LOGD(TAG, "SHT3x MOCK: %.2f°C, %.1f%%", *temperature, *humidity);
+    return ESP_OK;
+#else
     uint8_t cmd[2] = {
         (SHT3X_CMD_MEASURE_HIGH >> 8) & 0xFF,
         SHT3X_CMD_MEASURE_HIGH & 0xFF
@@ -89,6 +112,7 @@ esp_err_t sht3x_read(float *temperature, float *humidity) {
     ESP_LOGD(TAG, "SHT3x: %.2f°C, %.1f%%", *temperature, *humidity);
 
     return ESP_OK;
+#endif
 }
 
 esp_err_t sht3x_soft_reset(void) {

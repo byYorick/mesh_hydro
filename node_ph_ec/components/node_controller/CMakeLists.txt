@@ -3,7 +3,6 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES 
         freertos
-        esp_task_wdt
         node_config
         connection_monitor
         local_storage

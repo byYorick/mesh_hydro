@@ -7,10 +7,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_wifi.h"
 #include "nvs_flash.h"
 #include "driver/i2c.h"
 
@@ -26,6 +28,9 @@
 #include "pump_controller.h"
 #include "ph_ec_manager.h"
 
+// Для JSON парсинга
+#include "cJSON.h"
+
 static const char *TAG = "ph_ec_node";
 
 // I2C конфигурация
@@ -40,6 +45,7 @@ static ph_ec_node_config_t s_node_config;
 // Forward declarations
 static esp_err_t i2c_master_init(void);
 static void init_default_config(void);
+static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_t len);
 
 void app_main(void)
 {
@@ -71,35 +77,22 @@ void app_main(void)
     ESP_LOGI(TAG, "  EC target: %.2f (%.2f-%.2f)",
              s_node_config.ec_target, s_node_config.ec_min, s_node_config.ec_max);
     
-    // [Step 3/9] I2C init
-    ESP_LOGI(TAG, "[Step 3/9] I2C init (SCL=%d, SDA=%d)...",
-             I2C_MASTER_SCL_IO, I2C_MASTER_SDA_IO);
-    ESP_ERROR_CHECK(i2c_master_init());
+    // [Step 3/9] I2C init - ОТКЛЮЧЁН ДЛЯ ТЕСТИРОВАНИЯ БЕЗ ДАТЧИКОВ
+    ESP_LOGI(TAG, "[Step 3/9] I2C init - DISABLED (Mock mode)");
+    ESP_LOGW(TAG, "  ⚠️ I2C ОТКЛЮЧЁН - используются моковые значения!");
+    // ESP_ERROR_CHECK(i2c_master_init());  // ← Закомментировано
     
-    // [Step 4/9] Sensors init
-    ESP_LOGI(TAG, "[Step 4/9] Sensors init...");
+    // [Step 4/9] Sensors init - ОТКЛЮЧЕНЫ
+    ESP_LOGI(TAG, "[Step 4/9] Sensors init - MOCK MODE");
+    ESP_LOGW(TAG, "  ⚠️ ДАТЧИКИ ОТКЛЮЧЕНЫ - симуляция данных!");
+    ESP_LOGW(TAG, "  Mock pH: 6.5 ± 0.3");
+    ESP_LOGW(TAG, "  Mock EC: 2.5 ± 0.2");
     
-    ESP_LOGI(TAG, "  - pH sensor (0x%02X)...", PH_SENSOR_ADDR);
-    esp_err_t ret_ph = ph_sensor_init(I2C_MASTER_NUM);
-    if (ret_ph != ESP_OK) {
-        ESP_LOGW(TAG, "    WARNING: pH sensor init failed. Using default values.");
-    } else {
-        ESP_LOGI(TAG, "    OK");
-    }
+    // Датчики не инициализируются, будут использоваться моковые значения
+    // esp_err_t ret_ph = ph_sensor_init(I2C_MASTER_NUM);  // ← Закомментировано
+    // esp_err_t ret_ec = ec_sensor_init(I2C_MASTER_NUM);  // ← Закомментировано
     
-    ESP_LOGI(TAG, "  - EC sensor (0x%02X)...", EC_SENSOR_ADDR);
-    esp_err_t ret_ec = ec_sensor_init(I2C_MASTER_NUM);
-    if (ret_ec != ESP_OK) {
-        ESP_LOGW(TAG, "    WARNING: EC sensor init failed. Using default values.");
-    } else {
-        ESP_LOGI(TAG, "    OK");
-    }
-    
-    if (ret_ph == ESP_OK || ret_ec == ESP_OK) {
-        ESP_LOGI(TAG, "At least one sensor initialized successfully");
-    } else {
-        ESP_LOGW(TAG, "WARNING: All sensors failed. Running in simulation mode.");
-    }
+    ESP_LOGI(TAG, "  ✅ MOCK MODE активирован - датчики не требуются!");
     
     // [Step 5/9] Pumps init
     ESP_LOGI(TAG, "[Step 5/9] Pumps init (5x PWM)...");
@@ -123,6 +116,9 @@ void app_main(void)
     
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     ESP_LOGI(TAG, "  Mesh ID: %s", mesh_config.mesh_id);
+    
+    // Регистрация callback для команд от ROOT
+    mesh_manager_register_recv_cb(on_mesh_data_received);
     
     // [Step 7/9] pH/EC Manager init
     ESP_LOGI(TAG, "[Step 7/9] pH/EC Manager init...");
@@ -181,7 +177,7 @@ static void init_default_config(void) {
     
     // Базовая конфигурация
     uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
     snprintf(s_node_config.base.node_id, sizeof(s_node_config.base.node_id),
              "ph_ec_%02x%02x%02x", mac[3], mac[4], mac[5]);
     strncpy(s_node_config.base.zone, "Auto-discovered", sizeof(s_node_config.base.zone));
@@ -209,8 +205,61 @@ static void init_default_config(void) {
     }
     
     // Калибровка (дефолт)
-    s_node_config.ph_calibration_offset = 0.0f;
-    s_node_config.ec_calibration_multiplier = 1.0f;
+    s_node_config.ph_cal_offset = 0.0f;
+    s_node_config.ec_cal_offset = 0.0f;
     
     ESP_LOGI(TAG, "Default config initialized: %s", s_node_config.base.node_id);
+}
+
+/**
+ * @brief Callback при получении данных от ROOT
+ */
+static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_t len) {
+    // Создаём NULL-terminated копию
+    char *data_copy = malloc(len + 1);
+    if (data_copy == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for data copy");
+        return;
+    }
+    memcpy(data_copy, data, len);
+    data_copy[len] = '\0';
+    
+    mesh_message_t msg;
+    
+    if (!mesh_protocol_parse(data_copy, &msg)) {
+        ESP_LOGE(TAG, "Failed to parse mesh message");
+        free(data_copy);
+        return;
+    }
+
+    // Проверка что сообщение для нас
+    if (strcmp(msg.node_id, s_node_config.base.node_id) != 0) {
+        mesh_protocol_free_message(&msg);
+        free(data_copy);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Message from ROOT: type=%d", msg.type);
+
+    // Обработка по типу сообщения
+    switch (msg.type) {
+        case MESH_MSG_COMMAND: {
+            cJSON *cmd = cJSON_GetObjectItem(msg.data, "command");
+            if (cmd && cJSON_IsString(cmd)) {
+                ph_ec_manager_handle_command(cmd->valuestring, msg.data);
+            }
+            break;
+        }
+
+        case MESH_MSG_CONFIG:
+            ph_ec_manager_handle_config_update(msg.data);
+            break;
+
+        default:
+            ESP_LOGW(TAG, "Unknown message type: %d", msg.type);
+            break;
+    }
+
+    mesh_protocol_free_message(&msg);
+    free(data_copy);
 }

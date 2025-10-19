@@ -5,8 +5,12 @@
 
 #include "ccs811_driver.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+// MOCK MODE - отключить I2C, использовать моковые данные
+#define CCS811_MOCK_MODE 1
 
 static const char *TAG = "ccs811";
 
@@ -71,6 +75,29 @@ esp_err_t ccs811_read(uint16_t *co2, uint16_t *tvoc) {
         return ESP_ERR_INVALID_ARG;
     }
 
+#if CCS811_MOCK_MODE
+    // MOCK: Генерация реалистичных данных
+    static uint16_t base_co2 = 450;
+    static uint16_t base_tvoc = 50;
+    
+    // Добавляем небольшие случайные колебания
+    int co2_variation = (int)(esp_random() % 100) - 50;  // ±50 ppm
+    int tvoc_variation = (int)(esp_random() % 20) - 10;  // ±10 ppb
+    
+    *co2 = base_co2 + co2_variation;
+    
+    if (tvoc) {
+        *tvoc = base_tvoc + tvoc_variation;
+        if (*tvoc > 1000) *tvoc = 1000;  // Ограничение
+    }
+    
+    // Ограничиваем CO2
+    if (*co2 < 400) *co2 = 400;
+    if (*co2 > 2000) *co2 = 2000;
+    
+    ESP_LOGD(TAG, "CCS811 MOCK: CO2=%d ppm, TVOC=%d ppb", *co2, tvoc ? *tvoc : 0);
+    return ESP_OK;
+#else
     uint8_t data[8];
     
     // Чтение результатов из ALG_RESULT_DATA
@@ -101,6 +128,7 @@ esp_err_t ccs811_read(uint16_t *co2, uint16_t *tvoc) {
     ESP_LOGD(TAG, "CCS811: CO2=%d ppm, TVOC=%d ppb", *co2, tvoc ? *tvoc : 0);
 
     return ESP_OK;
+#endif
 }
 
 esp_err_t ccs811_set_environment(float temperature, float humidity) {

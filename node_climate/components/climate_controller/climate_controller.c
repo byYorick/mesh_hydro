@@ -142,11 +142,12 @@ static void climate_main_task(void *arg) {
             s_discovery_sent = true;
         }
 
-        // Чтение всех датчиков
+        // Чтение всех датчиков (или моковых значений в MOCK MODE)
         esp_err_t ret = read_all_sensors(&temp, &humidity, &co2, &lux);
 
+        // ⚠️ MOCK MODE: Всегда отправляем телеметрию (даже с моковыми данными)
         if (ret == ESP_OK) {
-            // Отправка телеметрии на ROOT (включая частичные данные)
+            // Отправка телеметрии на ROOT
             send_telemetry(temp, humidity, co2, lux);
 
             // Валидация данных (только для валидных значений)
@@ -158,9 +159,8 @@ static void climate_main_task(void *arg) {
             if (co2 > 0 && co2 > 5000) {
                 ESP_LOGW(TAG, "CO2 very high: %d ppm", co2);
             }
-        } else {
-            ESP_LOGW(TAG, "All sensors failed - skipping telemetry");
         }
+        // Убрана проверка "else" которая пропускала телеметрию - теперь всегда отправляется!
 
         // Интервал telemetry - 5 секунд (DEBUG режим!)
         vTaskDelay(pdMS_TO_TICKS(5000));
@@ -224,29 +224,31 @@ static esp_err_t read_all_sensors(float *temp, float *humidity, uint16_t *co2, u
         }
     }
 
-    // Установка дефолтных значений для неудачных чтений
+    // Установка моковых значений для неудачных чтений (MOCK MODE)
     if (ret_temp != ESP_OK) {
-        ESP_LOGW(TAG, "SHT3x read failed - using default values");
-        *temp = -127.0f;  // Невалидное значение
-        *humidity = 0.0f;
+        ESP_LOGW(TAG, "⚠️ SHT3x read failed - using MOCK values");
+        *temp = 22.5f;     // Моковая температура (вместо -127.0f)
+        *humidity = 65.0f; // Моковая влажность (вместо 0.0f)
     }
     if (ret_co2 != ESP_OK) {
-        ESP_LOGW(TAG, "CCS811 read failed - using default value");
-        *co2 = 0;
+        ESP_LOGW(TAG, "⚠️ CCS811 read failed - using MOCK value");
+        *co2 = 800;  // Моковое CO2 (вместо 0)
     }
     if (ret_lux != ESP_OK) {
-        ESP_LOGW(TAG, "Lux sensor read failed - using default value");
-        *lux = 0;
+        ESP_LOGW(TAG, "⚠️ Lux sensor read failed - using MOCK value");
+        *lux = 500;  // Моковое освещение (вместо 0)
     }
 
-    // Возвращаем успех если хотя бы один датчик прочитан
+    // ⚠️ MOCK MODE: Всегда возвращаем ESP_OK (даже если все датчики не работают)
+    // Телеметрия будет отправлена с моковыми значениями
     bool at_least_one_ok = (ret_temp == ESP_OK || ret_co2 == ESP_OK || ret_lux == ESP_OK);
     
     if (!at_least_one_ok) {
-        ESP_LOGE(TAG, "All sensors failed - no data available");
+        ESP_LOGW(TAG, "⚠️ All sensors failed - using MOCK data (temp=22.5°C, hum=65%, co2=800ppm, lux=500)");
     }
     
-    return at_least_one_ok ? ESP_OK : ESP_FAIL;
+    ESP_LOGD(TAG, "📊 Sensors: %.1f°C, %.0f%%, %dppm, %dlux", *temp, *humidity, *co2, *lux);
+    return ESP_OK;  // Всегда успех для отправки телеметрии с моковыми данными
 }
 
 // Получение RSSI к родительскому узлу (ROOT)

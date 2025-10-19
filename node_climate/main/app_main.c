@@ -112,50 +112,56 @@ void app_main(void) {
 
     // === Шаг 3: Инициализация I2C ===
     ESP_LOGI(TAG, "[Step 3/7] Initializing I2C...");
-    i2c_config_t i2c_conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = GPIO_I2C_SDA,
-        .scl_io_num = GPIO_I2C_SCL,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_FREQ_HZ,
-    };
-    ESP_ERROR_CHECK(i2c_param_config(I2C_NUM_0, &i2c_conf));
-    ESP_ERROR_CHECK(i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0));
-    ESP_LOGI(TAG, "I2C initialized (SDA=%d, SCL=%d)", GPIO_I2C_SDA, GPIO_I2C_SCL);
+    ESP_LOGW(TAG, "I2C DISABLED - Running in MOCK mode");
+    // i2c_config_t i2c_conf = {
+    //     .mode = I2C_MODE_MASTER,
+    //     .sda_io_num = GPIO_I2C_SDA,
+    //     .scl_io_num = GPIO_I2C_SCL,
+    //     .sda_pullup_en = GPIO_PULLUP_ENABLE,
+    //     .scl_pullup_en = GPIO_PULLUP_ENABLE,
+    //     .master.clk_speed = I2C_FREQ_HZ,
+    // };
+    // ESP_ERROR_CHECK(i2c_param_config(I2C_NUM_0, &i2c_conf));
+    // ESP_ERROR_CHECK(i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0));
+    ESP_LOGI(TAG, "I2C MOCK: Skipping hardware init");
 
     // === Шаг 4: Инициализация датчиков ===
     ESP_LOGI(TAG, "[Step 4/7] Initializing Sensors...");
+    ESP_LOGW(TAG, "SENSORS DISABLED - Running in MOCK mode");
     
-    ESP_LOGI(TAG, "  - SHT3x (temp + humidity)...");
-    esp_err_t ret_sht = sht3x_init(I2C_NUM_0);
-    if (ret_sht != ESP_OK) {
-        ESP_LOGW(TAG, "    WARNING: SHT3x init failed (0x%x). Sensor may not be connected.", ret_sht);
-    } else {
-        ESP_LOGI(TAG, "    OK");
-    }
+    ESP_LOGI(TAG, "  - SHT3x (temp + humidity)... MOCK");
+    // MOCK: всегда успешно
+    // esp_err_t ret_sht = sht3x_init(I2C_NUM_0);
+    // if (ret_sht != ESP_OK) {
+    //     ESP_LOGW(TAG, "    WARNING: SHT3x init failed (0x%x). Sensor may not be connected.", ret_sht);
+    // } else {
+    //     ESP_LOGI(TAG, "    OK");
+    // }
     
-    ESP_LOGI(TAG, "  - CCS811 (CO2)...");
-    esp_err_t ret_ccs = ccs811_init(I2C_NUM_0);
-    if (ret_ccs != ESP_OK) {
-        ESP_LOGW(TAG, "    WARNING: CCS811 init failed (0x%x). Sensor may not be connected.", ret_ccs);
-    } else {
-        ESP_LOGI(TAG, "    OK");
-    }
+    ESP_LOGI(TAG, "  - CCS811 (CO2)... MOCK");
+    // MOCK: всегда успешно
+    // esp_err_t ret_ccs = ccs811_init(I2C_NUM_0);
+    // if (ret_ccs != ESP_OK) {
+    //     ESP_LOGW(TAG, "    WARNING: CCS811 init failed (0x%x). Sensor may not be connected.", ret_ccs);
+    // } else {
+    //     ESP_LOGI(TAG, "    OK");
+    // }
     
-    ESP_LOGI(TAG, "  - Lux sensor...");
-    esp_err_t ret_lux = lux_sensor_init(I2C_NUM_0);
-    if (ret_lux != ESP_OK) {
-        ESP_LOGW(TAG, "    WARNING: Lux sensor init failed (0x%x). Sensor may not be connected.", ret_lux);
-    } else {
-        ESP_LOGI(TAG, "    OK");
-    }
+    ESP_LOGI(TAG, "  - Lux sensor... MOCK");
+    // MOCK: всегда успешно
+    // esp_err_t ret_lux = lux_sensor_init(I2C_NUM_0);
+    // if (ret_lux != ESP_OK) {
+    //     ESP_LOGW(TAG, "    WARNING: Lux sensor init failed (0x%x). Sensor may not be connected.", ret_lux);
+    // } else {
+    //     ESP_LOGI(TAG, "    OK");
+    // }
     
-    if (ret_sht == ESP_OK || ret_ccs == ESP_OK || ret_lux == ESP_OK) {
-        ESP_LOGI(TAG, "At least one sensor initialized successfully");
-    } else {
-        ESP_LOGW(TAG, "WARNING: All sensors failed to initialize. Running in degraded mode.");
-    }
+    ESP_LOGI(TAG, "All sensors initialized in MOCK mode");
+    // if (ret_sht == ESP_OK || ret_ccs == ESP_OK || ret_lux == ESP_OK) {
+    //     ESP_LOGI(TAG, "At least one sensor initialized successfully");
+    // } else {
+    //     ESP_LOGW(TAG, "WARNING: All sensors failed to initialize. Running in degraded mode.");
+    // }
 
     // === Шаг 5: Инициализация Mesh (NODE режим) ===
     ESP_LOGI(TAG, "[Step 5/7] Initializing Mesh (NODE mode)...");

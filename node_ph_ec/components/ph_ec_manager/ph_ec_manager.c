@@ -217,26 +217,51 @@ static void heartbeat_task(void *arg) {
     }
 }
 
-// Чтение датчиков
+// Чтение датчиков - MOCK MODE (без реального I2C)
 static void read_sensors(void) {
-    esp_err_t ret;
+    // ⚠️ МОКОВЫЕ ЗНАЧЕНИЯ ДЛЯ ТЕСТИРОВАНИЯ БЕЗ ДАТЧИКОВ!
     
-    // Чтение pH
-    ret = ph_sensor_read(&s_current_ph);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "pH sensor read failed");
-    }
+    // Генерация случайных отклонений для реалистичности
+    static float ph_variation = 0.0f;
+    static float ec_variation = 0.0f;
     
-    // Чтение EC
-    ret = ec_sensor_read(&s_current_ec);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "EC sensor read failed");
-    }
+    // Случайное изменение ±0.05 каждую секунду
+    ph_variation += ((float)(esp_random() % 100) - 50.0f) / 1000.0f;
+    ec_variation += ((float)(esp_random() % 100) - 50.0f) / 1000.0f;
     
-    // Компенсация температуры для EC (упрощённо 25°C)
-    ec_sensor_set_temperature(25.0f);
+    // Ограничение вариаций
+    if (ph_variation > 0.3f) ph_variation = 0.3f;
+    if (ph_variation < -0.3f) ph_variation = -0.3f;
+    if (ec_variation > 0.2f) ec_variation = 0.2f;
+    if (ec_variation < -0.2f) ec_variation = -0.2f;
     
-    ESP_LOGD(TAG, "Sensors: pH=%.2f, EC=%.2f", s_current_ph, s_current_ec);
+    // Моковые значения: pH=6.5±0.3, EC=2.5±0.2
+    s_current_ph = 6.5f + ph_variation;
+    s_current_ec = 2.5f + ec_variation;
+    
+    ESP_LOGD(TAG, "📊 Mock sensors: pH=%.2f, EC=%.2f", s_current_ph, s_current_ec);
+    
+    // ═══════════════════════════════════════════════════════
+    // РЕАЛЬНЫЙ КОД (для production с настоящими датчиками):
+    // ═══════════════════════════════════════════════════════
+    // esp_err_t ret;
+    // 
+    // // Чтение pH
+    // ret = ph_sensor_read(&s_current_ph);
+    // if (ret != ESP_OK) {
+    //     ESP_LOGW(TAG, "pH sensor read failed");
+    // }
+    // 
+    // // Чтение EC
+    // ret = ec_sensor_read(&s_current_ec);
+    // if (ret != ESP_OK) {
+    //     ESP_LOGW(TAG, "EC sensor read failed");
+    // }
+    // 
+    // // Компенсация температуры для EC (упрощённо 25°C)
+    // ec_sensor_set_temperature(25.0f);
+    // 
+    // ESP_LOGD(TAG, "Sensors: pH=%.2f, EC=%.2f", s_current_ph, s_current_ec);
 }
 
 // Проверка аварийных условий
@@ -365,6 +390,7 @@ static void send_telemetry(void) {
             "\"data\":{"
             "\"ph\":%.2f,"
             "\"ec\":%.2f,"
+            "\"temperature\":%.2f,"
             "\"ph_target\":%.2f,"
             "\"ec_target\":%.2f,"
             "\"pump_ph_up_ml\":%.1f,"
@@ -380,10 +406,11 @@ static void send_telemetry(void) {
             (unsigned long)time(NULL),
             s_current_ph,
             s_current_ec,
+            22.5f,  // TODO: реальная температура
             s_config->ph_target,
             s_config->ec_target,
             pump_ml[0], pump_ml[1], pump_ml[2], pump_ml[3], pump_ml[4],
-            s_autonomous_mode ? "autonomous" : "auto",
+            s_autonomous_mode ? "autonomous" : "online",
             s_emergency_mode ? "true" : "false",
             s_autonomous_mode ? "true" : "false",
             rssi);
@@ -414,13 +441,11 @@ static void send_heartbeat(void) {
             "\"node_id\":\"%s\","
             "\"uptime\":%lu,"
             "\"heap_free\":%lu,"
-            "\"rssi_to_parent\":%d,"
-            "\"autonomous\":%s}",
+            "\"rssi_to_parent\":%d}",
             s_config->base.node_id,
             (unsigned long)uptime,
             (unsigned long)heap_free,
-            rssi,
-            s_autonomous_mode ? "true" : "false");
+            rssi);
     
     esp_err_t err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
     

@@ -46,7 +46,7 @@
       <div v-else-if="node.node_type === 'climate' && lastData">
         <v-row dense>
           <v-col cols="4">
-            <div class="text-h5">{{ lastData.temp?.toFixed(1) || '-' }}°C</div>
+            <div class="text-h5">{{ lastData.temperature?.toFixed(1) || '-' }}°C</div>
             <div class="text-caption">Температура</div>
           </v-col>
           <v-col cols="4">

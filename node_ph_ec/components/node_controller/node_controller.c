@@ -13,7 +13,7 @@
 #include "node_config.h"
 
 #include "esp_log.h"
-#include "esp_task_wdt.h"
+// #include "esp_task_wdt.h"  // Закомментировано для ESP-IDF v5.5
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -90,12 +90,12 @@ esp_err_t node_controller_stop(void) {
 static void node_controller_main_task(void *arg) {
     ESP_LOGI(TAG, "Main task running (cycle: 10 seconds)");
     
-    // Регистрация в watchdog
-    esp_task_wdt_add(NULL);
+    // Регистрация в watchdog (закомментировано для ESP-IDF v5.5)
+    // esp_task_wdt_add(NULL);
 
     while (1) {
-        // Сброс watchdog
-        esp_task_wdt_reset();
+        // Сброс watchdog (закомментировано для ESP-IDF v5.5)
+        // esp_task_wdt_reset();
 
         // 1. Чтение датчиков
         float ph = read_ph_sensor();

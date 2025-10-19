@@ -334,10 +334,28 @@ class MqttService
                 // Broadcast новый узел на фронтенд
                 event(new \App\Events\NodeDiscovered($node));
             } else {
-                // Обновление last_seen_at для существующего узла
+                // Обновление last_seen_at и метаданных для существующего узла
+                $metadata = $node->metadata ?? [];
+                
+                // Обновляем heap_free из heartbeat (если есть)
+                if (isset($data['heap_free'])) {
+                    $metadata['heap_free'] = $data['heap_free'];
+                }
+                
+                // Обновляем RSSI
+                if (isset($data['rssi_to_parent'])) {
+                    $metadata['rssi_to_parent'] = $data['rssi_to_parent'];
+                }
+                
+                // Обновляем uptime
+                if (isset($data['uptime'])) {
+                    $metadata['uptime'] = $data['uptime'];
+                }
+                
                 $node->update([
                     'online' => true,
                     'last_seen_at' => now(),
+                    'metadata' => $metadata,
                 ]);
             }
 

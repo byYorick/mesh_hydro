@@ -5,8 +5,12 @@
 
 #include "lux_sensor.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+// MOCK MODE - отключить I2C, использовать моковые данные
+#define LUX_SENSOR_MOCK_MODE 1
 
 static const char *TAG = "lux_sensor";
 
@@ -69,6 +73,21 @@ esp_err_t lux_sensor_read(uint16_t *lux) {
         return ESP_ERR_INVALID_ARG;
     }
 
+#if LUX_SENSOR_MOCK_MODE
+    // MOCK: Генерация реалистичных данных
+    static uint16_t base_lux = 500;
+    
+    // Добавляем небольшие случайные колебания
+    int lux_variation = (int)(esp_random() % 200) - 100;  // ±100 lux
+    
+    *lux = base_lux + lux_variation;
+    
+    // Ограничиваем значения
+    if (*lux > 2000) *lux = 2000;
+    
+    ESP_LOGD(TAG, "Lux MOCK: %d", *lux);
+    return ESP_OK;
+#else
     uint8_t data_low, data_high;
 
     // Чтение младшего байта
@@ -116,5 +135,6 @@ esp_err_t lux_sensor_read(uint16_t *lux) {
     ESP_LOGD(TAG, "Lux: %d", *lux);
 
     return ESP_OK;
+#endif
 }
 
