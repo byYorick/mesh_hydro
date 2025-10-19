@@ -303,19 +303,25 @@ static void send_heartbeat(void) {
         return;
     }
 
+    // Получение MAC адреса
+    uint8_t mac[6];
+    mesh_manager_get_mac(mac);
+
     uint32_t uptime = (uint32_t)time(NULL) - s_boot_time;
     uint32_t heap_free = esp_get_free_heap_size();
     int8_t rssi = get_rssi_to_parent();
 
-    // Создание heartbeat JSON
-    char heartbeat_msg[256];
+    // Создание heartbeat JSON с MAC адресом
+    char heartbeat_msg[384];
     snprintf(heartbeat_msg, sizeof(heartbeat_msg),
             "{\"type\":\"heartbeat\","
             "\"node_id\":\"%s\","
+            "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
             "\"uptime\":%lu,"
             "\"heap_free\":%lu,"
             "\"rssi_to_parent\":%d}",
             s_config->base.node_id,
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
             (unsigned long)uptime,
             (unsigned long)heap_free,
             rssi);

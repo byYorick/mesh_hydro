@@ -35,6 +35,17 @@
           <v-list-item-subtitle>{{ metadata.hardware }}</v-list-item-subtitle>
         </v-list-item>
 
+        <!-- MAC Address -->
+        <v-list-item v-if="node.mac_address || metadata.mac_address || metadata.mac">
+          <template v-slot:prepend>
+            <v-icon icon="mdi-network-outline" color="primary"></v-icon>
+          </template>
+          <v-list-item-title>MAC адрес</v-list-item-title>
+          <v-list-item-subtitle>
+            {{ formatMac(node.mac_address || metadata.mac_address || metadata.mac) }}
+          </v-list-item-subtitle>
+        </v-list-item>
+
         <!-- IP Address -->
         <v-list-item v-if="metadata.ip_address">
           <template v-slot:prepend>
@@ -268,8 +279,31 @@ function formatCreatedVia(via) {
     'mqtt': 'MQTT автообнаружение',
     'api': 'API',
     'seeder': 'Database Seeder',
+    'heartbeat': 'MQTT Heartbeat',
+    'discovery_topic': 'MQTT Discovery',
   }
   return labels[via] || via
+}
+
+function formatMac(mac) {
+  if (!mac) return 'N/A'
+  
+  // Если уже форматировано с двоеточиями (00:4b:12:37:d5:a4)
+  if (mac.includes(':')) {
+    return mac.toUpperCase()
+  }
+  
+  // Если без разделителей (004b1237d5a4)
+  if (mac.length === 12) {
+    return mac.match(/.{1,2}/g).join(':').toUpperCase()
+  }
+  
+  // Если с дефисами (00-4b-12-37-d5-a4)
+  if (mac.includes('-')) {
+    return mac.replace(/-/g, ':').toUpperCase()
+  }
+  
+  return mac.toUpperCase()
 }
 </script>
 

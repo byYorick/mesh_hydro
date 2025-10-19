@@ -355,11 +355,23 @@ class MqttService
                     $metadata['uptime'] = $data['uptime'];
                 }
                 
-                $node->update([
+                // Обновляем MAC адрес (если пришёл в heartbeat)
+                if (isset($data['mac_address']) || isset($data['mac'])) {
+                    $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'];
+                }
+                
+                $updateData = [
                     'online' => true,
                     'last_seen_at' => now(),
                     'metadata' => $metadata,
-                ]);
+                ];
+                
+                // Обновляем также поле mac_address в таблице nodes (если пришло)
+                if (isset($data['mac_address']) || isset($data['mac'])) {
+                    $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
+                }
+                
+                $node->update($updateData);
             }
 
             Log::debug("Heartbeat received", ['node_id' => $nodeId]);
@@ -405,19 +417,26 @@ class MqttService
                 ]);
                 
                 // Обновляем метаданные если пришли новые данные
-                if (isset($data['firmware']) || isset($data['hardware'])) {
+                if (isset($data['firmware']) || isset($data['hardware']) || isset($data['mac_address']) || isset($data['mac'])) {
                     $metadata = $existingNode->metadata ?? [];
                     $metadata['firmware'] = $data['firmware'] ?? $metadata['firmware'] ?? null;
                     $metadata['hardware'] = $data['hardware'] ?? $metadata['hardware'] ?? null;
-                    $metadata['mac_address'] = $data['mac'] ?? $metadata['mac_address'] ?? null;
+                    $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'] ?? $metadata['mac_address'] ?? null;
                     $metadata['ip_address'] = $data['ip'] ?? $metadata['ip_address'] ?? null;
                     $metadata['last_discovery'] = now()->toIso8601String();
                     
-                    $existingNode->update([
+                    $updateData = [
                         'metadata' => $metadata,
                         'online' => true,
                         'last_seen_at' => now(),
-                    ]);
+                    ];
+                    
+                    // Обновляем также поле mac_address в таблице nodes
+                    if (isset($data['mac_address']) || isset($data['mac'])) {
+                        $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
+                    }
+                    
+                    $existingNode->update($updateData);
                 }
                 
                 return;
