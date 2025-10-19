@@ -95,6 +95,23 @@
         ></v-progress-linear>
       </div>
 
+      <!-- WiFi Signal (RSSI) -->
+      <div v-if="hasRssi" class="mb-2">
+        <div class="d-flex justify-space-between mb-1">
+          <span class="text-caption">
+            <v-icon :icon="rssiIcon" size="x-small" class="mr-1"></v-icon>
+            WiFi
+          </span>
+          <span class="text-caption">{{ rssiValue }} dBm</span>
+        </div>
+        <v-progress-linear
+          :model-value="rssiPercent"
+          :color="getRssiColor(rssiPercent)"
+          height="6"
+          rounded
+        ></v-progress-linear>
+      </div>
+
       <!-- Last seen -->
       <div class="text-caption text-disabled">
         <v-icon icon="mdi-clock-outline" size="small" class="mr-1"></v-icon>
@@ -311,6 +328,38 @@ const heapPercent = computed(() => (heapUsed.value / heapTotal.value) * 100)
 function getMemoryColor(percent) {
   if (percent < 50) return 'success'
   if (percent < 75) return 'warning'
+  return 'error'
+}
+
+// WiFi Signal (RSSI)
+const hasRssi = computed(() => {
+  return metadata.value.rssi_to_parent != null || metadata.value.wifi_rssi != null
+})
+
+const rssiValue = computed(() => {
+  return metadata.value.rssi_to_parent || metadata.value.wifi_rssi || 0
+})
+
+// Преобразование RSSI (-100 до -30 dBm) в проценты (0-100%)
+const rssiPercent = computed(() => {
+  const rssi = rssiValue.value
+  if (rssi === 0) return 0
+  // -30 dBm = отлично (100%), -90 dBm = плохо (0%)
+  const percent = Math.min(100, Math.max(0, (rssi + 90) * (100 / 60)))
+  return percent
+})
+
+const rssiIcon = computed(() => {
+  const percent = rssiPercent.value
+  if (percent > 75) return 'mdi-wifi-strength-4'
+  if (percent > 50) return 'mdi-wifi-strength-3'
+  if (percent > 25) return 'mdi-wifi-strength-2'
+  return 'mdi-wifi-strength-1'
+})
+
+function getRssiColor(percent) {
+  if (percent > 60) return 'success'
+  if (percent > 30) return 'warning'
   return 'error'
 }
 </script>

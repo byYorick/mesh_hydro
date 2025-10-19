@@ -314,6 +314,9 @@ class MqttService
                         'firmware' => $data['firmware'] ?? null,
                         'hardware' => $data['hardware'] ?? null,
                         'ip_address' => $data['ip'] ?? null,
+                        'heap_free' => $data['heap_free'] ?? null,
+                        'rssi_to_parent' => $data['rssi_to_parent'] ?? null,
+                        'uptime' => $data['uptime'] ?? null,
                     ],
                 ]);
 
