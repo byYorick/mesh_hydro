@@ -125,6 +125,9 @@
         </v-btn>
       </template>
     </v-snackbar>
+
+    <!-- Node Auto-Discovery Indicator -->
+    <NodeDiscoveryIndicator ref="discoveryIndicator" />
   </v-app>
 </template>
 
@@ -134,14 +137,18 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { useEventsStore } from '@/stores/events'
+import { useSettingsStore } from '@/stores/settings'
+import NodeDiscoveryIndicator from '@/components/NodeDiscoveryIndicator.vue'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
 const eventsStore = useEventsStore()
+const settingsStore = useSettingsStore()
 
 const rail = ref(false)
+const discoveryIndicator = ref(null)
 
 // Filtered menu routes (exclude hidden ones)
 const menuRoutes = computed(() => {
@@ -186,10 +193,13 @@ onMounted(async () => {
   // Initial data load
   await refreshData()
 
-  // Auto-refresh every 30 seconds
-  refreshInterval = setInterval(() => {
-    refreshData()
-  }, 30000)
+  // Auto-refresh based on settings
+  if (settingsStore.ui.autoRefresh) {
+    const interval = settingsStore.ui.refreshInterval * 1000
+    refreshInterval = setInterval(() => {
+      refreshData()
+    }, interval)
+  }
 })
 
 onUnmounted(() => {

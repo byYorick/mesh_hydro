@@ -1,0 +1,162 @@
+# ========================================
+# MESH HYDRO V2 - DOCKER COMPOSE
+# ========================================
+# 
+# ⚠️ ВАЖНО: Только СЕРВЕРНЫЕ компоненты!
+#
+# В Docker:
+#   - Mosquitto MQTT Broker
+#   - SQLite Database (файловая БД)
+#   - Laravel Backend API
+#   - MQTT Listener (PHP)
+#   - Vue.js Frontend
+#
+# НЕ в Docker (физическое железо):
+#   - ROOT Node (ESP32-S3) - прошивается через idf.py
+#   - NODE Climate (ESP32) - прошивается через idf.py
+#   - NODE pH/EC (ESP32-S3) - прошивается через idf.py
+#   - и другие узлы...
+#
+# ESP32 подключаются к MQTT в Docker через WiFi
+# ========================================
+
+services:
+  # ========================================
+  # MQTT Broker (Mosquitto)
+  # Для приема данных от ESP32 узлов
+  # ========================================
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: hydro_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"     # MQTT
+      - "9001:9001"     # WebSocket (опционально)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - hydro_network
+
+  # ========================================
+  # Backend (Laravel 10)
+  # REST API + MQTT обработка
+  # SQLite база данных в volume
+  # ========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+      - DB_CONNECTION=sqlite
+      - DB_DATABASE=/var/www/html/database/hydro_system.sqlite
+      - MQTT_HOST=192.168.1.100  # ВАЖНО: IP хоста, где ROOT публикует!
+      - MQTT_PORT=1883
+    volumes:
+      - ./backend:/var/www/html
+      - backend_storage:/var/www/html/storage
+      - sqlite_data:/var/www/html/database
+    depends_on:
+      mosquitto:
+        condition: service_started
+    networks:
+      - hydro_network
+    command: >
+      sh -c "mkdir -p /var/www/html/database &&
+             touch /var/www/html/database/hydro_system.sqlite &&
+             chmod 666 /var/www/html/database/hydro_system.sqlite &&
+             php artisan migrate --force &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+
+  # ========================================
+  # MQTT Listener (Laravel Artisan)
+  # Принимает данные от ESP32 через MQTT
+  # ========================================
+  mqtt_listener:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_mqtt_listener
+    restart: unless-stopped
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+      - DB_CONNECTION=sqlite
+      - DB_DATABASE=/var/www/html/database/hydro_system.sqlite
+      - MQTT_HOST=192.168.1.100  # ВАЖНО: IP хоста, где ROOT публикует!
+      - MQTT_PORT=1883
+    volumes:
+      - ./backend:/var/www/html
+      - sqlite_data:/var/www/html/database
+    depends_on:
+      - mosquitto
+      - backend
+    networks:
+      - hydro_network
+    command: php artisan mqtt:listen
+
+  # ========================================
+  # Frontend (Vue.js 3)
+  # Веб-интерфейс для мониторинга ESP32
+  # ========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+    container_name: hydro_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - hydro_network
+
+  # ========================================
+  # Nginx (Reverse Proxy) - опционально
+  # ========================================
+  nginx:
+    image: nginx:alpine
+    container_name: hydro_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - hydro_network
+    profiles:
+      - production  # Запускается только с --profile production
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  hydro_network:
+    driver: bridge
+
+# ========================================
+# Volumes (постоянное хранение данных)
+# ========================================
+volumes:
+  sqlite_data:
+    driver: local
+  backend_storage:
+    driver: local
+

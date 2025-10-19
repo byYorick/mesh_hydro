@@ -33,11 +33,20 @@ typedef struct {
     const char *mesh_id;            ///< ID mesh-сети (6 байт)
     const char *mesh_password;      ///< Пароль mesh-сети
     uint8_t channel;                ///< WiFi канал (1-13, 0=auto)
-    uint8_t max_connection;         ///< Макс. подключений (для ROOT)
-    const char *router_ssid;        ///< SSID роутера (нужен для ROOT и NODE!)
-    const char *router_password;    ///< Пароль роутера (нужен для ROOT и NODE!)
-    const uint8_t *router_bssid;    ///< BSSID роутера (NULL=auto)
+    uint8_t max_connection;         ///< Макс. подключений (для ROOT AP)
+    const char *router_ssid;        ///< SSID роутера (ТОЛЬКО ДЛЯ ROOT! NODE = NULL)
+    const char *router_password;    ///< Пароль роутера (ТОЛЬКО ДЛЯ ROOT! NODE = NULL)
+    const uint8_t *router_bssid;    ///< BSSID роутера (NULL=auto, только для ROOT)
 } mesh_manager_config_t;
+
+/**
+ * @brief Информация об узле mesh сети
+ */
+typedef struct {
+    uint8_t mac[6];     ///< MAC адрес узла
+    int8_t rssi;        ///< RSSI (сила сигнала) к родительскому узлу
+    uint8_t layer;      ///< Уровень в mesh дереве (1=ROOT, 2=дети ROOT, и т.д.)
+} mesh_node_info_t;
 
 /**
  * @brief Callback для приема данных из mesh
@@ -133,6 +142,39 @@ int mesh_manager_get_total_nodes(void);
  * @return ESP_OK при успехе
  */
 esp_err_t mesh_manager_get_mac(uint8_t *mac);
+
+/**
+ * @brief Получение таблицы маршрутизации с RSSI (для ROOT)
+ * 
+ * Заполняет массив информацией о всех подключенных узлах mesh сети,
+ * включая MAC адрес, RSSI и уровень в дереве.
+ * 
+ * @param nodes Массив для заполнения (должен быть выделен вызывающей стороной)
+ * @param max_count Максимальный размер массива
+ * @param actual_count Указатель для записи фактического количества узлов
+ * @return ESP_OK при успехе, ESP_ERR_NOT_SUPPORTED если не ROOT
+ * 
+ * Пример использования:
+ * @code
+ * mesh_node_info_t nodes[50];
+ * int count = 0;
+ * esp_err_t ret = mesh_manager_get_routing_table_with_rssi(nodes, 50, &count);
+ * if (ret == ESP_OK) {
+ *     for (int i = 0; i < count; i++) {
+ *         ESP_LOGI(TAG, "Node %d: "MACSTR" RSSI=%d Layer=%d",
+ *                  i, MAC2STR(nodes[i].mac), nodes[i].rssi, nodes[i].layer);
+ *     }
+ * }
+ * @endcode
+ */
+esp_err_t mesh_manager_get_routing_table_with_rssi(mesh_node_info_t *nodes, int max_count, int *actual_count);
+
+/**
+ * @brief Получение RSSI к родительскому узлу (для NODE)
+ * 
+ * @return RSSI в dBm (от -100 до 0), 0 если не подключен или является ROOT
+ */
+int8_t mesh_manager_get_parent_rssi(void);
 
 #ifdef __cplusplus
 }

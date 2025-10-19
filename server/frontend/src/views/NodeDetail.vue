@@ -20,38 +20,48 @@
     <!-- Node Info -->
     <v-row>
       <v-col cols="12" md="4">
-        <v-card>
-          <v-card-title>Информация об узле</v-card-title>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>Тип</v-list-item-title>
-                <v-list-item-subtitle>{{ node.node_type }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Зона</v-list-item-title>
-                <v-list-item-subtitle>{{ node.zone || 'Не указана' }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>MAC адрес</v-list-item-title>
-                <v-list-item-subtitle>{{ node.mac_address || 'Не указан' }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Последняя связь</v-list-item-title>
-                <v-list-item-subtitle>{{ formatDateTime(node.last_seen_at) }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
+        <NodeManagementCard
+          :node="node"
+          @node-updated="handleNodeUpdate"
+          @node-deleted="handleNodeDelete"
+        />
       </v-col>
 
-      <!-- Latest Telemetry -->
+      <!-- Actions Panel -->
       <v-col cols="12" md="8">
-        <TelemetryChart
+        <NodeActions
+          :node="node"
+          @command="sendCommand"
+          @config-update="updateConfig"
+        />
+      </v-col>
+    </v-row>
+
+    <!-- Memory and Metadata -->
+    <v-row>
+      <v-col cols="12" md="6">
+        <NodeMemoryCard
+          :node="node"
+          :loading="loading"
+          @refresh="loadTelemetry"
+        />
+      </v-col>
+      <v-col cols="12" md="6">
+        <NodeMetadataCard :node="node" />
+      </v-col>
+    </v-row>
+
+    <!-- Advanced Chart -->
+    <v-row>
+      <v-col cols="12">
+        <AdvancedChart
           :title="`Телеметрия: ${node.node_id}`"
+          :icon="getNodeIcon(node.node_type)"
           :data="telemetryData"
           :fields="telemetryFields"
+          :loading="loading"
           @range-changed="onRangeChanged"
+          @refresh="loadTelemetry"
         />
       </v-col>
     </v-row>
@@ -99,19 +109,28 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useNodesStore } from '@/stores/nodes'
 import { useTelemetryStore } from '@/stores/telemetry'
-import TelemetryChart from '@/components/TelemetryChart.vue'
+import { useAppStore } from '@/stores/app'
+import AdvancedChart from '@/components/AdvancedChart.vue'
+import NodeActions from '@/components/NodeActions.vue'
+import NodeManagementCard from '@/components/NodeManagementCard.vue'
+import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
+import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
 import { formatDateTime } from '@/utils/time'
+import api from '@/services/api'
 
 const route = useRoute()
+const router = useRouter()
 const nodesStore = useNodesStore()
 const telemetryStore = useTelemetryStore()
+const appStore = useAppStore()
 
 const node = ref(null)
 const telemetryData = ref([])
 const selectedRange = ref('24h')
+const loading = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
@@ -146,11 +165,47 @@ onMounted(async () => {
 })
 
 async function loadTelemetry() {
-  const hours = getHoursFromRange(selectedRange.value)
-  telemetryData.value = await telemetryStore.fetchTelemetry({
-    node_id: node.value.node_id,
-    hours,
-  })
+  loading.value = true
+  try {
+    const hours = getHoursFromRange(selectedRange.value)
+    telemetryData.value = await telemetryStore.fetchTelemetry({
+      node_id: node.value.node_id,
+      hours,
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
+async function sendCommand({ command, params }) {
+  try {
+    await nodesStore.sendCommand(node.value.node_id, command, params)
+    appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+  } catch (error) {
+    appStore.showSnackbar('Ошибка отправки команды', 'error')
+  }
+}
+
+async function updateConfig(config) {
+  try {
+    await nodesStore.updateConfig(node.value.node_id, config)
+    node.value.config = config
+    appStore.showSnackbar('Конфигурация обновлена', 'success')
+  } catch (error) {
+    appStore.showSnackbar('Ошибка обновления конфигурации', 'error')
+  }
+}
+
+function getNodeIcon(type) {
+  const icons = {
+    'ph_ec': 'mdi-flask',
+    'climate': 'mdi-thermometer',
+    'relay': 'mdi-electric-switch',
+    'water': 'mdi-water',
+    'display': 'mdi-monitor',
+    'root': 'mdi-server-network',
+  }
+  return icons[type] || 'mdi-chip'
 }
 
 function onRangeChanged(range) {
@@ -176,6 +231,35 @@ function getLevelColor(level) {
     emergency: 'purple',
   }
   return colors[level] || 'grey'
+}
+
+async function handleNodeUpdate(updateData) {
+  try {
+    // Update node via API
+    await api.updateNodeConfig(node.value.node_id, {
+      ...node.value.config,
+      ...updateData.config,
+    })
+    
+    // Update local data
+    Object.assign(node.value, updateData)
+    
+    appStore.showSnackbar('Узел обновлен', 'success')
+  } catch (error) {
+    appStore.showSnackbar('Ошибка обновления узла', 'error')
+  }
+}
+
+async function handleNodeDelete(nodeId) {
+  try {
+    await nodesStore.deleteNode(nodeId)
+    appStore.showSnackbar(`Узел ${nodeId} удален`, 'success')
+    
+    // Redirect to nodes list
+    router.push({ name: 'Nodes' })
+  } catch (error) {
+    appStore.showSnackbar('Ошибка удаления узла', 'error')
+  }
 }
 </script>
 

@@ -11,14 +11,12 @@ class CleanupTelemetryCommand extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'telemetry:cleanup
-                            {--days=365 : Delete telemetry older than N days}
-                            {--dry-run : Show what would be deleted without actually deleting}';
+    protected $signature = 'telemetry:cleanup {--days=30 : Number of days to keep}';
 
     /**
      * The console command description.
      */
-    protected $description = 'Clean up old telemetry data';
+    protected $description = 'Delete telemetry data older than specified days';
 
     /**
      * Execute the console command.
@@ -26,64 +24,41 @@ class CleanupTelemetryCommand extends Command
     public function handle(): int
     {
         $days = (int) $this->option('days');
-        $dryRun = $this->option('dry-run');
         
         $this->info("Cleaning up telemetry older than {$days} days...");
-        
+
         $cutoffDate = now()->subDays($days);
-        
-        // Подсчет записей для удаления
+
+        // Count records to be deleted
         $count = Telemetry::where('received_at', '<', $cutoffDate)->count();
-        
+
         if ($count === 0) {
-            $this->info('No old telemetry data found.');
-            return 0;
+            $this->info('No old telemetry records found.');
+            return self::SUCCESS;
         }
 
-        $this->warn("Found {$count} records to delete (before {$cutoffDate->toDateTimeString()})");
-
-        if ($dryRun) {
-            $this->info('DRY RUN: No data was deleted.');
-            return 0;
-        }
-
-        if (!$this->confirm('Do you want to continue?', true)) {
+        if (!$this->confirm("Found {$count} records. Do you want to delete them?", true)) {
             $this->info('Cleanup cancelled.');
-            return 0;
+            return self::SUCCESS;
         }
 
-        // Удаление старых записей пакетами (чтобы не заблокировать БД)
-        $deleted = 0;
-        $batchSize = 1000;
+        $bar = $this->output->createProgressBar($count);
+        $bar->start();
 
-        $this->output->progressStart($count);
+        // Delete in chunks to avoid memory issues
+        Telemetry::where('received_at', '<', $cutoffDate)
+            ->chunkById(1000, function ($telemetry) use ($bar) {
+                DB::transaction(function () use ($telemetry) {
+                    $telemetry->each->delete();
+                });
+                $bar->advance($telemetry->count());
+            });
 
-        while (true) {
-            $batch = Telemetry::where('received_at', '<', $cutoffDate)
-                ->limit($batchSize)
-                ->delete();
-            
-            if ($batch === 0) {
-                break;
-            }
+        $bar->finish();
+        $this->newLine();
 
-            $deleted += $batch;
-            $this->output->progressAdvance($batch);
-            
-            // Небольшая пауза между пакетами
-            usleep(100000); // 0.1 секунды
-        }
+        $this->info("Successfully deleted {$count} telemetry records.");
 
-        $this->output->progressFinish();
-        
-        $this->info("✅ Deleted {$deleted} telemetry records.");
-
-        // Оптимизация таблицы (для PostgreSQL)
-        $this->info('Optimizing table...');
-        DB::statement('VACUUM ANALYZE telemetry');
-        $this->info('✅ Table optimized.');
-
-        return 0;
+        return self::SUCCESS;
     }
 }
-

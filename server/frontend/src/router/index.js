@@ -47,9 +47,18 @@ const routes = [
     },
   },
   {
+    path: '/analytics',
+    name: 'Analytics',
+    component: () => import('@/views/Analytics.vue'),
+    meta: {
+      title: 'Аналитика',
+      icon: 'mdi-chart-box',
+    },
+  },
+  {
     path: '/settings',
     name: 'Settings',
-    component: () => import('@/views/Settings.vue'),
+    component: () => import('@/views/AdvancedSettings.vue'),
     meta: {
       title: 'Настройки',
       icon: 'mdi-cog',

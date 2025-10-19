@@ -9,6 +9,7 @@ idf_component_register(
         esp_system
         mesh_manager
         mesh_protocol
+        mesh_config
         node_registry
         mqtt_client
         data_router

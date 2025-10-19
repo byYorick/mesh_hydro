@@ -6,21 +6,15 @@ idf_component_register(
         nvs_flash
         esp_wifi
         esp_event
-        esp_task_wdt
+        esp_system
         driver
-        # Common компоненты
         mesh_manager
         mesh_protocol
+        mesh_config        # Централизованная конфигурация
         node_config
-        # NODE pH/EC компоненты
-        node_controller
-        connection_monitor
-        local_storage
-        oled_display
-        buzzer_led
-        sensor_manager
-        pump_manager
-        adaptive_pid
+        ph_sensor
+        ec_sensor
+        pump_controller
+        ph_ec_manager
         json
 )
-

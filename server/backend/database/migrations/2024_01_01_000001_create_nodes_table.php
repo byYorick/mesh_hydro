@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('mac_address', 17)->nullable(); // "AA:BB:CC:DD:EE:FF"
             $table->boolean('online')->default(false);
             $table->timestamp('last_seen_at')->nullable();
-            $table->jsonb('config')->nullable();   // Конфигурация узла
-            $table->jsonb('metadata')->nullable(); // Метаданные (версия прошивки и т.д.)
+            $table->json('config')->nullable();   // Конфигурация узла
+            $table->json('metadata')->nullable(); // Метаданные (версия прошивки и т.д.)
             $table->timestamps();
 
             // Индексы для быстрого поиска

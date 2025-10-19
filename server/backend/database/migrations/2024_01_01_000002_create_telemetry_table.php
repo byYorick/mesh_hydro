@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->string('node_id');            // "ph_ec_001"
             $table->string('node_type');          // "ph_ec"
-            $table->jsonb('data');                // Данные телеметрии (зависят от типа узла)
+            $table->json('data');                 // Данные телеметрии (зависят от типа узла)
             $table->timestamp('received_at');     // Время получения на сервере
             $table->timestamps();
 
@@ -27,8 +27,8 @@ return new class extends Migration
             $table->index(['node_id', 'received_at']); // Составной индекс
         });
 
-        // GIN индекс для поиска по JSONB полю
-        DB::statement('CREATE INDEX telemetry_data_gin ON telemetry USING GIN (data)');
+        // GIN индекс только для PostgreSQL (SQLite не поддерживает)
+        // DB::statement('CREATE INDEX telemetry_data_gin ON telemetry USING GIN (data)');
     }
 
     /**

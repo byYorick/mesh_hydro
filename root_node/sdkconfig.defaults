@@ -3,9 +3,8 @@
 # ESP32-S3 Target
 CONFIG_IDF_TARGET="esp32s3"
 
-# WiFi Configuration
-CONFIG_WIFI_SSID="Yorick"
-CONFIG_WIFI_PASSWORD="pro100password"
+# WiFi Configuration (теперь в common/mesh_config.h)
+# CONFIG_WIFI_SSID и CONFIG_WIFI_PASSWORD удалены - используются из mesh_config.h
 
 # ESP-WIFI-MESH
 CONFIG_ESP_WIFI_MESH_SUPPORT=y

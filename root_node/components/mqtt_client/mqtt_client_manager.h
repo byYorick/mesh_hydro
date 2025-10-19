@@ -79,6 +79,14 @@ bool mqtt_client_manager_is_connected(void);
  */
 esp_err_t mqtt_client_manager_reconnect(void);
 
+/**
+ * @brief Отправка discovery сообщения
+ * 
+ * Публикует информацию о ROOT узле в hydro/discovery
+ * Используется при первом подключении и периодически для регистрации на сервере
+ */
+void mqtt_client_manager_send_discovery(void);
+
 #ifdef __cplusplus
 }
 #endif

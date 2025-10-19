@@ -17,6 +17,7 @@
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 #include "node_config.h"
+#include "mesh_config.h"  // Централизованная конфигурация
 
 // NODE Climate компоненты
 #include "climate_controller.h"
@@ -160,14 +161,15 @@ void app_main(void) {
     ESP_LOGI(TAG, "[Step 5/7] Initializing Mesh (NODE mode)...");
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = "HYDRO1",
-        .mesh_password = "hydro_mesh_2025",
-        .channel = 1,
-        // Router credentials нужны для всех узлов mesh сети
-        // ВАЖНО: должны совпадать с настройками ROOT узла!
-        .router_ssid = "Yorick",        // TODO: Изменить на ваш WiFi
-        .router_password = "pro100parol",  // TODO: Изменить на ваш пароль
-        .router_bssid = NULL  // Auto
+        .mesh_id = MESH_NETWORK_ID,
+        .mesh_password = MESH_NETWORK_PASSWORD,
+        .channel = MESH_NETWORK_CHANNEL,
+        .max_connection = 6,          // Макс подключений для NODE AP
+        // ВАЖНО: NODE нужны router settings для ESP-MESH API
+        // Но NODE НЕ будет голосовать за ROOT (vote percentage = 0%)
+        .router_ssid = MESH_ROUTER_SSID,
+        .router_password = MESH_ROUTER_PASSWORD,
+        .router_bssid = NULL
     };
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     mesh_manager_register_recv_cb(on_mesh_data_received);

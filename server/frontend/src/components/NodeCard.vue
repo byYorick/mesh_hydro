@@ -77,8 +77,25 @@
         Нет данных
       </div>
 
-      <!-- Last seen -->
+      <!-- Memory Usage (compact) -->
       <v-divider class="my-2"></v-divider>
+      <div v-if="hasMemoryInfo" class="mb-2">
+        <div class="d-flex justify-space-between mb-1">
+          <span class="text-caption">
+            <v-icon icon="mdi-memory" size="x-small" class="mr-1"></v-icon>
+            RAM
+          </span>
+          <span class="text-caption">{{ heapPercent.toFixed(0) }}%</span>
+        </div>
+        <v-progress-linear
+          :model-value="heapPercent"
+          :color="getMemoryColor(heapPercent)"
+          height="6"
+          rounded
+        ></v-progress-linear>
+      </div>
+
+      <!-- Last seen -->
       <div class="text-caption text-disabled">
         <v-icon icon="mdi-clock-outline" size="small" class="mr-1"></v-icon>
         {{ lastSeenText }}
@@ -90,6 +107,7 @@
         size="small"
         variant="text"
         :to="{ name: 'NodeDetail', params: { nodeId: node.node_id } }"
+        prepend-icon="mdi-eye"
       >
         Детали
       </v-btn>
@@ -97,16 +115,82 @@
       <v-spacer></v-spacer>
 
       <!-- Quick actions based on node type -->
-      <v-btn
-        v-if="node.node_type === 'relay'"
-        size="small"
-        color="primary"
-        @click="$emit('command', 'toggle_relay', { relay: 1 })"
-        :disabled="!isOnline"
-      >
-        <v-icon icon="mdi-power" start></v-icon>
-        Переключить
-      </v-btn>
+      <template v-if="isOnline">
+        <!-- pH/EC Quick Actions -->
+        <v-menu v-if="node.node_type === 'ph_ec'">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              size="small"
+              color="primary"
+              v-bind="props"
+              prepend-icon="mdi-pump"
+            >
+              Насосы
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="quickPump('ph_up')">
+              <v-list-item-title>
+                <v-icon icon="mdi-arrow-up" size="small" class="mr-1"></v-icon>
+                pH Up (5 сек)
+              </v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="quickPump('ph_down')">
+              <v-list-item-title>
+                <v-icon icon="mdi-arrow-down" size="small" class="mr-1"></v-icon>
+                pH Down (5 сек)
+              </v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="quickPump('ec_up')">
+              <v-list-item-title>
+                <v-icon icon="mdi-flash" size="small" class="mr-1"></v-icon>
+                EC Up (5 сек)
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+
+        <!-- Relay Quick Actions -->
+        <v-btn
+          v-if="node.node_type === 'relay'"
+          size="small"
+          color="primary"
+          prepend-icon="mdi-window-open"
+          @click="$emit('command', { command: 'open_all', params: {} })"
+        >
+          Открыть
+        </v-btn>
+
+        <!-- Climate Quick Action -->
+        <v-btn
+          v-if="node.node_type === 'climate'"
+          size="small"
+          color="primary"
+          prepend-icon="mdi-refresh"
+          @click="$emit('command', { command: 'update_sensors', params: {} })"
+        >
+          Обновить
+        </v-btn>
+
+        <!-- Command Dialog (all nodes) -->
+        <CommandDialog :node="node" @command-sent="handleCommand">
+          <template v-slot:activator="{ props: dialogProps }">
+            <v-btn
+              size="small"
+              color="secondary"
+              v-bind="dialogProps"
+              prepend-icon="mdi-send"
+            >
+              Команды
+            </v-btn>
+          </template>
+        </CommandDialog>
+      </template>
+
+      <v-chip v-else size="small" color="error">
+        <v-icon icon="mdi-lan-disconnect" start size="small"></v-icon>
+        Offline
+      </v-chip>
     </v-card-actions>
   </v-card>
 </template>
@@ -114,6 +198,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDistanceToNow } from '@/utils/time'
+import CommandDialog from './CommandDialog.vue'
 
 const props = defineProps({
   node: {
@@ -122,7 +207,18 @@ const props = defineProps({
   },
 })
 
-defineEmits(['command'])
+const emit = defineEmits(['command'])
+
+function quickPump(pump) {
+  emit('command', {
+    command: 'run_pump',
+    params: { pump, duration: 5 },
+  })
+}
+
+function handleCommand({ command, params }) {
+  emit('command', { command, params })
+}
 
 // Node online status
 const isOnline = computed(() => {
@@ -187,6 +283,36 @@ const lastSeenText = computed(() => {
   if (!props.node.last_seen_at) return 'Никогда'
   return formatDistanceToNow(props.node.last_seen_at)
 })
+
+// Memory info
+const metadata = computed(() => props.node.metadata || {})
+
+const hasMemoryInfo = computed(() => {
+  return metadata.value.heap_total || metadata.value.total_heap || metadata.value.heap_used || metadata.value.heap_free
+})
+
+const heapFree = computed(() => metadata.value.heap_free || metadata.value.free_heap || 0)
+const heapTotal = computed(() => {
+  if (metadata.value.heap_total || metadata.value.total_heap) {
+    return metadata.value.heap_total || metadata.value.total_heap
+  }
+  // Оцениваем total по free (предполагаем free ~60%)
+  if (heapFree.value > 0) {
+    return Math.round(heapFree.value / 0.6)
+  }
+  return 320000
+})
+const heapUsed = computed(() => {
+  if (metadata.value.heap_used) return metadata.value.heap_used
+  return heapTotal.value - heapFree.value
+})
+const heapPercent = computed(() => (heapUsed.value / heapTotal.value) * 100)
+
+function getMemoryColor(percent) {
+  if (percent < 50) return 'success'
+  if (percent < 75) return 'warning'
+  return 'error'
+}
 </script>
 
 <style scoped>

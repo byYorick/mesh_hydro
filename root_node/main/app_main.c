@@ -12,6 +12,7 @@
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "nvs_flash.h"
+#include "esp_netif.h"
 
 // Common компоненты
 #include "mesh_manager.h"
@@ -63,6 +64,11 @@ static void root_monitoring_task(void *arg) {
             ESP_LOGI(TAG, "MQTT: %s", mqtt_online ? "ONLINE" : "OFFLINE");
             ESP_LOGI(TAG, "Climate fallback: %s", fallback_active ? "ACTIVE" : "INACTIVE");
             ESP_LOGI(TAG, "========================================");
+            
+            // Отправка discovery сообщения (для регистрации на сервере)
+            if (mqtt_online) {
+                mqtt_client_manager_send_discovery();
+            }
             
             // Предупреждение при низкой памяти
             if (free_heap < 50000) {
@@ -122,14 +128,53 @@ void app_main(void) {
     ESP_LOGI(TAG, "Mesh network started");
     
     // Ожидание подключения к роутеру и получения IP (для MQTT)
-    ESP_LOGI(TAG, "Waiting for IP address...");
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP_LOGI(TAG, "Waiting for IP address from DHCP...");
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_ip_info_t ip_info;
+    
+    // Ждем до 30 секунд получения IP
+    int retry_count = 0;
+    const int max_retries = 60;  // 60 * 500ms = 30 секунд
+    bool ip_obtained = false;
+    
+    while (retry_count < max_retries) {
+        if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+            if (ip_info.ip.addr != 0) {
+                ESP_LOGI(TAG, "✓ IP address obtained: " IPSTR, IP2STR(&ip_info.ip));
+                ESP_LOGI(TAG, "✓ Netmask: " IPSTR, IP2STR(&ip_info.netmask));
+                ESP_LOGI(TAG, "✓ Gateway: " IPSTR, IP2STR(&ip_info.gw));
+                ip_obtained = true;
+                break;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
+        retry_count++;
+        
+        // Логируем прогресс каждые 5 секунд
+        if (retry_count % 10 == 0) {
+            ESP_LOGW(TAG, "Still waiting for IP... (%d/%d)", retry_count, max_retries);
+        }
+    }
+    
+    if (!ip_obtained) {
+        ESP_LOGE(TAG, "❌ CRITICAL: Failed to obtain IP address from DHCP!");
+        ESP_LOGE(TAG, "Possible causes:");
+        ESP_LOGE(TAG, "  1. DHCP server not responding");
+        ESP_LOGE(TAG, "  2. Router blocking this device");
+        ESP_LOGE(TAG, "  3. No available IP addresses in DHCP pool");
+        ESP_LOGE(TAG, "MQTT connection will FAIL without IP address!");
+        ESP_LOGW(TAG, "Continuing startup, but MQTT will not work...");
+    }
     
     // Шаг 5: Инициализация MQTT Client
     ESP_LOGI(TAG, "[Step 5/7] Initializing MQTT Client...");
-    ESP_ERROR_CHECK(mqtt_client_manager_init());
-    ESP_ERROR_CHECK(mqtt_client_manager_start());
-    ESP_LOGI(TAG, "MQTT Client started (connecting to broker...)");
+    if (ip_obtained) {
+        ESP_ERROR_CHECK(mqtt_client_manager_init());
+        ESP_ERROR_CHECK(mqtt_client_manager_start());
+        ESP_LOGI(TAG, "MQTT Client started (connecting to broker...)");
+    } else {
+        ESP_LOGE(TAG, "Skipping MQTT initialization - no IP address!");
+    }
     
     // Шаг 6: Инициализация Data Router
     ESP_LOGI(TAG, "[Step 6/7] Initializing Data Router...");
@@ -148,7 +193,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "========================================");
     
     // Запуск задачи мониторинга
-    xTaskCreate(root_monitoring_task, "root_monitor", 4096, NULL, 5, NULL);
+    // Stack увеличен в 2 раза для безопасности: 4096 → 8192
+    xTaskCreate(root_monitoring_task, "root_monitor", 8192, NULL, 5, NULL);
     
     ESP_LOGI(TAG, "All systems operational. ROOT node ready.");
 }

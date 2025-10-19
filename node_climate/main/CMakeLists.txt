@@ -8,11 +8,10 @@ idf_component_register(
         esp_event
         esp_system
         driver
-        # Common компоненты
         mesh_manager
         mesh_protocol
+        mesh_config
         node_config
-        # NODE Climate компоненты
         climate_controller
         sht3x_driver
         ccs811_driver

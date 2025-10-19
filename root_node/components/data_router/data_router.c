@@ -30,14 +30,33 @@ esp_err_t data_router_init(void) {
 }
 
 void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, size_t len) {
-    ESP_LOGD(TAG, "Mesh data received: %d bytes from "MACSTR, len, MAC2STR(src_addr));
-
-    // Парсинг JSON
-    mesh_message_t msg;
-    if (!mesh_protocol_parse((const char *)data, &msg)) {
-        ESP_LOGE(TAG, "Failed to parse mesh message");
+    ESP_LOGI(TAG, "📥 Mesh data received: %d bytes from "MACSTR, len, MAC2STR(src_addr));
+    
+    // ВАЖНО: Создаём NULL-terminated копию для безопасного парсинга и публикации
+    char *data_copy = malloc(len + 1);
+    if (data_copy == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for data copy");
         return;
     }
+    memcpy(data_copy, data, len);
+    data_copy[len] = '\0';  // ← Добавляем '\0' для strlen()
+    
+    // DEBUG: Показать первые 100 символов JSON
+    char preview[101] = {0};
+    size_t preview_len = (len > 100) ? 100 : len;
+    memcpy(preview, data_copy, preview_len);
+    ESP_LOGI(TAG, "   Data: %s%s", preview, (len > 100) ? "..." : "");
+
+    // Парсинг JSON (используем data_copy с '\0')
+    mesh_message_t msg;
+    if (!mesh_protocol_parse(data_copy, &msg)) {
+        ESP_LOGE(TAG, "❌ Failed to parse mesh message!");
+        ESP_LOGE(TAG, "   Raw data: %s", data_copy);
+        free(data_copy);
+        return;
+    }
+    
+    ESP_LOGI(TAG, "✅ Message parsed: type=%d, node_id=%s", msg.type, msg.node_id);
 
     // Обновление реестра узлов (отметка последнего контакта)
     node_registry_update_last_seen(msg.node_id, src_addr);
@@ -45,14 +64,23 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
     // Маршрутизация в зависимости от типа сообщения
     switch (msg.type) {
         case MESH_MSG_TELEMETRY:
-            ESP_LOGI(TAG, "Telemetry from %s → MQTT", msg.node_id);
+            ESP_LOGI(TAG, "📊 Telemetry from %s → MQTT", msg.node_id);
             
             // Обновление данных в реестре
             node_registry_update_data(msg.node_id, msg.data);
             
-            // Отправка в MQTT
+            // Отправка в MQTT с node_id в топике (для backend!)
             if (mqtt_client_manager_is_connected()) {
-                mqtt_client_manager_publish(MQTT_TOPIC_TELEMETRY, (const char *)data);
+                char topic[64];
+                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_TELEMETRY, msg.node_id);
+                
+                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
+                esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "   ✓ Telemetry published to %s", topic);
+                } else {
+                    ESP_LOGW(TAG, "   ✗ Failed to publish telemetry: %s", esp_err_to_name(err));
+                }
             } else {
                 ESP_LOGW(TAG, "MQTT offline, telemetry dropped");
                 // TODO: буферизация для отправки позже
@@ -60,17 +88,26 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             break;
 
         case MESH_MSG_EVENT:
-            ESP_LOGI(TAG, "Event from %s → MQTT", msg.node_id);
+            ESP_LOGI(TAG, "🔔 Event from %s → MQTT", msg.node_id);
             
             if (mqtt_client_manager_is_connected()) {
-                mqtt_client_manager_publish(MQTT_TOPIC_EVENT, (const char *)data);
+                char topic[64];
+                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_EVENT, msg.node_id);
+                
+                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
+                esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "   ✓ Event published to %s", topic);
+                } else {
+                    ESP_LOGW(TAG, "   ✗ Failed to publish event: %s", esp_err_to_name(err));
+                }
 
                 // Проверка критичности события
                 cJSON *level = cJSON_GetObjectItem(msg.data, "level");
                 if (level && cJSON_IsString(level)) {
                     const char *level_str = level->valuestring;
                     if (strcmp(level_str, "critical") == 0 || strcmp(level_str, "emergency") == 0) {
-                        ESP_LOGW(TAG, "CRITICAL event from %s!", msg.node_id);
+                        ESP_LOGW(TAG, "⚠️ CRITICAL event from %s!", msg.node_id);
                         // TODO: дополнительные действия (SMS, Telegram)
                     }
                 }
@@ -78,12 +115,23 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             break;
 
         case MESH_MSG_HEARTBEAT:
-            ESP_LOGD(TAG, "Heartbeat from %s", msg.node_id);
+            ESP_LOGI(TAG, "💓 Heartbeat from %s → MQTT", msg.node_id);
             
             // Heartbeat обновляет только реестр (уже сделано выше)
-            // Опционально отправлять в MQTT для мониторинга
+            // Отправка в MQTT с node_id в топике (для backend!)
             if (mqtt_client_manager_is_connected()) {
-                mqtt_client_manager_publish(MQTT_TOPIC_HEARTBEAT, (const char *)data);
+                char topic[64];
+                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_HEARTBEAT, msg.node_id);
+                
+                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
+                esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "   ✓ Heartbeat published to %s (len=%d)", topic, len);
+                } else {
+                    ESP_LOGW(TAG, "   ✗ Failed to publish heartbeat: %s", esp_err_to_name(err));
+                }
+            } else {
+                ESP_LOGW(TAG, "   ✗ MQTT offline, heartbeat dropped");
             }
             break;
 
@@ -121,6 +169,7 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
     }
 
     mesh_protocol_free_message(&msg);
+    free(data_copy);
 }
 
 void data_router_handle_mqtt_data(const char *topic, const char *data, int data_len) {

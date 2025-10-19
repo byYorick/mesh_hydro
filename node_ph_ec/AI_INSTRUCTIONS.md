@@ -1,489 +1,845 @@
-# 🤖 AI INSTRUCTIONS - NODE pH/EC
+# 🤖 ПОЛНАЯ ИНСТРУКЦИЯ ДЛЯ ИИ: NODE pH/EC
 
-## 🎯 Назначение узла
-
-**NODE pH/EC (ESP32-S3 #3+)** - КРИТИЧНЫЙ узел с автономной работой
-
-### ⚠️ ЭТО САМЫЙ ВАЖНЫЙ УЗЕЛ СИСТЕМЫ!
-
-### Основные функции:
-- 📊 Измерение pH и EC (I2C датчики Trema)
-- 💧 Управление 5 насосами (pH UP/DOWN, EC A/B/C)
-- 🤖 AI PID контроллер (адаптивный)
-- 📺 OLED дисплей 128x64 (SSD1306) - локальная индикация
-- 🔋 **АВТОНОМНАЯ РАБОТА** при потере связи с ROOT
-- 💾 Локальный ring buffer (1000 записей)
-- 🔴 LED + Buzzer индикация
-- 🔘 Кнопка MODE (переключение режимов)
-
-### 🚨 КРИТИЧНЫЕ ПРАВИЛА:
-
-1. ✅ **ВСЕГДА автономная работа**
-   - Если ROOT offline > 30 сек → автономный режим
-   - PID контроллер НИКОГДА не останавливается
-   - Используй настройки из NVS
-
-2. ✅ **ВСЕГДА сохранение в NVS**
-   - Все настройки (pH target, EC target, PID параметры)
-   - Калибровки датчиков
-   - История насосов (мл за день)
-
-3. ✅ **ВСЕГДА локальный buffer**
-   - Ring buffer 1000 записей
-   - При восстановлении связи → отправка батчами
-
-4. ✅ **ВСЕГДА watchdog**
-   - Сброс каждые 10 сек
-   - Перезагрузка при зависании
-
-5. ❌ **НИКОГДА не блокировать PID**
-   - PID цикл каждые 10 сек
-   - Не ждать ответа от ROOT
-   - Mesh отправка в отдельной задаче
+**⚠️ КРИТИЧНЫЙ УЗЕЛ - Автономное управление pH и EC с PID контроллером**
 
 ---
 
-## 🏗️ Архитектура
+## 🎯 НАЗНАЧЕНИЕ УЗЛА
+
+**NODE pH/EC (ESP32-S3 #3)** - самый важный узел системы, управляет качеством питательного раствора.
+
+### 💧 Ключевые функции:
+
+1. **Мониторинг pH/EC** - каждые 10 секунд чтение I2C датчиков
+2. **PID управление** - автоматическая коррекция через 5 насосов
+3. **Автономная работа** - продолжает работу при потере связи с ROOT
+4. **Emergency protection** - аварийная остановка при критичных значениях
+5. **Локальный буфер** - 1000 записей в ring buffer
+6. **OLED дисплей** - локальная индикация pH, EC, статуса
+7. **Статистика насосов** - мл за час/день/неделю
+
+### ⚠️ КРИТИЧНЫЕ ПРАВИЛА:
+
+1. ✅ **PID РАБОТАЕТ ВСЕГДА** - даже при offline ROOT!
+2. ✅ **АВТОНОМНЫЙ РЕЖИМ** - через 30 сек после потери ROOT
+3. ✅ **SAFETY FIRST** - emergency stop при критичных значениях
+4. ✅ **БУФЕРИЗАЦИЯ** - сохраняй все данные локально
+5. ❌ **НЕ ОСТАНАВЛИВАЙ PID** - насосы должны работать 24/7
+
+---
+
+## 📦 ДАТЧИКИ И ИСПОЛНИТЕЛИ
+
+### Датчики (I2C):
+| Датчик | Адрес | Назначение | Диапазон |
+|--------|-------|------------|----------|
+| **Trema pH** | 0x4D | pH раствора | 0.0-14.0 |
+| **Trema EC** | 0x64 | Электропроводность | 0-5.0 mS/cm |
+| **DS18B20** | 1-Wire | Температура (опц.) | -55...+125°C |
+
+### Насосы (PWM):
+| Насос | GPIO | Назначение | Дозировка |
+|-------|------|------------|-----------|
+| **pH UP** | 4 | Повышение pH (KOH) | 0-100% PWM |
+| **pH DOWN** | 5 | Понижение pH (H3PO4) | 0-100% PWM |
+| **EC A** | 6 | Удобрение A | 0-100% PWM |
+| **EC B** | 7 | Удобрение B | 0-100% PWM |
+| **EC C** | 15 | Микроэлементы | 0-100% PWM |
+
+### Индикация:
+| Компонент | GPIO | Назначение |
+|-----------|------|------------|
+| **OLED SSD1306** | I2C (17,18) | Локальный дисплей |
+| **LED Status** | 21 | Зеленый=OK, Желтый=Degraded, Красный=Emergency |
+| **Buzzer** | 22 | Аварийные сигналы |
+| **Button MODE** | 23 | Смена режимов |
+
+---
+
+## 🔌 РАСПИНОВКА ESP32-S3 #3
+
+| GPIO | Назначение | Примечание |
+|------|------------|------------|
+| **I2C шина (датчики + OLED):** | | |
+| 17 | I2C SCL | Clock (100 kHz) |
+| 18 | I2C SDA | Data |
+| **PWM насосы (перистальтические):** | | |
+| 4 | Pump pH UP | PWM 1000 Hz, max 60 сек |
+| 5 | Pump pH DOWN | PWM 1000 Hz, max 60 сек |
+| 6 | Pump EC A | PWM 1000 Hz, max 60 сек |
+| 7 | Pump EC B | PWM 1000 Hz, max 60 сек |
+| 15 | Pump EC C | PWM 1000 Hz, max 60 сек |
+| **Индикация и управление:** | | |
+| 21 | LED RGB | WS2812 или обычный LED |
+| 22 | Buzzer | 5V активный |
+| 23 | Button MODE | Подтяжка к GND |
+
+---
+
+## 🏗️ АРХИТЕКТУРА ПО КОМПОНЕНТАМ
 
 ```
-NODE pH/EC (ESP32-S3 #3)
+node_ph_ec/
+├── components/
+│   ├── ph_sensor/           # Драйвер Trema pH (I2C 0x4D)
+│   ├── ec_sensor/           # Драйвер Trema EC (I2C 0x64)
+│   ├── temp_sensor/         # DS18B20 (1-Wire)
+│   ├── pump_controller/     # Управление 5 насосами (PWM + safety)
+│   ├── adaptive_pid/        # AI PID контроллер (адаптивные Kp, Ki, Kd)
+│   ├── ph_ec_manager/       # Главный менеджер (координация всех компонентов)
+│   ├── connection_monitor/  # Мониторинг связи с ROOT
+│   ├── local_storage/       # Ring buffer 1000 записей
+│   ├── oled_display/        # SSD1306 128x64 (локальная индикация)
+│   ├── buzzer_led/          # Аварийные сигналы
+│   └── node_controller/     # Главная логика и режимы
 │
-├── Sensor Manager
-│   ├── pH sensor (I2C 0x0A) - Trema
-│   ├── EC sensor (I2C 0x08) - Trema
-│   ├── Калибровка из NVS
-│   └── Retry логика (3 попытки)
+├── main/
+│   └── app_main.c           # Точка входа + mesh callback
 │
-├── Pump Manager
-│   ├── 5 насосов (GPIO 1-5)
-│   ├── Safety: max time, cooldown
-│   ├── Статистика (мл за день/неделю)
-│   └── Emergency stop
-│
-├── Adaptive PID (AI)
-│   ├── pH UP/DOWN контроллеры
-│   ├── EC A/B/C контроллеры
-│   ├── Адаптация параметров
-│   └── Anti-windup
-│
-├── OLED Display (SSD1306)
-│   ├── pH: 6.5  EC: 1.8
-│   ├── ● ONLINE / ⚡ AUTONOMOUS
-│   ├── Насосы (мл за час)
-│   └── Статус/алерты
-│
-├── Connection Monitor
-│   ├── Проверка связи с ROOT
-│   ├── Переключение режимов:
-│   │   - ONLINE (норма)
-│   │   - DEGRADED (нестабильно)
-│   │   - AUTONOMOUS (автономия)
-│   │   - EMERGENCY (авария)
-│   └── Логика переходов
-│
-├── Local Storage
-│   ├── Ring buffer (1000 записей)
-│   ├── Timestamp каждой записи
-│   └── Синхронизация с ROOT
-│
-└── Buzzer + LED + Button
-    ├── LED: зеленый/желтый/красный
-    ├── Buzzer: сигналы при авариях
-    └── Кнопка MODE: смена режимов
+└── AI_INSTRUCTIONS.md       # ← ЭТА ИНСТРУКЦИЯ
 ```
 
 ---
 
-## 📦 Компоненты
+## 📨 ТИПЫ СООБЩЕНИЙ
 
-### Обязательные (common):
-- `mesh_manager` - Mesh NODE режим
-- `mesh_protocol` - JSON протокол
-- `node_config` - NVS конфигурация
-- `sensor_base` - Retry, validation
-- `actuator_base` - Safety checks
+### 1. 📤 TELEMETRY (каждые 10 сек)
 
-### Из hydro1.0 (портировать):
-- `sensor_manager` - pH/EC датчики
-- `pump_manager` - 5 насосов
-- `adaptive_pid` - AI PID контроллер
+**NODE → ROOT → MQTT → Server**
 
-### Новые (реализовать):
-- `oled_display` - SSD1306 128x64
-- `connection_monitor` - Мониторинг связи
-- `local_storage` - Ring buffer
-- `buzzer_led` - Индикация
-- `node_controller` - Главная логика
+```json
+{
+  "type": "telemetry",
+  "node_id": "ph_ec_001",
+  "timestamp": 1729346400,
+  "data": {
+    "ph": 6.5,
+    "ec": 1.8,
+    "temperature": 22.5,
+    "rssi_to_parent": -45,
+    "pump_stats": {
+      "ph_up_ml_today": 120,
+      "ph_down_ml_today": 85,
+      "ec_a_ml_today": 250,
+      "ec_b_ml_today": 250,
+      "ec_c_ml_today": 50
+    },
+    "mode": "online"  // online/degraded/autonomous/emergency
+  }
+}
+```
 
----
-
-## 🔌 Распиновка
-
-| GPIO | Назначение | Компонент |
-|------|------------|-----------|
-| **I2C шина:** | | |
-| 17 | I2C SCL | pH, EC, OLED |
-| 18 | I2C SDA | pH, EC, OLED |
-| - | OLED 0x3C | SSD1306 128x64 |
-| - | pH 0x0A | Trema pH |
-| - | EC 0x08 | Trema EC |
-| **Насосы (5 штук):** | | |
-| 1 | Насос pH UP | GPIO HIGH = вкл |
-| 2 | Насос pH DOWN | GPIO HIGH = вкл |
-| 3 | Насос EC A | GPIO HIGH = вкл |
-| 4 | Насос EC B | GPIO HIGH = вкл |
-| 5 | Насос EC C | GPIO HIGH = вкл |
-| **Индикация:** | | |
-| 15 | LED статус | RGB или 3×LED (R/G/Y) |
-| 16 | Buzzer | Пищалка 3.3V |
-| 19 | Кнопка MODE | Переключение режимов |
-
----
-
-## 💻 Примеры кода
-
-### Главный цикл
-
+**Код:**
 ```c
-void node_ph_ec_main_task(void *arg) {
-    ph_ec_node_config_t config;
-    float ph, ec;
+static void send_telemetry(float ph, float ec, float temp) {
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddNumberToObject(data, "ph", ph);
+    cJSON_AddNumberToObject(data, "ec", ec);
+    cJSON_AddNumberToObject(data, "temperature", temp);
+    cJSON_AddNumberToObject(data, "rssi_to_parent", mesh_manager_get_parent_rssi());
     
-    // Загрузка конфигурации из NVS
-    node_config_load(&config, sizeof(config), "ph_ec_ns");
+    // Статистика насосов
+    cJSON *pump_stats = cJSON_CreateObject();
+    cJSON_AddNumberToObject(pump_stats, "ph_up_ml_today", pump_controller_get_daily_ml(PUMP_PH_UP));
+    cJSON_AddNumberToObject(pump_stats, "ph_down_ml_today", pump_controller_get_daily_ml(PUMP_PH_DOWN));
+    // ...
+    cJSON_AddItemToObject(data, "pump_stats", pump_stats);
     
-    while (1) {
-        // 1. Чтение датчиков
-        if (sensor_manager_read_ph(&ph) == ESP_OK &&
-            sensor_manager_read_ec(&ec) == ESP_OK) {
-            
-            sensor_cache_value("ph", ph);
-            sensor_cache_value("ec", ec);
-            
-            // 2. OLED обновление
-            oled_display_update(ph, ec, get_connection_state());
-            
-            // 3. PID контроль (ВСЕГДА работает!)
-            if (config.base.auto_mode || is_autonomous()) {
-                adaptive_pid_update(ph, ec, &config);
-            }
-            
-            // 4. Отправка телеметрии (если online)
-            if (is_online()) {
-                send_telemetry(ph, ec);
-            } else {
-                // Автономный режим - буферизация
-                local_storage_add(ph, ec);
-            }
-            
-            // 5. Проверка аварийных ситуаций
-            if (ph < config.ph_emergency_low) {
-                handle_emergency_ph_low(ph, &config);
-            }
+    cJSON_AddStringToObject(data, "mode", connection_monitor_get_state_str());
+    
+    char json_buf[1024];
+    mesh_protocol_create_telemetry(s_config->base.node_id, data, json_buf, sizeof(json_buf));
+    mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
+    
+    cJSON_Delete(data);
+}
+```
+
+---
+
+### 2. 📥 COMMAND (Server → MQTT → ROOT → NODE)
+
+**Топик:** `hydro/command/ph_ec_001`
+
+**Примеры команд:**
+
+#### a) Изменение target значений:
+```json
+{
+  "type": "command",
+  "node_id": "ph_ec_001",
+  "command": "set_targets",
+  "params": {
+    "ph_target": 6.5,
+    "ec_target": 1.8
+  }
+}
+```
+
+#### b) Ручное управление насосом (emergency):
+```json
+{
+  "type": "command",
+  "node_id": "ph_ec_001",
+  "command": "manual_pump",
+  "params": {
+    "pump": "ph_up",
+    "duration_sec": 5,
+    "power_percent": 100
+  }
+}
+```
+
+#### c) Калибровка датчиков:
+```json
+{
+  "type": "command",
+  "node_id": "ph_ec_001",
+  "command": "calibrate_ph",
+  "params": {
+    "ph_value": 7.0
+  }
+}
+```
+
+#### d) Переключение режима:
+```json
+{
+  "type": "command",
+  "node_id": "ph_ec_001",
+  "command": "set_mode",
+  "params": {
+    "mode": "autonomous"  // online/autonomous/manual
+  }
+}
+```
+
+**Обработка:**
+```c
+void node_controller_handle_command(const char *command, cJSON *params) {
+    ESP_LOGI(TAG, "Command received: %s", command);
+    
+    if (strcmp(command, "set_targets") == 0) {
+        cJSON *ph = cJSON_GetObjectItem(params, "ph_target");
+        cJSON *ec = cJSON_GetObjectItem(params, "ec_target");
+        
+        if (ph && cJSON_IsNumber(ph)) {
+            s_config->ph_target = (float)ph->valuedouble;
+        }
+        if (ec && cJSON_IsNumber(ec)) {
+            s_config->ec_target = (float)ec->valuedouble;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(10000));  // Каждые 10 сек
+        // Сохранение в NVS
+        node_config_save(s_config, sizeof(ph_ec_node_config_t), "ph_ec_ns");
+        ESP_LOGI(TAG, "Targets updated: pH=%.2f, EC=%.2f", s_config->ph_target, s_config->ec_target);
     }
-}
-```
-
-### Автономная работа
-
-```c
-void connection_monitor_task(void *arg) {
-    uint64_t last_root_msg = 0;
-    connection_state_t state = STATE_ONLINE;
-    
-    while (1) {
-        uint64_t now = esp_timer_get_time() / 1000;
-        uint64_t elapsed = now - last_root_msg;
-        
-        switch (state) {
-            case STATE_ONLINE:
-                if (elapsed > 10000) {  // 10 сек без сообщений
-                    state = STATE_DEGRADED;
-                    oled_display_set_status("DEGRADED");
-                    set_led_yellow();
-                }
-                break;
-                
-            case STATE_DEGRADED:
-                if (elapsed > 30000) {  // 30 сек без сообщений
-                    state = STATE_AUTONOMOUS;
-                    oled_display_set_status("AUTONOMOUS");
-                    set_led_yellow_blink();
-                    
-                    // Загрузить последнюю конфигурацию из NVS
-                    load_config_from_nvs();
-                    
-                    ESP_LOGW(TAG, "Entering AUTONOMOUS mode");
-                }
-                break;
-                
-            case STATE_AUTONOMOUS:
-                if (elapsed < 10000) {  // Связь восстановлена
-                    state = STATE_ONLINE;
-                    oled_display_set_status("ONLINE");
-                    set_led_green();
-                    
-                    // Синхронизация буфера
-                    sync_local_buffer_to_root();
-                    
-                    ESP_LOGI(TAG, "Back to ONLINE mode");
-                }
-                break;
+    else if (strcmp(command, "manual_pump") == 0) {
+        // Ручное управление насосом (только в manual режиме!)
+        if (s_autonomous_mode) {
+            ESP_LOGW(TAG, "Manual pump rejected - in autonomous mode");
+            return;
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        // ...
+    }
+    else if (strcmp(command, "calibrate_ph") == 0) {
+        // Калибровка pH датчика
+        // ...
     }
 }
 ```
 
-### Аварийная ситуация
+---
+
+### 3. 🔔 EVENT (критичные события)
+
+**NODE → ROOT → MQTT → Server**
+
+```json
+{
+  "type": "event",
+  "node_id": "ph_ec_001",
+  "timestamp": 1729346400,
+  "level": "critical",  // info/warning/critical/emergency
+  "message": "pH out of safe range",
+  "data": {
+    "current_ph": 5.2,
+    "target_ph": 6.5,
+    "action": "pump_ph_up_activated"
+  }
+}
+```
+
+**Когда отправлять:**
+- pH/EC вне безопасного диапазона
+- Датчик не отвечает
+- Насос работает слишком долго
+- Emergency stop активирован
+- Переход в autonomous режим
+
+---
+
+### 4. 💓 HEARTBEAT (каждые 10 сек)
+
+```json
+{
+  "type": "heartbeat",
+  "node_id": "ph_ec_001",
+  "uptime": 3600,
+  "heap_free": 180000,
+  "rssi_to_parent": -45
+}
+```
+
+---
+
+## 🧠 PID КОНТРОЛЛЕР (АДАПТИВНЫЙ)
+
+### Логика работы:
 
 ```c
-void handle_emergency_ph_low(float ph, ph_ec_node_config_t *config) {
-    ESP_LOGE(TAG, "EMERGENCY: pH critically low: %.2f", ph);
+static void run_pid_control(float ph, float ec) {
+    // 1. pH контроль
+    float ph_error = s_config->ph_target - ph;
     
-    // 1. Визуальная индикация
-    set_led_red_fast_blink();
-    buzzer_alarm(3);  // 3 сигнала
-    oled_display_show_emergency("pH TOO LOW!", ph);
-    
-    // 2. Агрессивная коррекция
-    float correction_ml = calculate_emergency_correction(ph, config->ph_target);
-    pump_manager_run("ph_up", correction_ml * 1000, true);  // true = emergency
-    
-    // 3. Попытка отправить SOS
-    if (is_online()) {
-        send_emergency_event("pH critically low", ph);
-    } else {
-        // Сохранить в buffer с высоким приоритетом
-        local_storage_add_priority(ph, EC_EMERGENCY_TAG);
+    if (fabs(ph_error) > PH_DEADBAND) {  // Deadband = 0.05
+        if (ph_error > 0) {
+            // pH слишком низкий → нужен pH UP
+            float duty_cycle = adaptive_pid_calculate(&pid_ph_up, ph_error);
+            uint32_t duration_ms = (uint32_t)(duty_cycle * 1000.0f);
+            pump_controller_run(PUMP_PH_UP, duration_ms, 100);
+        } else {
+            // pH слишком высокий → нужен pH DOWN
+            float duty_cycle = adaptive_pid_calculate(&pid_ph_down, -ph_error);
+            uint32_t duration_ms = (uint32_t)(duty_cycle * 1000.0f);
+            pump_controller_run(PUMP_PH_DOWN, duration_ms, 100);
+        }
     }
     
-    // 4. Логирование
-    log_emergency_action("ph_low", ph, correction_ml);
+    // 2. EC контроль (аналогично)
+    float ec_error = s_config->ec_target - ec;
+    
+    if (fabs(ec_error) > EC_DEADBAND) {  // Deadband = 0.05
+        if (ec_error > 0) {
+            // EC слишком низкая → добавить удобрения
+            float duty_cycle = adaptive_pid_calculate(&pid_ec, ec_error);
+            uint32_t duration_ms = (uint32_t)(duty_cycle * 1000.0f);
+            
+            // Пропорциональное распределение A:B:C = 10:10:1
+            pump_controller_run(PUMP_EC_A, duration_ms, 100);
+            pump_controller_run(PUMP_EC_B, duration_ms, 100);
+            pump_controller_run(PUMP_EC_C, duration_ms / 10, 100);
+        }
+    }
 }
 ```
 
-### OLED дисплей
+### PID параметры (начальные):
 
 ```c
-void oled_display_update(float ph, float ec, connection_state_t state) {
-    char line1[32], line2[32], line3[32], line4[32];
-    
-    // Строка 1: Заголовок
-    snprintf(line1, sizeof(line1), "pH/EC Zone 1");
-    
-    // Строка 2: Показания
-    snprintf(line2, sizeof(line2), "pH:%.1f  EC:%.1f", ph, ec);
-    
-    // Строка 3: Статус
-    const char *status_str = get_status_string(state);
-    const char *mode_str = config.auto_mode ? "AUTO" : "MANUAL";
-    snprintf(line3, sizeof(line3), "%s  %s", status_str, mode_str);
-    
-    // Строка 4: Насосы (за последний час)
-    pump_stats_t stats = pump_manager_get_stats();
-    snprintf(line4, sizeof(line4), "↑%dml ↓%dml →%dml", 
-             stats.ph_up_ml_hour, 
-             stats.ph_down_ml_hour, 
-             stats.ec_ml_hour);
-    
-    // Отправка на дисплей
-    ssd1306_clear_screen();
-    ssd1306_draw_string(0, 0, line1, 1);
-    ssd1306_draw_string(0, 16, line2, 1);
-    ssd1306_draw_string(0, 32, line3, 1);
-    ssd1306_draw_string(0, 48, line4, 1);
-    ssd1306_refresh_gram();
-}
+typedef struct {
+    float kp;           // Пропорциональный коэффициент
+    float ki;           // Интегральный
+    float kd;           // Дифференциальный
+    float integral;     // Накопленная ошибка
+    float prev_error;   // Предыдущая ошибка
+    float output_min;   // Минимальный выход (0.0)
+    float output_max;   // Максимальный выход (1.0)
+} adaptive_pid_t;
+
+// Начальные значения (адаптируются автоматически):
+adaptive_pid_t pid_ph_up = {
+    .kp = 0.5,
+    .ki = 0.05,
+    .kd = 0.1,
+    .output_min = 0.0,
+    .output_max = 1.0
+};
 ```
 
-### Кнопка MODE
+---
+
+## 🔄 РЕЖИМЫ РАБОТЫ
+
+### 1. 🟢 ONLINE (норма)
+- ROOT доступен
+- Отправка телеметрии каждые 10 сек
+- PID работает
+- Heartbeat каждые 10 сек
+- Команды от сервера обрабатываются
+
+### 2. 🟡 DEGRADED (нестабильная связь)
+- ROOT пропадает периодически
+- Буферизация данных в ring buffer
+- PID работает
+- Попытки переотправки буфера
+
+### 3. 🟠 AUTONOMOUS (автономия)
+- ROOT offline > 30 сек
+- **PID работает с настройками из NVS**
+- Все данные в ring buffer
+- OLED показывает "⚡ AUTONOMOUS"
+- Buzzer 1 короткий сигнал при переходе
+
+### 4. 🔴 EMERGENCY (авария)
+- pH/EC вне критичных пределов
+- **ВСЕ НАСОСЫ ОСТАНАВЛИВАЮТСЯ**
+- Buzzer непрерывный сигнал
+- LED красный мигает
+- OLED показывает "🔴 EMERGENCY"
+- Отправка event (если ROOT доступен)
+
+---
+
+## 📨 ОБРАБОТКА КОМАНД
+
+### Callback в app_main.c:
 
 ```c
-void button_task(void *arg) {
-    uint32_t press_start = 0;
-    bool pressed = false;
+static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_t len) {
+    // Создаём NULL-terminated копию
+    char *data_copy = malloc(len + 1);
+    if (!data_copy) return;
+    memcpy(data_copy, data, len);
+    data_copy[len] = '\0';
     
-    while (1) {
-        bool current = gpio_get_level(GPIO_BUTTON_MODE) == 0;
-        
-        if (current && !pressed) {
-            // Нажатие
-            press_start = xTaskGetTickCount();
-            pressed = true;
-            
-        } else if (!current && pressed) {
-            // Отпускание
-            uint32_t duration = xTaskGetTickCount() - press_start;
-            pressed = false;
-            
-            if (duration < 1000) {
-                // Короткое нажатие - переключить AUTO/MANUAL
-                config.auto_mode = !config.auto_mode;
-                oled_show_mode(config.auto_mode ? "AUTO" : "MANUAL");
-                
-            } else if (duration < 3000) {
-                // 2 нажатия - сброс Buzzer
-                buzzer_stop();
-                
-            } else if (duration < 10000) {
-                // Долгое - сброс Emergency
-                reset_emergency_state();
-                oled_show_message("Emergency Reset");
-                
-            } else {
-                // Очень долгое - Factory Reset
-                oled_show_message("Factory Reset...");
-                node_config_erase_all();
-                esp_restart();
+    mesh_message_t msg;
+    if (!mesh_protocol_parse(data_copy, &msg)) {
+        free(data_copy);
+        return;
+    }
+    
+    // Проверка что для нас
+    if (strcmp(msg.node_id, g_config.base.node_id) != 0) {
+        free(data_copy);
+        mesh_protocol_free_message(&msg);
+        return;
+    }
+
+    switch (msg.type) {
+        case MESH_MSG_COMMAND: {
+            cJSON *cmd = cJSON_GetObjectItem(msg.data, "command");
+            if (cmd && cJSON_IsString(cmd)) {
+                node_controller_handle_command(cmd->valuestring, msg.data);
             }
+            break;
+        }
+
+        case MESH_MSG_CONFIG:
+            node_controller_handle_config_update(msg.data);
+            break;
+
+        default:
+            ESP_LOGW(TAG, "Unknown message type: %d", msg.type);
+            break;
+    }
+
+    free(data_copy);
+    mesh_protocol_free_message(&msg);
+}
+```
+
+---
+
+## 🔐 SAFETY CHECKS
+
+### Проверки ПЕРЕД включением насоса:
+
+```c
+esp_err_t pump_controller_run(pump_type_t pump, uint32_t duration_ms, uint8_t power_percent) {
+    // 1. Проверка таймаута с последнего запуска
+    if (time_since_last_run < PUMP_COOLDOWN_MS) {
+        ESP_LOGW(TAG, "Pump cooldown active");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // 2. Проверка максимальной длительности
+    if (duration_ms > PUMP_MAX_DURATION_MS) {
+        ESP_LOGW(TAG, "Duration too long: %d ms (max %d)", duration_ms, PUMP_MAX_DURATION_MS);
+        duration_ms = PUMP_MAX_DURATION_MS;
+    }
+    
+    // 3. Проверка лимита в сутки
+    float ml_today = get_pump_ml_today(pump);
+    if (ml_today > PUMP_MAX_ML_PER_DAY) {
+        ESP_LOGE(TAG, "Daily limit reached: %.1f ml", ml_today);
+        node_controller_send_event(MESH_EVENT_CRITICAL, "Pump daily limit reached");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // 4. Запуск насоса
+    return pump_start_pwm(pump, duration_ms, power_percent);
+}
+```
+
+---
+
+## 🌐 MESH INTEGRATION
+
+### Инициализация (NODE режим):
+
+```c
+void app_main(void) {
+    // ...
+    
+    mesh_manager_config_t mesh_config = {
+        .mode = MESH_MODE_NODE,  // ← ВСЕГДА NODE!
+        .mesh_id = MESH_NETWORK_ID,
+        .mesh_password = MESH_NETWORK_PASSWORD,
+        .channel = MESH_NETWORK_CHANNEL,
+        .max_connection = 6,
+        .router_ssid = MESH_ROUTER_SSID,
+        .router_password = MESH_ROUTER_PASSWORD,
+        .router_bssid = NULL
+    };
+    
+    ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
+    mesh_manager_register_recv_cb(on_mesh_data_received);  // ← Callback для команд!
+    ESP_ERROR_CHECK(mesh_manager_start());
+    
+    // ...
+}
+```
+
+### Проверка статуса mesh:
+
+```c
+// В главной задаче (каждые 10 сек):
+bool mesh_connected = mesh_manager_is_connected();
+int8_t rssi = mesh_manager_get_parent_rssi();
+int layer = mesh_manager_get_layer();
+
+ESP_LOGI(TAG, "Mesh: %s, Layer: %d, RSSI: %d dBm",
+         mesh_connected ? "CONNECTED" : "OFFLINE", layer, rssi);
+```
+
+---
+
+## 🔄 АВТОНОМНЫЙ РЕЖИМ (КЛЮЧЕВАЯ ФИШКА!)
+
+### Переход в автономию:
+
+```c
+static void on_connection_state_changed(connection_state_t new_state, connection_state_t old_state) {
+    if (new_state == CONN_STATE_AUTONOMOUS && old_state != CONN_STATE_AUTONOMOUS) {
+        ESP_LOGW(TAG, "⚡ Entering AUTONOMOUS mode (ROOT offline > 30s)");
+        
+        // 1. Звуковой сигнал
+        buzzer_beep(1, 200);
+        
+        // 2. Загрузка настроек из NVS (на случай изменений)
+        node_config_load(s_config, sizeof(ph_ec_node_config_t), "ph_ec_ns");
+        
+        // 3. Переход в автономный режим
+        s_autonomous_mode = true;
+        
+        // 4. Обновление OLED
+        oled_display_show_autonomous();
+    }
+    
+    if (new_state == CONN_STATE_ONLINE && old_state == CONN_STATE_AUTONOMOUS) {
+        ESP_LOGI(TAG, "✅ Returning to ONLINE mode (ROOT reconnected)");
+        
+        s_autonomous_mode = false;
+        
+        // Отправка накопленного буфера
+        local_storage_sync_to_root();
+        
+        // 2 коротких сигнала
+        buzzer_beep(2, 100);
+    }
+}
+```
+
+### ⚠️ ВАЖНО: PID работает В ОБОИХ РЕЖИМАХ!
+
+```c
+// ГЛАВНАЯ ЗАДАЧА (каждые 10 сек):
+static void node_controller_main_task(void *arg) {
+    while (1) {
+        float ph = read_ph_sensor();
+        float ec = read_ec_sensor();
+        float temp = read_temp_sensor();
+        
+        // PID управление ВСЕГДА активно!
+        run_pid_control(ph, ec);  // ← Работает и в ONLINE, и в AUTONOMOUS!
+        
+        // Отправка данных зависит от режима
+        if (connection_monitor_get_state() == CONN_STATE_ONLINE) {
+            send_telemetry(ph, ec, temp);
+        } else {
+            local_storage_add(ph, ec, temp);  // ← Буферизация
         }
         
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
 ```
 
 ---
 
-## 🚫 Что НЕЛЬЗЯ делать
+## 🚨 EMERGENCY PROTECTION
 
-1. ❌ **НЕ ОСТАНАВЛИВАЙ PID при потере связи**
-   ```c
-   // ПЛОХО:
-   if (!is_online()) {
-       return;  // ❌ PID остановлен!
-   }
-   pid_update();
-   
-   // ХОРОШО:
-   pid_update();  // ✅ Работает всегда
-   if (is_online()) {
-       send_data();
-   }
-   ```
+### Критичные пределы:
 
-2. ❌ **НЕ ЖДАТЬ ответа от ROOT**
-   ```c
-   // ПЛОХО:
-   send_command_and_wait();  // ❌ Блокировка!
-   
-   // ХОРОШО:
-   send_command_async();  // ✅ Неблокирующая отправка
-   ```
+```c
+#define PH_EMERGENCY_LOW      4.0   // pH < 4.0 = авария!
+#define PH_EMERGENCY_HIGH     9.0   // pH > 9.0 = авария!
+#define EC_EMERGENCY_HIGH     5.0   // EC > 5.0 = авария!
+#define PUMP_MAX_DURATION_SEC 60    // Макс время работы насоса
+#define PUMP_MAX_ML_PER_DAY   5000  // Макс мл за сутки
+```
 
-3. ❌ **НЕ ИГНОРИРУЙ аварии**
-   - pH < 5.0 или > 8.0 → EMERGENCY
-   - EC > 3.0 → EMERGENCY
-   - Всегда логируй и сигнализируй
+### Emergency обработчик:
 
-4. ❌ **НЕ ПЕРЕПОЛНЯЙ buffer**
-   - Ring buffer 1000 записей
-   - Старые вытесняются новыми
-
----
-
-## ✅ Что НУЖНО делать
-
-1. ✅ **Сохраняй ВСЁ в NVS**
-   ```c
-   // При изменении конфигурации
-   node_config_save(&config, sizeof(config), "ph_ec_ns");
-   ```
-
-2. ✅ **Буферизуй при offline**
-   ```c
-   if (!is_online()) {
-       local_storage_add(ph, ec);
-   }
-   ```
-
-3. ✅ **Обновляй OLED постоянно**
-   - Каждые 10 сек
-   - Даже в автономном режиме
-
-4. ✅ **Мониторь насосы**
-   - Статистика мл/день
-   - Проверка max_daily_volume
-   - Cooldown между включениями
+```c
+void node_controller_handle_emergency(const char *reason, float value) {
+    ESP_LOGE(TAG, "🚨 EMERGENCY: %s (value=%.2f)", reason, value);
+    
+    // 1. ОСТАНОВКА ВСЕХ НАСОСОВ!
+    pump_controller_emergency_stop();
+    
+    // 2. Buzzer сигнал (непрерывный)
+    buzzer_continuous(true);
+    
+    // 3. LED красный мигающий
+    led_set_mode(LED_MODE_EMERGENCY);
+    
+    // 4. OLED большими буквами
+    oled_display_show_emergency(reason);
+    
+    // 5. Отправка event на сервер (если ROOT доступен)
+    if (mesh_manager_is_connected()) {
+        cJSON *event_data = cJSON_CreateObject();
+        cJSON_AddStringToObject(event_data, "reason", reason);
+        cJSON_AddNumberToObject(event_data, "value", value);
+        
+        char event_buf[512];
+        mesh_protocol_create_event(s_config->base.node_id, MESH_EVENT_EMERGENCY,
+                                   reason, event_data, event_buf, sizeof(event_buf));
+        mesh_manager_send_to_root((uint8_t *)event_buf, strlen(event_buf));
+        
+        cJSON_Delete(event_data);
+    }
+    
+    // 6. Переход в EMERGENCY режим (требует ручного сброса!)
+    s_emergency_mode = true;
+}
+```
 
 ---
 
-## 🧪 Тестирование
+## 💾 ЛОКАЛЬНОЕ ХРАНИЛИЩЕ
 
-### Тест 1: Нормальная работа
+### Ring Buffer (1000 записей):
+
+```c
+typedef struct {
+    uint64_t timestamp;
+    float ph;
+    float ec;
+    float temperature;
+    bool synced;  // Отправлено на ROOT?
+} ph_ec_record_t;
+
+// API:
+void local_storage_add(float ph, float ec, float temp);
+int local_storage_get_unsynced_count(void);
+bool local_storage_get_next_unsynced(ph_ec_record_t *record);
+void local_storage_mark_synced(uint64_t timestamp);
+void local_storage_sync_to_root(void);  // Отправка всех несинхронизированных
+```
+
+### Синхронизация при восстановлении связи:
+
+```c
+void local_storage_sync_to_root(void) {
+    int unsynced = local_storage_get_unsynced_count();
+    
+    if (unsynced == 0) return;
+    
+    ESP_LOGI(TAG, "Syncing %d records to ROOT...", unsynced);
+    
+    // Отправка батчами по 10 записей
+    for (int i = 0; i < unsynced && i < 100; i++) {  // Макс 100 за раз
+        ph_ec_record_t record;
+        if (local_storage_get_next_unsynced(&record)) {
+            send_buffered_telemetry(&record);
+            local_storage_mark_synced(record.timestamp);
+            
+            vTaskDelay(pdMS_TO_TICKS(100));  // 100ms между отправками
+        }
+    }
+    
+    ESP_LOGI(TAG, "Sync complete");
+}
+```
+
+---
+
+## 📺 OLED ДИСПЛЕЙ (SSD1306 128x64)
+
+### Главный экран:
+
+```
+┌──────────────────────┐
+│  pH: 6.5  EC: 1.8    │  ← Текущие значения
+│  T: 22.5°C           │
+│                      │
+│  ● ONLINE            │  ← Статус: ●=online, ⚡=autonomous, 🔴=emergency
+│  RSSI: -45 dBm       │
+│                      │
+│  Pumps (ml/h):       │
+│  ↑120 ↓85  A250 B250 │  ← Статистика насосов за час
+└──────────────────────┘
+```
+
+### Экран аварии:
+
+```
+┌──────────────────────┐
+│    🔴 EMERGENCY!     │
+│                      │
+│  pH TOO LOW: 4.2     │
+│  Target: 6.5         │
+│                      │
+│  ALL PUMPS STOPPED   │
+│  MANUAL RESET REQ!   │
+└──────────────────────┘
+```
+
+---
+
+## ❌ ЧТО НЕ ДЕЛАТЬ
+
+### 1. ❌ НЕ останавливай PID при offline ROOT
+
+```c
+// ПЛОХО ❌
+if (!mesh_manager_is_connected()) {
+    return;  // ❌ PID остановлен!
+}
+run_pid_control(ph, ec);
+
+// ХОРОШО ✅
+run_pid_control(ph, ec);  // ✅ Работает всегда!
+
+if (mesh_manager_is_connected()) {
+    send_telemetry(...);
+} else {
+    local_storage_add(...);  // Буферизация
+}
+```
+
+### 2. ❌ НЕ блокируй главный цикл ожиданием mesh
+
+```c
+// ПЛОХО ❌
+esp_err_t err = mesh_manager_send_to_root(...);
+while (err != ESP_OK) {  // ❌ Зависание!
+    vTaskDelay(1000);
+    err = mesh_manager_send_to_root(...);
+}
+
+// ХОРОШО ✅
+esp_err_t err = mesh_manager_send_to_root(...);
+if (err != ESP_OK) {
+    local_storage_add(...);  // ✅ Буферизация
+}
+```
+
+### 3. ❌ НЕ запускай насос без safety checks
+
+```c
+// ПЛОХО ❌
+gpio_set_level(PUMP_PH_UP_GPIO, 1);
+vTaskDelay(pdMS_TO_TICKS(5000));
+gpio_set_level(PUMP_PH_UP_GPIO, 0);  // ❌ Нет контроля!
+
+// ХОРОШО ✅
+esp_err_t err = pump_controller_run(PUMP_PH_UP, 5000, 100);
+if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Pump safety check failed: %s", esp_err_to_name(err));
+}
+```
+
+---
+
+## 🧪 ТЕСТИРОВАНИЕ
+
+### Тест автономии (симуляция потери ROOT):
+
+1. Запусти NODE pH/EC
+2. Выключи ROOT
+3. **Проверь через 30 сек:**
+   - ✅ OLED показывает "⚡ AUTONOMOUS"
+   - ✅ PID продолжает работать
+   - ✅ Buzzer 1 короткий сигнал
+   - ✅ Данные сохраняются в buffer
+4. Включи ROOT обратно
+5. **Проверь:**
+   - ✅ OLED "● ONLINE"
+   - ✅ Buffer синхронизируется
+   - ✅ Buzzer 2 коротких сигнала
+
+### Тест команды от сервера:
 
 ```bash
-cd node_ph_ec
-idf.py set-target esp32s3
-idf.py build
-idf.py -p COM5 flash monitor
+mosquitto_pub -h 192.168.1.100 -t hydro/command/ph_ec_001 -m '{
+  "type": "command",
+  "node_id": "ph_ec_001",
+  "command": "set_targets",
+  "params": {"ph_target": 6.2, "ec_target": 2.0}
+}'
 ```
 
-**Ожидается:**
-- ✅ Чтение pH и EC
-- ✅ OLED показывает данные
-- ✅ PID корректирует значения
-- ✅ Отправка в mesh (если ROOT online)
-
-### Тест 2: Автономный режим
-
-1. Прошей узел
-2. Выключи ROOT
-3. Подожди 30 сек
-
-**Ожидается:**
-- ⚡ OLED: "AUTONOMOUS"
-- ⚡ LED желтый мигает
-- ✅ PID продолжает работу
-- ✅ Данные буферизуются локально
-
-4. Включи ROOT обратно
-
-**Ожидается:**
-- ● OLED: "ONLINE"
-- ● LED зеленый
-- ✅ Синхронизация буфера
-
-### Тест 3: Аварийная ситуация
-
-Симулируй pH 4.5 (замени данные в коде временно):
-
-**Ожидается:**
-- 🔴 LED красный быстро мигает
-- 🔊 Buzzer: 3 сигнала каждые 10 сек
-- 🚨 OLED: "EMERGENCY pH 4.5!"
-- 💧 Агрессивная коррекция pH UP
-- 📡 SOS на ROOT (если online)
-
-### Тест 4: Кнопка MODE
-
-1. Короткое нажатие → переключение AUTO/MANUAL
-2. Долгое (3 сек) → сброс Emergency
-3. Очень долгое (10 сек) → Factory Reset
+**Ожидаемый лог:**
+```
+I (12000) ph_ec: Message from ROOT: type=1
+I (12000) node_controller: Command received: set_targets
+I (12000) node_controller: Targets updated: pH=6.20, EC=2.00
+```
 
 ---
 
-## 📊 Чек-лист разработки
+## 📋 CHECKLIST ДЛЯ ИИ
 
-- [ ] Портировать sensor_manager из hydro1.0
-- [ ] Портировать pump_manager из hydro1.0
-- [ ] Портировать adaptive_pid из hydro1.0
-- [ ] Реализовать oled_display (SSD1306)
-- [ ] Реализовать connection_monitor
-- [ ] Реализовать local_storage (ring buffer)
-- [ ] Реализовать buzzer_led
-- [ ] Реализовать button обработчик
-- [ ] NVS сохранение/загрузка конфигурации
-- [ ] Тестирование нормальной работы
-- [ ] Тестирование автономного режима
-- [ ] Тестирование аварийных ситуаций
-- [ ] Тестирование восстановления связи
-- [ ] Стресс-тест (24 часа непрерывной работы)
+Перед коммитом проверь:
 
-**NODE pH/EC - критичный узел. Автономия превыше всего!** 🛡️
+- [ ] `MESH_MODE_NODE` (НЕ ROOT!)
+- [ ] PID работает ВСЕГДА (не зависит от mesh)
+- [ ] Автономный режим через 30 сек offline
+- [ ] Ring buffer 1000 записей
+- [ ] Safety checks для всех насосов
+- [ ] Emergency stop при критичных значениях
+- [ ] OLED показывает статус
+- [ ] Buzzer сигналы при событиях
+- [ ] Калибровка сохраняется в NVS
+- [ ] Статистика насосов (мл за день)
+- [ ] Команды обрабатываются
+- [ ] Telemetry включает pump_stats
+
+---
+
+## 🎯 ПРИОРИТЕТЫ РАЗРАБОТКИ
+
+### Сейчас реализовано:
+✅ Базовая структура компонентов
+✅ Конфигурация в NVS
+✅ Mesh integration (NODE режим)
+
+### TODO (по приоритету):
+
+1. **HIGH:** Реализация sensor_manager (pH/EC/Temp чтение)
+2. **HIGH:** Реализация pump_controller (PWM + safety)
+3. **HIGH:** Реализация adaptive_pid (базовый PID)
+4. **MEDIUM:** Реализация connection_monitor (мониторинг ROOT)
+5. **MEDIUM:** Реализация local_storage (ring buffer)
+6. **MEDIUM:** Реализация node_controller (главная логика)
+7. **LOW:** Реализация oled_display (SSD1306)
+8. **LOW:** Реализация buzzer_led (индикация)
+
+---
+
+**ГОТОВО! pH/EC NODE - АВТОНОМНОЕ УПРАВЛЕНИЕ С PID!** 💧🤖
 

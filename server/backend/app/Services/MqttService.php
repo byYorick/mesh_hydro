@@ -64,6 +64,11 @@ class MqttService
     {
         try {
             $this->mqtt->subscribe($topic, function ($topic, $message) use ($callback) {
+                Log::debug("📨 MQTT message received", [
+                    'topic' => $topic,
+                    'length' => strlen($message),
+                    'preview' => substr($message, 0, 100)
+                ]);
                 $callback($topic, $message);
             }, $qos);
             
@@ -145,28 +150,82 @@ class MqttService
                 return;
             }
 
+            // Валидация node_type
+            $validTypes = ['ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
+            $nodeType = isset($data['type']) && in_array($data['type'], $validTypes) 
+                ? $data['type'] 
+                : 'unknown';
+
             // Сохранение телеметрии в БД
-            Telemetry::create([
+            $telemetry = Telemetry::create([
                 'node_id' => $data['node_id'],
-                'node_type' => $data['type'] ?? 'unknown',
+                'node_type' => $nodeType,
                 'data' => $data['data'] ?? [],
                 'received_at' => now(),
             ]);
 
-            // Обновление статуса узла
-            Node::updateOrCreate(
+            // Broadcast real-time event
+            event(new \App\Events\TelemetryReceived($telemetry));
+
+            // Обновление узла (или создание если новый)
+            $node = Node::where('node_id', $data['node_id'])->first();
+            $wasOnline = $node ? $node->online : false;
+            $isNewNode = !$node;
+            
+            // Подготовка metadata
+            $metadata = $node->metadata ?? [];
+            if (isset($data['firmware'])) {
+                $metadata['firmware'] = $data['firmware'];
+            }
+            if (isset($data['hardware'])) {
+                $metadata['hardware'] = $data['hardware'];
+            }
+            if (isset($data['mac_address'])) {
+                $metadata['mac_from_mqtt'] = $data['mac_address'];
+            }
+            
+            // Создание или обновление узла
+            $updateData = [
+                'online' => true,
+                'last_seen_at' => now(),
+            ];
+            
+            // Только для новых узлов
+            if ($isNewNode) {
+                $updateData['node_type'] = $nodeType;
+                $updateData['metadata'] = array_merge([
+                    'created_via' => 'mqtt',
+                    'created_at' => now()->toIso8601String(),
+                ], $metadata);
+            } else {
+                // Обновляем только metadata для существующих
+                if (!empty($metadata)) {
+                    $updateData['metadata'] = array_merge($node->metadata ?? [], $metadata);
+                }
+            }
+            
+            $node = Node::updateOrCreate(
                 ['node_id' => $data['node_id']],
-                [
-                    'node_type' => $data['type'] ?? 'unknown',
-                    'online' => true,
-                    'last_seen_at' => now(),
-                ]
+                $updateData
             );
+
+            // Broadcast status change если изменился или новый узел
+            if ($wasOnline !== true) {
+                event(new \App\Events\NodeStatusChanged($node, $wasOnline, true));
+                
+                if ($isNewNode) {
+                    Log::info("New node auto-registered via MQTT", [
+                        'node_id' => $node->node_id,
+                        'node_type' => $node->node_type,
+                    ]);
+                }
+            }
 
             Log::debug("Telemetry saved", [
                 'node_id' => $data['node_id'],
-                'type' => $data['type'] ?? 'unknown'
+                'type' => $nodeType
             ]);
+            
         } catch (Exception $e) {
             Log::error("Telemetry handling error", [
                 'topic' => $topic,
@@ -205,6 +264,9 @@ class MqttService
                 'message' => $event->message
             ]);
 
+            // Broadcast event to frontend
+            event(new \App\Events\EventCreated($event));
+
             // Если критичное событие - отправить уведомления
             if ($event->isCritical()) {
                 $this->sendNotifications($event);
@@ -219,6 +281,7 @@ class MqttService
 
     /**
      * Обработка heartbeat (живой сигнал от узла)
+     * Автоматически создаёт узел если он не существует
      */
     public function handleHeartbeat(string $topic, string $payload): void
     {
@@ -229,19 +292,225 @@ class MqttService
                 return;
             }
 
-            // Обновление last_seen_at
-            Node::where('node_id', $data['node_id'])->update([
-                'online' => true,
-                'last_seen_at' => now(),
-            ]);
+            $nodeId = $data['node_id'];
+            
+            // Проверяем существует ли узел
+            $node = Node::where('node_id', $nodeId)->first();
+            
+            if (!$node) {
+                // АВТОПОИСК: Создаём новый узел автоматически
+                $nodeType = $this->detectNodeType($nodeId, $data);
+                
+                $node = Node::create([
+                    'node_id' => $nodeId,
+                    'node_type' => $nodeType,
+                    'zone' => 'Auto-discovered',
+                    'online' => true,
+                    'last_seen_at' => now(),
+                    'mac_address' => $data['mac'] ?? null,
+                    'metadata' => [
+                        'discovered_at' => now()->toIso8601String(),
+                        'discovered_via' => 'heartbeat',
+                        'firmware' => $data['firmware'] ?? null,
+                        'hardware' => $data['hardware'] ?? null,
+                        'ip_address' => $data['ip'] ?? null,
+                    ],
+                ]);
 
-            Log::debug("Heartbeat received", ['node_id' => $data['node_id']]);
+                Log::info("🔍 AUTO-DISCOVERY: New node found via heartbeat", [
+                    'node_id' => $nodeId,
+                    'node_type' => $nodeType,
+                    'mac' => $data['mac'] ?? 'unknown',
+                ]);
+
+                // Создаём событие об обнаружении нового узла
+                Event::create([
+                    'node_id' => $nodeId,
+                    'level' => Event::LEVEL_INFO,
+                    'message' => "New node auto-discovered: {$nodeId}",
+                    'data' => ['node_type' => $nodeType],
+                ]);
+
+                // Broadcast новый узел на фронтенд
+                event(new \App\Events\NodeDiscovered($node));
+            } else {
+                // Обновление last_seen_at для существующего узла
+                $node->update([
+                    'online' => true,
+                    'last_seen_at' => now(),
+                ]);
+            }
+
+            Log::debug("Heartbeat received", ['node_id' => $nodeId]);
         } catch (Exception $e) {
             Log::error("Heartbeat handling error", [
                 'topic' => $topic,
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Обработка discovery топика (специальный топик для регистрации новых узлов)
+     */
+    public function handleDiscovery(string $topic, string $payload): void
+    {
+        try {
+            Log::info("🔍 handleDiscovery called", [
+                'topic' => $topic,
+                'payload_length' => strlen($payload),
+                'payload' => $payload
+            ]);
+            
+            $data = json_decode($payload, true);
+            
+            if (!$data || !isset($data['node_id'])) {
+                Log::warning("Invalid discovery data", [
+                    'topic' => $topic,
+                    'payload' => $payload,
+                    'json_error' => json_last_error_msg()
+                ]);
+                return;
+            }
+
+            $nodeId = $data['node_id'];
+            
+            // Проверяем существует ли узел
+            $existingNode = Node::where('node_id', $nodeId)->first();
+            
+            if ($existingNode) {
+                Log::info("🔍 Discovery: Node already registered", [
+                    'node_id' => $nodeId
+                ]);
+                
+                // Обновляем метаданные если пришли новые данные
+                if (isset($data['firmware']) || isset($data['hardware'])) {
+                    $metadata = $existingNode->metadata ?? [];
+                    $metadata['firmware'] = $data['firmware'] ?? $metadata['firmware'] ?? null;
+                    $metadata['hardware'] = $data['hardware'] ?? $metadata['hardware'] ?? null;
+                    $metadata['mac_address'] = $data['mac'] ?? $metadata['mac_address'] ?? null;
+                    $metadata['ip_address'] = $data['ip'] ?? $metadata['ip_address'] ?? null;
+                    $metadata['last_discovery'] = now()->toIso8601String();
+                    
+                    $existingNode->update([
+                        'metadata' => $metadata,
+                        'online' => true,
+                        'last_seen_at' => now(),
+                    ]);
+                }
+                
+                return;
+            }
+
+            // АВТОПОИСК: Создаём новый узел
+            // Используем node_type (тип узла), а не type (тип сообщения)
+            $nodeType = $data['node_type'] ?? $this->detectNodeType($nodeId, $data);
+            
+            $node = Node::create([
+                'node_id' => $nodeId,
+                'node_type' => $nodeType,
+                'zone' => $data['zone'] ?? 'Auto-discovered',
+                'online' => true,
+                'last_seen_at' => now(),
+                'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
+                'metadata' => [
+                    'discovered_at' => now()->toIso8601String(),
+                    'discovered_via' => 'discovery_topic',
+                    'firmware' => $data['firmware'] ?? null,
+                    'hardware' => $data['hardware'] ?? null,
+                    'ip_address' => $data['ip'] ?? null,
+                    'sensors' => $data['sensors'] ?? [],
+                    'capabilities' => $data['capabilities'] ?? [],
+                    // Информация о памяти
+                    'heap_free' => $data['heap_free'] ?? null,
+                    'heap_min' => $data['heap_min'] ?? null,
+                    'heap_total' => $data['heap_total'] ?? null,
+                    // Flash память
+                    'flash_total' => $data['flash_total'] ?? null,
+                    'flash_used' => $data['flash_used'] ?? null,
+                    // WiFi сигнал
+                    'wifi_rssi' => $data['wifi_rssi'] ?? null,
+                    // Mesh нод
+                    'mesh_nodes' => $data['mesh_nodes'] ?? 0,
+                ],
+            ]);
+
+            Log::info("🔍 AUTO-DISCOVERY: New node registered", [
+                'node_id' => $nodeId,
+                'node_type' => $nodeType,
+                'mac' => $data['mac'] ?? 'unknown',
+                'firmware' => $data['firmware'] ?? 'unknown',
+            ]);
+
+            // Создаём событие об обнаружении
+            Event::create([
+                'node_id' => $nodeId,
+                'level' => Event::LEVEL_INFO,
+                'message' => "New node auto-discovered and registered: {$nodeId}",
+                'data' => [
+                    'node_type' => $nodeType,
+                    'firmware' => $data['firmware'] ?? null,
+                    'hardware' => $data['hardware'] ?? null,
+                ],
+            ]);
+
+            // Broadcast новый узел на фронтенд
+            event(new \App\Events\NodeDiscovered($node));
+
+            Log::info("✅ Node discovery complete", ['node_id' => $nodeId]);
+            
+        } catch (Exception $e) {
+            Log::error("Discovery handling error", [
+                'topic' => $topic,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Определение типа узла по его ID или данным
+     */
+    private function detectNodeType(string $nodeId, array $data): string
+    {
+        // ВАЖНО: Определяем по префиксу node_id ПЕРВЫМ (до проверки $data['type'])
+        // Потому что $data['type'] может быть "heartbeat"/"telemetry" (тип сообщения, а не узла!)
+        if (str_starts_with($nodeId, 'root_')) {
+            return 'root';
+        }
+        if (str_starts_with($nodeId, 'climate_')) {
+            return 'climate';
+        }
+        if (str_starts_with($nodeId, 'ph_ec_')) {
+            return 'ph_ec';
+        }
+        if (str_starts_with($nodeId, 'relay_')) {
+            return 'relay';
+        }
+        if (str_starts_with($nodeId, 'water_')) {
+            return 'water';
+        }
+        if (str_starts_with($nodeId, 'display_')) {
+            return 'display';
+        }
+
+        // Проверяем явный тип узла в данных (только если это не тип сообщения!)
+        if (isset($data['node_type'])) {
+            return $data['node_type'];
+        }
+
+        // Определяем по наличию сенсоров в данных
+        if (isset($data['sensors'])) {
+            $sensors = $data['sensors'];
+            if (in_array('ph', $sensors) || in_array('ec', $sensors)) {
+                return 'ph_ec';
+            }
+            if (in_array('temperature', $sensors) || in_array('humidity', $sensors)) {
+                return 'climate';
+            }
+        }
+
+        // По умолчанию - неизвестный тип
+        return 'unknown';
     }
 
     /**

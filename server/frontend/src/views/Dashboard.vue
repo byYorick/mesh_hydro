@@ -55,9 +55,26 @@
 
     <!-- Nodes Grid -->
     <v-row>
-      <v-col cols="12">
+      <v-col cols="12" md="6">
         <h2 class="text-h5 mb-3">Узлы системы</h2>
       </v-col>
+      <v-col cols="12" md="6" class="text-right">
+        <AddNodeDialog @node-created="handleNodeCreated">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              color="primary"
+              v-bind="props"
+              prepend-icon="mdi-plus"
+              size="small"
+            >
+              Добавить узел
+            </v-btn>
+          </template>
+        </AddNodeDialog>
+      </v-col>
+    </v-row>
+
+    <v-row>
 
       <v-col
         v-for="node in nodesStore.nodes"
@@ -131,6 +148,8 @@ import { useNodesStore } from '@/stores/nodes'
 import { useEventsStore } from '@/stores/events'
 import NodeCard from '@/components/NodeCard.vue'
 import EventLog from '@/components/EventLog.vue'
+import AddNodeDialog from '@/components/AddNodeDialog.vue'
+import api from '@/services/api'
 
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
@@ -198,6 +217,28 @@ function formatTelemetryData(data) {
     .slice(0, 3)
     .map(([key, value]) => `${key}: ${typeof value === 'number' ? value.toFixed(2) : value}`)
     .join(' • ')
+}
+
+// Handle node creation
+async function handleNodeCreated(nodeData) {
+  try {
+    await api.createNode(nodeData)
+    
+    // Reload nodes and summary
+    await nodesStore.fetchNodes()
+    summary.value = await appStore.fetchDashboardSummary()
+    
+    appStore.showSnackbar(
+      `Узел "${nodeData.node_id}" успешно создан!`,
+      'success',
+      5000
+    )
+  } catch (error) {
+    appStore.showSnackbar(
+      'Ошибка создания узла: ' + (error.response?.data?.message || error.message),
+      'error'
+    )
+  }
 }
 </script>
 

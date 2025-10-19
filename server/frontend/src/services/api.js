@@ -76,8 +76,21 @@ export default {
     return api.get(`/nodes/${nodeId}`)
   },
 
-  createNode(data) {
-    return api.post('/nodes', data)
+  async createNode(nodeData) {
+    console.log('API: Creating node with data:', nodeData)
+    try {
+      // Note: response interceptor already extracts .data
+      const response = await api.post('/nodes', nodeData)
+      console.log('API: Node creation response:', response)
+      return response
+    } catch (error) {
+      console.error('API: Node creation error:', error.response?.data)
+      throw error
+    }
+  },
+
+  updateNode(nodeId, data) {
+    return api.put(`/nodes/${nodeId}`, data)
   },
 
   updateNodeConfig(nodeId, config) {

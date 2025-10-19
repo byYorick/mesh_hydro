@@ -1,8 +1,22 @@
 <template>
   <div>
     <v-row>
-      <v-col cols="12">
+      <v-col cols="12" md="6">
         <h1 class="text-h3 mb-4">Узлы системы</h1>
+      </v-col>
+      <v-col cols="12" md="6" class="text-right">
+        <AddNodeDialog @node-created="handleNodeCreated">
+          <template v-slot:activator="{ props }">
+            <v-btn
+              color="primary"
+              size="large"
+              v-bind="props"
+              prepend-icon="mdi-plus-circle"
+            >
+              Добавить узел
+            </v-btn>
+          </template>
+        </AddNodeDialog>
       </v-col>
     </v-row>
 
@@ -77,6 +91,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import NodeCard from '@/components/NodeCard.vue'
+import AddNodeDialog from '@/components/AddNodeDialog.vue'
+import api from '@/services/api'
 
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
@@ -129,6 +145,27 @@ async function sendCommand(nodeId, { command, params }) {
     appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
   } catch (error) {
     appStore.showSnackbar('Ошибка отправки команды', 'error')
+  }
+}
+
+// Handle node creation
+async function handleNodeCreated(nodeData) {
+  try {
+    const createdNode = await api.createNode(nodeData)
+    
+    // Add to store
+    await nodesStore.fetchNodes()
+    
+    appStore.showSnackbar(
+      `Узел "${nodeData.node_id}" успешно создан!`,
+      'success',
+      5000
+    )
+  } catch (error) {
+    appStore.showSnackbar(
+      'Ошибка создания узла: ' + (error.response?.data?.message || error.message),
+      'error'
+    )
   }
 }
 </script>

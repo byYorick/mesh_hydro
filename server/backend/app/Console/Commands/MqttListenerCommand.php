@@ -97,31 +97,51 @@ class MqttListenerCommand extends Command
             $mqtt->handleCommandResponse($topic, $message);
         });
 
+        // Подписка на discovery (автопоиск узлов)
+        // Подписываемся БЕЗ wildcard, т.к. ESP32 публикует в "hydro/discovery"
+        $this->info('📡 Subscribing to: hydro/discovery');
+        $mqtt->subscribe('hydro/discovery', function ($topic, $message) use ($mqtt) {
+            $this->line("🔍 [DISCOVERY] {$topic}");
+            $mqtt->handleDiscovery($topic, $message);
+        });
+
         $this->newLine();
-        $this->info('🎧 MQTT Listener is running...');
+        $this->info('🎧 MQTT Listener is running (AUTO-DISCOVERY enabled)...');
         $this->info('Press Ctrl+C to stop');
         $this->newLine();
 
-        // Обработка Ctrl+C для корректного закрытия
-        pcntl_async_signals(true);
-        pcntl_signal(SIGINT, function () use ($mqtt) {
+        // Обработка Ctrl+C для корректного закрытия (только для Unix)
+        if (function_exists('pcntl_async_signals')) {
+            pcntl_async_signals(true);
+            pcntl_signal(SIGINT, function () use ($mqtt) {
+                $this->newLine();
+                $this->warn('⚠️  Shutting down...');
+                $mqtt->disconnect();
+                $this->info('👋 Goodbye!');
+                exit(0);
+            });
+
+            pcntl_signal(SIGTERM, function () use ($mqtt) {
+                $this->newLine();
+                $this->warn('⚠️  Shutting down...');
+                $mqtt->disconnect();
+                $this->info('👋 Goodbye!');
+                exit(0);
+            });
+        }
+
+        // Для Windows: используем try-catch для graceful shutdown
+        try {
+            // Бесконечный цикл прослушивания с обработкой сообщений
+            while (true) {
+                $mqtt->loop(true); // blocking = true, exitWhenQueuesEmpty = false (default)
+            }
+        } catch (\Exception $e) {
             $this->newLine();
             $this->warn('⚠️  Shutting down...');
             $mqtt->disconnect();
-            $this->info('👋 Goodbye!');
-            exit(0);
-        });
-
-        pcntl_signal(SIGTERM, function () use ($mqtt) {
-            $this->newLine();
-            $this->warn('⚠️  Shutting down...');
-            $mqtt->disconnect();
-            $this->info('👋 Goodbye!');
-            exit(0);
-        });
-
-        // Бесконечный цикл прослушивания
-        $mqtt->loop(true);
+            throw $e;
+        }
     }
 }
 

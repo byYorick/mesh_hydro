@@ -6,7 +6,13 @@
 #include "mqtt_client_manager.h"
 #include "mqtt_client.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_system.h"
 #include <string.h>
+#include <stdio.h>
+
+// Внешнее объявление для spi_flash функции
+extern uint32_t spi_flash_get_chip_size(void);
 
 static const char *TAG = "mqtt_manager";
 
@@ -19,8 +25,9 @@ static const char *TAG = "mqtt_manager";
 
 // MQTT конфигурация (TODO: переместить в sdkconfig)
 #define MQTT_BROKER_URI         "mqtt://192.168.1.100:1883"
-#define MQTT_USERNAME           "hydro_root"
-#define MQTT_PASSWORD           "hydro_pass"
+// Mosquitto настроен с allow_anonymous, поэтому username/password не нужны
+#define MQTT_USERNAME           NULL
+#define MQTT_PASSWORD           NULL
 
 static esp_mqtt_client_handle_t s_mqtt_client = NULL;
 static mqtt_recv_callback_t s_recv_cb = NULL;
@@ -33,18 +40,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 esp_err_t mqtt_client_manager_init(void) {
     ESP_LOGI(TAG, "Initializing MQTT client...");
 
+    // Mosquitto настроен с allow_anonymous, поэтому credentials не нужны
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
-        .credentials = {
-            .username = MQTT_USERNAME,
-            .authentication.password = MQTT_PASSWORD,
-        },
+        // .credentials не указываем для anonymous доступа
         .session = {
             .keepalive = 60,
             .disable_clean_session = 0,
         },
         .network = {
             .reconnect_timeout_ms = 10000,
+            .timeout_ms = 10000,
         },
     };
 
@@ -98,14 +104,16 @@ esp_err_t mqtt_client_manager_publish(const char *topic, const char *data) {
         return ESP_FAIL;
     }
 
-    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, data, strlen(data), 0, 0);
+    // ВАЖНО: strlen() для null-terminated строк (JSON payload)
+    int data_len = strlen(data);
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, topic, data, data_len, 0, 0);
     
     if (msg_id < 0) {
         ESP_LOGE(TAG, "Failed to publish to %s", topic);
         return ESP_FAIL;
     }
 
-    ESP_LOGD(TAG, "Published to %s (msg_id=%d)", topic, msg_id);
+    ESP_LOGI(TAG, "✅ MQTT Published: %s (msg_id=%d, len=%d)", topic, msg_id, data_len);
     return ESP_OK;
 }
 
@@ -142,6 +150,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 
             esp_mqtt_client_subscribe(s_mqtt_client, MQTT_TOPIC_CONFIG, 1);
             ESP_LOGI(TAG, "Subscribed to %s", MQTT_TOPIC_CONFIG);
+            
+            // Отправка discovery сообщения
+            mqtt_client_manager_send_discovery();
             break;
 
         case MQTT_EVENT_DISCONNECTED:
@@ -192,6 +203,56 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         default:
             ESP_LOGD(TAG, "MQTT event: %d", event_id);
             break;
+    }
+}
+
+void mqtt_client_manager_send_discovery(void) {
+    if (!s_mqtt_client || !s_is_connected) {
+        ESP_LOGW(TAG, "Cannot send discovery - MQTT not connected");
+        return;
+    }
+
+    // Сбор информации о системе
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    
+    wifi_ap_record_t ap_info;
+    int8_t rssi = -100;
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        rssi = ap_info.rssi;
+    }
+    
+    uint32_t free_heap = esp_get_free_heap_size();
+    uint32_t min_heap = esp_get_minimum_free_heap_size();
+    uint32_t flash_size = spi_flash_get_chip_size();
+    uint32_t flash_used = 2 * 1024 * 1024;  // Примерная оценка
+    
+    char discovery_msg[768];
+    snprintf(discovery_msg, sizeof(discovery_msg),
+            "{\"type\":\"discovery\","
+            "\"node_id\":\"root_%02x%02x%02x%02x%02x%02x\","
+            "\"node_type\":\"root\","
+            "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
+            "\"firmware\":\"2.0.0\","
+            "\"hardware\":\"ESP32-S3\","
+            "\"heap_free\":%lu,"
+            "\"heap_min\":%lu,"
+            "\"flash_total\":%lu,"
+            "\"flash_used\":%lu,"
+            "\"wifi_rssi\":%d,"
+            "\"capabilities\":[\"mesh_coordinator\",\"mqtt_bridge\",\"data_router\"]}",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+            (unsigned long)free_heap, (unsigned long)min_heap,
+            (unsigned long)flash_size, (unsigned long)flash_used,
+            rssi);
+    
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, "hydro/discovery", 
+                                        discovery_msg, strlen(discovery_msg), 1, 0);
+    if (msg_id >= 0) {
+        ESP_LOGI(TAG, "Published discovery message (msg_id=%d, len=%d)", msg_id, strlen(discovery_msg));
+    } else {
+        ESP_LOGE(TAG, "Failed to publish discovery message");
     }
 }
 

@@ -58,6 +58,18 @@ esp_err_t mesh_manager_init(const mesh_manager_config_t *config) {
     // Инициализация mesh
     ESP_ERROR_CHECK(esp_mesh_init());
     ESP_ERROR_CHECK(esp_event_handler_register(MESH_EVENT, ESP_EVENT_ANY_ID, &mesh_event_handler, NULL));
+    
+    // ВАЖНО: Устанавливаем max_layer ДО esp_mesh_start() (как в официальном примере ESP-IDF)
+    // Это ограничивает глубину сети (количество уровней)
+    ESP_ERROR_CHECK(esp_mesh_set_max_layer(6));
+    ESP_LOGI(TAG, "Max mesh layers set to 6");
+    
+    // Для ROOT: Устанавливаем vote_percentage=1 (100% голосов для стабильности)
+    // Для NODE: Это не влияет, так как ROOT зафиксирован через esp_mesh_fix_root(true)
+    ESP_ERROR_CHECK(esp_mesh_set_vote_percentage(1));
+    
+    // Таймаут ассоциации (как в официальном примере)
+    ESP_ERROR_CHECK(esp_mesh_set_ap_assoc_expire(10));
 
     ESP_LOGI(TAG, "Mesh manager initialized (mode: %s)", 
              config->mode == MESH_MODE_ROOT ? "ROOT" : "NODE");
@@ -74,44 +86,67 @@ esp_err_t mesh_manager_start(void) {
     // Установка канала
     cfg.channel = s_config.channel;
     
-    // !!! ВАЖНО: Router credentials нужны для ВСЕХ узлов (ROOT и NODE) !!!
-    // Даже NODE узлы должны знать о роутере для правильной работы mesh
-    cfg.router.ssid_len = strlen(s_config.router_ssid);
-    memcpy((uint8_t *)&cfg.router.ssid, s_config.router_ssid, cfg.router.ssid_len);
-    memcpy((uint8_t *)&cfg.router.password, s_config.router_password, strlen(s_config.router_password));
-    
-    // Если указан BSSID - используем его
-    if (s_config.router_bssid != NULL) {
-        memcpy((uint8_t *)&cfg.router.bssid, s_config.router_bssid, 6);
-    }
-    
-    // Максимум подключений (для ROOT используем из конфига, для NODE - дефолт 6)
-    cfg.mesh_ap.max_connection = (s_config.mode == MESH_MODE_ROOT) 
-                                  ? s_config.max_connection 
-                                  : 6;  // Дефолт для NODE узлов
-    
     // Специфичные настройки для ROOT
     if (s_config.mode == MESH_MODE_ROOT) {
         ESP_ERROR_CHECK(esp_mesh_set_type(MESH_ROOT));
         
-        ESP_LOGI(TAG, "ROOT: router '%s' (len=%d), BSSID=%s, WPA2, max_conn=%d", 
+        // КРИТИЧНО: Зафиксировать ROOT статус (запретить переключение)
+        ESP_ERROR_CHECK(esp_mesh_fix_root(true));
+        ESP_LOGI(TAG, "ROOT status fixed (cannot lose ROOT role)");
+        
+        // ТОЛЬКО ROOT подключается к WiFi роутеру!
+        if (s_config.router_ssid == NULL || s_config.router_password == NULL) {
+            ESP_LOGE(TAG, "ROOT requires router_ssid and router_password!");
+            return ESP_ERR_INVALID_ARG;
+        }
+        
+        cfg.router.ssid_len = strlen(s_config.router_ssid);
+        memcpy((uint8_t *)&cfg.router.ssid, s_config.router_ssid, cfg.router.ssid_len);
+        memcpy((uint8_t *)&cfg.router.password, s_config.router_password, strlen(s_config.router_password));
+        
+        // Если указан BSSID - используем его
+        if (s_config.router_bssid != NULL) {
+            memcpy((uint8_t *)&cfg.router.bssid, s_config.router_bssid, 6);
+        }
+        
+        // Максимум подключений для ROOT
+        cfg.mesh_ap.max_connection = s_config.max_connection;
+        
+        ESP_LOGI(TAG, "ROOT mode: connecting to router '%s' (len=%d), BSSID=%s, max_conn=%d", 
                  s_config.router_ssid, cfg.router.ssid_len,
                  s_config.router_bssid ? "set" : "auto",
                  cfg.mesh_ap.max_connection);
         
-        // Настройка WPA2-PSK для STA интерфейса (только для ROOT)
-        wifi_config_t wifi_config = {0};
-        strcpy((char *)wifi_config.sta.ssid, s_config.router_ssid);
-        strcpy((char *)wifi_config.sta.password, s_config.router_password);
-        wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-        wifi_config.sta.pmf_cfg.capable = true;
-        wifi_config.sta.pmf_cfg.required = false;
+        // ✅ ТЕСТ: Попробуем БЕЗ esp_wifi_set_config() (как в официальном примере)
+        // Router credentials будут применены через esp_mesh_set_config(&cfg)
+        // wifi_config_t wifi_config = {0};
+        // strcpy((char *)wifi_config.sta.ssid, s_config.router_ssid);
+        // strcpy((char *)wifi_config.sta.password, s_config.router_password);
+        // wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+        // wifi_config.sta.pmf_cfg.capable = true;
+        // wifi_config.sta.pmf_cfg.required = false;
+        // ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         
-        ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_mesh_set_ap_authmode(WIFI_AUTH_WPA2_PSK));
     } else {
-        ESP_LOGI(TAG, "NODE mode (router: '%s', max_conn=%d)", 
-                 s_config.router_ssid, cfg.mesh_ap.max_connection);
+        // NODE mode
+        // ✅ ГЕНИАЛЬНОЕ РЕШЕНИЕ: Передаем MESH параметры как "router"!
+        // NODE будет искать mesh AP "HYDRO1" вместо роутера "Yorick"
+        
+        // Устанавливаем mesh AP как "роутер" для NODE
+        cfg.router.ssid_len = strlen(s_config.mesh_id);
+        memcpy((uint8_t *)&cfg.router.ssid, s_config.mesh_id, cfg.router.ssid_len);
+        memcpy((uint8_t *)&cfg.router.password, s_config.mesh_password, strlen(s_config.mesh_password));
+        
+        // BSSID не устанавливаем - NODE найдет любой AP с SSID "HYDRO1"
+        
+        // Максимум подключений для NODE (для их собственного mesh AP)
+        cfg.mesh_ap.max_connection = 6;
+        
+        ESP_LOGI(TAG, "NODE mode: will search for mesh AP '%s' (password: %s) on channel %d", 
+                 s_config.mesh_id, 
+                 strlen(s_config.mesh_password) > 0 ? "***" : "OPEN",
+                 cfg.channel);
     }
 
     // Установка mesh пароля
@@ -119,18 +154,39 @@ esp_err_t mesh_manager_start(void) {
     if (s_config.mesh_password && strlen(s_config.mesh_password) > 0) {
         strcpy((char *)cfg.mesh_ap.password, s_config.mesh_password);
     }
+    
+    // ✅ ВАЖНО: Установить authmode для mesh AP ДО esp_mesh_set_config() (как в примере)
+    ESP_ERROR_CHECK(esp_mesh_set_ap_authmode(
+        (s_config.mesh_password && strlen(s_config.mesh_password) > 0) 
+        ? WIFI_AUTH_WPA2_PSK 
+        : WIFI_AUTH_OPEN
+    ));
+
+    // Логирование Mesh AP конфигурации (для ROOT)
+    if (s_config.mode == MESH_MODE_ROOT) {
+        ESP_LOGI(TAG, "ROOT Mesh AP configuration:");
+        ESP_LOGI(TAG, "  SSID: %s (from mesh_id)", s_config.mesh_id);
+        ESP_LOGI(TAG, "  Password: %s", 
+                 strlen(s_config.mesh_password) > 0 ? "***" : "OPEN");
+        ESP_LOGI(TAG, "  Max connections: %d", cfg.mesh_ap.max_connection);
+        ESP_LOGI(TAG, "  Channel: %d (0=auto)", cfg.channel);
+    }
 
     // Применение конфигурации с router credentials
     ESP_ERROR_CHECK(esp_mesh_set_config(&cfg));
     
     // Для NODE тип устанавливается автоматически (MESH_NODE - дефолт)
     // esp_mesh_set_type() вызывается только для ROOT (выше)
+    
+    // NODE: Никаких дополнительных настроек не требуется!
+    // ROOT зафиксирован через esp_mesh_fix_root(true), поэтому NODE не может стать ROOT
+    // Self-organizing включен по умолчанию, NODE автоматически найдёт и подключится к mesh AP
 
     // Запуск mesh
     ESP_ERROR_CHECK(esp_mesh_start());
 
-    // Запуск задачи приема данных
-    xTaskCreate(mesh_recv_task, "mesh_recv", 4096, NULL, 5, NULL);
+    // Запуск задачи приема данных (увеличен stack в 4 раза для безопасности: 4096 → 16384)
+    xTaskCreate(mesh_recv_task, "mesh_recv", 16384, NULL, 5, NULL);
 
     ESP_LOGI(TAG, "Mesh started");
 
@@ -157,19 +213,18 @@ esp_err_t mesh_manager_send(const uint8_t *dest_addr, const uint8_t *data, size_
     mesh_data.tos = MESH_TOS_P2P;
 
     mesh_addr_t addr;
+    int flag;
+    
     if (dest_addr == NULL) {
-        // Отправка на ROOT
-        addr.addr[0] = 0;
-        addr.addr[1] = 0;
-        addr.addr[2] = 0;
-        addr.addr[3] = 0;
-        addr.addr[4] = 0;
-        addr.addr[5] = 0;
+        // Отправка на ROOT (TODS - To Distribution System)
+        memset(&addr, 0, sizeof(addr));
+        flag = MESH_DATA_TODS;  // ← Флаг для отправки к ROOT
     } else {
+        // Отправка конкретному узлу (P2P)
         memcpy(addr.addr, dest_addr, 6);
+        flag = MESH_DATA_P2P;   // ← Флаг для P2P
     }
 
-    int flag = 0;
     esp_err_t err = esp_mesh_send(&addr, &mesh_data, flag, NULL, 0);
     
     if (err != ESP_OK) {
@@ -180,6 +235,24 @@ esp_err_t mesh_manager_send(const uint8_t *dest_addr, const uint8_t *data, size_
 }
 
 esp_err_t mesh_manager_send_to_root(const uint8_t *data, size_t len) {
+    // Проверка: только NODE могут отправлять на ROOT
+    if (s_config.mode == MESH_MODE_ROOT) {
+        ESP_LOGW(TAG, "ROOT cannot send to itself");
+        return ESP_ERR_MESH_ARGUMENT;
+    }
+    
+    // Проверка подключения
+    if (!s_is_mesh_connected) {
+        ESP_LOGW(TAG, "Mesh not connected, cannot send to root");
+        return ESP_ERR_MESH_NOT_START;
+    }
+    
+    // Проверка что узел не является root (не голосованием)
+    if (esp_mesh_is_root()) {
+        ESP_LOGW(TAG, "Node is currently root (voting), cannot send to parent");
+        return ESP_ERR_MESH_NO_PARENT_FOUND;
+    }
+    
     return mesh_manager_send(NULL, data, len);
 }
 
@@ -248,6 +321,7 @@ esp_err_t mesh_manager_broadcast(const uint8_t *data, size_t len) {
 
 void mesh_manager_register_recv_cb(mesh_recv_cb_t cb) {
     s_recv_cb = cb;
+    ESP_LOGI(TAG, "✅ Recv callback registered: %p", (void*)cb);
 }
 
 bool mesh_manager_is_root(void) {
@@ -303,11 +377,19 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             ESP_LOGI(TAG, "========================================");
             s_is_mesh_connected = true;
             
-            // Для ROOT узла - запустить DHCP клиент
-            if (esp_mesh_is_root() && s_netif_sta) {
-                ESP_LOGI(TAG, "ROOT node: Starting DHCP client...");
-                esp_netif_dhcpc_start(s_netif_sta);
+            // ROOT зафиксирован ДО подключения к роутеру, поэтому MESH_EVENT_ROOT_FIXED может не прийти
+            // Запускаем DHCP клиент здесь для ROOT узла
+            if (s_config.mode == MESH_MODE_ROOT && s_netif_sta) {
+                ESP_LOGI(TAG, "Starting DHCP client for ROOT node...");
+                esp_err_t err = esp_netif_dhcpc_start(s_netif_sta);
+                if (err != ESP_OK && err != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED) {
+                    ESP_LOGE(TAG, "Failed to start DHCP client: %s", esp_err_to_name(err));
+                } else {
+                    ESP_LOGI(TAG, "DHCP client started successfully");
+                }
             }
+            
+            // NODE узлы не запускают DHCP - они получают IP через mesh
             break;
         }
 
@@ -317,8 +399,16 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             break;
 
         case MESH_EVENT_ROOT_FIXED:
-            ESP_LOGI(TAG, "ROOT node established");
+            ESP_LOGI(TAG, "========================================");
+            ESP_LOGI(TAG, "✓ ROOT node established and fixed!");
+            ESP_LOGI(TAG, "========================================");
             s_is_mesh_connected = true;
+            
+            // ROOT зафиксирован - запускаем DHCP
+            if (s_config.mode == MESH_MODE_ROOT && s_netif_sta) {
+                ESP_LOGI(TAG, "Starting DHCP client for fixed ROOT...");
+                esp_netif_dhcpc_start(s_netif_sta);
+            }
             break;
 
         case MESH_EVENT_CHILD_CONNECTED: {
@@ -344,15 +434,36 @@ static void mesh_recv_task(void *arg) {
     mesh_addr_t from;
     mesh_data_t data;
     int flag = 0;
-    data.data = malloc(1500); // Max mesh packet size
-    data.size = 1500;
+    const int max_data_size = 1500; // Max mesh packet size
+    data.data = malloc(max_data_size);
+    
+    if (data.data == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for mesh recv");
+        vTaskDelete(NULL);
+        return;
+    }
 
+    ESP_LOGI(TAG, "mesh_recv_task started, waiting for data...");
+    
     while (true) {
+        // ВАЖНО: Сбрасываем data.size перед каждым приёмом!
+        data.size = max_data_size;
+        
         esp_err_t err = esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0);
         
         if (err == ESP_OK) {
+            ESP_LOGI(TAG, "✓ Mesh data received: %d bytes from "MACSTR" (flag=%d)", 
+                     data.size, MAC2STR(from.addr), flag);
+            
+            // DEBUG: Вывести первые 100 байт данных
+            ESP_LOG_BUFFER_HEXDUMP(TAG, data.data, (data.size > 100 ? 100 : data.size), ESP_LOG_INFO);
+            
             if (s_recv_cb != NULL) {
+                ESP_LOGI(TAG, "Calling recv_cb...");
                 s_recv_cb(from.addr, data.data, data.size);
+                ESP_LOGI(TAG, "recv_cb returned");
+            } else {
+                ESP_LOGW(TAG, "⚠️ No recv callback registered - data dropped!");
             }
         } else {
             ESP_LOGE(TAG, "Mesh recv failed: %s", esp_err_to_name(err));
@@ -363,5 +474,95 @@ static void mesh_recv_task(void *arg) {
 
     free(data.data);
     vTaskDelete(NULL);
+}
+
+esp_err_t mesh_manager_get_routing_table_with_rssi(mesh_node_info_t *nodes, int max_count, int *actual_count) {
+    if (nodes == NULL || actual_count == NULL) {
+        ESP_LOGE(TAG, "Invalid arguments");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (!mesh_manager_is_root()) {
+        ESP_LOGW(TAG, "Not a ROOT node, routing table not available");
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    
+    if (!s_is_mesh_connected) {
+        ESP_LOGW(TAG, "Mesh not connected");
+        *actual_count = 0;
+        return ESP_ERR_MESH_NOT_START;
+    }
+    
+    // Получить общее количество узлов (API изменился в v5.5 - теперь возвращает напрямую)
+    int total_nodes = esp_mesh_get_total_node_num();
+    
+    if (total_nodes <= 1) {
+        ESP_LOGD(TAG, "No child nodes");
+        *actual_count = 0;
+        return ESP_OK;
+    }
+    
+    // Выделить временный буфер для таблицы маршрутизации
+    int route_table_size = (total_nodes < max_count) ? total_nodes : max_count;
+    mesh_addr_t *route_table = malloc(route_table_size * sizeof(mesh_addr_t));
+    if (route_table == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for routing table");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Получить таблицу маршрутизации
+    int actual_table_size = route_table_size;
+    esp_err_t err = esp_mesh_get_routing_table(route_table, 
+                                                 route_table_size * sizeof(mesh_addr_t), 
+                                                 &actual_table_size);
+    
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get routing table: %s", esp_err_to_name(err));
+        free(route_table);
+        return err;
+    }
+    
+    // Заполнить массив узлов с информацией
+    *actual_count = (actual_table_size < max_count) ? actual_table_size : max_count;
+    
+    for (int i = 0; i < *actual_count; i++) {
+        // Копировать MAC адрес
+        memcpy(nodes[i].mac, route_table[i].addr, 6);
+        
+        // В ESP-IDF v5.5 esp_mesh_get_routing_table_by_mac() удалена
+        // Используем базовую информацию без RSSI и layer
+        // TODO: Если нужны RSSI/layer - использовать esp_mesh_get_subnet_nodes_list()
+        nodes[i].rssi = 0;   // RSSI недоступен через routing table API
+        nodes[i].layer = 0;  // Layer недоступен напрямую
+    }
+    
+    free(route_table);
+    
+    ESP_LOGD(TAG, "Retrieved %d nodes from routing table", *actual_count);
+    return ESP_OK;
+}
+
+int8_t mesh_manager_get_parent_rssi(void) {
+    // Проверка: ROOT узлы не имеют родителя
+    if (mesh_manager_is_root()) {
+        return 0;
+    }
+    
+    // Проверка подключения
+    if (!s_is_mesh_connected) {
+        return 0;
+    }
+    
+    // Получить информацию о родительском узле
+    wifi_ap_record_t ap_info;
+    esp_err_t err = esp_wifi_sta_get_ap_info(&ap_info);
+    
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "Parent RSSI: %d dBm", ap_info.rssi);
+        return ap_info.rssi;
+    } else {
+        ESP_LOGW(TAG, "Failed to get parent RSSI: %s", esp_err_to_name(err));
+        return 0;
+    }
 }
 

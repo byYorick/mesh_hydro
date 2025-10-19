@@ -37,9 +37,10 @@ esp_err_t climate_logic_start(void) {
         return ESP_OK;
     }
 
+    // Stack увеличен в 2 раза для безопасности: 4096 → 8192
     BaseType_t ret = xTaskCreate(climate_fallback_task, 
                                   "climate_fallback", 
-                                  4096, 
+                                  8192, 
                                   NULL, 
                                   5, 
                                   &s_climate_task);

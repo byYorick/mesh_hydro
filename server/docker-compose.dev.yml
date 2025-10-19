@@ -1,0 +1,99 @@
+# ========================================
+# Docker Compose для РАЗРАБОТКИ
+# Использует volumes для hot reload
+# ========================================
+
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: hydro_mosquitto_dev
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - hydro_network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: hydro_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hydro_dev
+      POSTGRES_USER: hydro
+      POSTGRES_PASSWORD: hydro_dev_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - hydro_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_backend_dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=hydro_dev
+      - DB_USERNAME=hydro
+      - DB_PASSWORD=hydro_dev_pass
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    volumes:
+      - ./backend:/var/www/html  # Hot reload!
+    depends_on:
+      - postgres
+      - mosquitto
+    networks:
+      - hydro_network
+
+  mqtt_listener:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_mqtt_dev
+    restart: unless-stopped
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=hydro_dev
+      - DB_USERNAME=hydro
+      - DB_PASSWORD=hydro_dev_pass
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - postgres
+      - mosquitto
+      - backend
+    networks:
+      - hydro_network
+    command: php artisan mqtt:listen
+
+networks:
+  hydro_network:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+    driver: local
+

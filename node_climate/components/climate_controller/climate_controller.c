@@ -12,21 +12,31 @@
 #include "node_config.h"
 
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_system.h"
 // #include "esp_task_wdt.h"  // Закомментировано для совместимости с ESP-IDF v5.5
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 static const char *TAG = "climate_ctrl";
 
 static climate_node_config_t *s_config = NULL;
 static TaskHandle_t s_main_task = NULL;
+static TaskHandle_t s_heartbeat_task = NULL;
+static bool s_discovery_sent = false;
+static uint32_t s_boot_time = 0;
 
 // Forward declarations
 static void climate_main_task(void *arg);
+static void heartbeat_task(void *arg);
 static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lux);
+static void send_discovery(void);
+static void send_heartbeat(void);
 static esp_err_t read_all_sensors(float *temp, float *humidity, uint16_t *co2, uint16_t *lux);
+static int8_t get_rssi_to_parent(void);
 
 esp_err_t climate_controller_init(climate_node_config_t *config) {
     if (!config) {
@@ -35,6 +45,8 @@ esp_err_t climate_controller_init(climate_node_config_t *config) {
     }
 
     s_config = config;
+    s_boot_time = (uint32_t)time(NULL);
+    s_discovery_sent = false;
 
     ESP_LOGI(TAG, "Climate Controller initialized");
     ESP_LOGI(TAG, "Node ID: %s, Zone: %s", s_config->base.node_id, s_config->base.zone);
@@ -49,9 +61,11 @@ esp_err_t climate_controller_start(void) {
         return ESP_OK;
     }
 
+    // Запуск главной задачи (telemetry каждые 30 сек)
+    // Stack увеличен в 2 раза для безопасности: 4096 → 8192
     BaseType_t ret = xTaskCreate(climate_main_task,
                                   "climate_main",
-                                  4096,
+                                  8192,
                                   NULL,
                                   5,
                                   &s_main_task);
@@ -59,6 +73,20 @@ esp_err_t climate_controller_start(void) {
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create main task");
         return ESP_FAIL;
+    }
+
+    // Запуск задачи heartbeat (каждые 60 сек)
+    // Stack увеличен в 2 раза для безопасности: 3072 → 6144
+    ret = xTaskCreate(heartbeat_task,
+                      "heartbeat",
+                      6144,
+                      NULL,
+                      4,
+                      &s_heartbeat_task);
+    
+    if (ret != pdPASS) {
+        ESP_LOGW(TAG, "Failed to create heartbeat task");
+        // Не критично - продолжаем работу
     }
 
     ESP_LOGI(TAG, "Climate Controller started");
@@ -69,14 +97,18 @@ esp_err_t climate_controller_stop(void) {
     if (s_main_task != NULL) {
         vTaskDelete(s_main_task);
         s_main_task = NULL;
-        ESP_LOGI(TAG, "Climate Controller stopped");
     }
+    if (s_heartbeat_task != NULL) {
+        vTaskDelete(s_heartbeat_task);
+        s_heartbeat_task = NULL;
+    }
+    ESP_LOGI(TAG, "Climate Controller stopped");
     return ESP_OK;
 }
 
-// Главная задача чтения датчиков
+// Главная задача чтения датчиков и отправки telemetry
 static void climate_main_task(void *arg) {
-    ESP_LOGI(TAG, "Main task running (interval: %d ms)", s_config->read_interval_ms);
+    ESP_LOGI(TAG, "Main task running (telemetry every 30 sec)");
     
     // Регистрация в watchdog (закомментировано для ESP-IDF v5.5)
     // esp_task_wdt_add(NULL);
@@ -84,9 +116,31 @@ static void climate_main_task(void *arg) {
     float temp, humidity;
     uint16_t co2, lux;
 
+    // Отправка discovery сообщения при старте
+    // Ожидаем подключения к mesh (до 30 секунд)
+    int wait_count = 0;
+    while (!mesh_manager_is_connected() && wait_count < 30) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        wait_count++;
+    }
+    
+    // Дополнительная задержка после подключения для стабилизации mesh
+    if (mesh_manager_is_connected()) {
+        ESP_LOGI(TAG, "Mesh connected, waiting 3 seconds for stabilization...");
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        send_discovery();
+        s_discovery_sent = true;
+    }
+
     while (1) {
         // Сброс watchdog (закомментировано для ESP-IDF v5.5)
         // esp_task_wdt_reset();
+
+        // Если mesh подключен, но discovery не отправлен - отправить
+        if (mesh_manager_is_connected() && !s_discovery_sent) {
+            send_discovery();
+            s_discovery_sent = true;
+        }
 
         // Чтение всех датчиков
         esp_err_t ret = read_all_sensors(&temp, &humidity, &co2, &lux);
@@ -108,8 +162,24 @@ static void climate_main_task(void *arg) {
             ESP_LOGW(TAG, "All sensors failed - skipping telemetry");
         }
 
-        // Интервал чтения
-        vTaskDelay(pdMS_TO_TICKS(s_config->read_interval_ms));
+        // Интервал telemetry - 5 секунд (DEBUG режим!)
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
+
+// Задача heartbeat (каждые 5 секунд для DEBUG)
+static void heartbeat_task(void *arg) {
+    ESP_LOGI(TAG, "Heartbeat task running (every 5 sec - DEBUG mode)");
+    
+    // Начальная задержка
+    vTaskDelay(pdMS_TO_TICKS(5000));
+
+    while (1) {
+        if (mesh_manager_is_connected()) {
+            send_heartbeat();
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(5000));  // Каждые 5 секунд (DEBUG)
     }
 }
 
@@ -179,7 +249,84 @@ static esp_err_t read_all_sensors(float *temp, float *humidity, uint16_t *co2, u
     return at_least_one_ok ? ESP_OK : ESP_FAIL;
 }
 
-// Отправка телеметрии на ROOT
+// Получение RSSI к родительскому узлу (ROOT)
+static int8_t get_rssi_to_parent(void) {
+    return mesh_manager_get_parent_rssi();
+}
+
+// Отправка discovery сообщения
+static void send_discovery(void) {
+    if (!mesh_manager_is_connected()) {
+        ESP_LOGW(TAG, "Mesh offline, discovery skipped");
+        return;
+    }
+
+    // Получение MAC адреса
+    uint8_t mac[6];
+    mesh_manager_get_mac(mac);
+
+    // Получение данных о системе
+    uint32_t heap_free = esp_get_free_heap_size();
+    int8_t rssi = get_rssi_to_parent();
+
+    // Создание discovery JSON
+    char discovery_msg[512];
+    snprintf(discovery_msg, sizeof(discovery_msg),
+            "{\"type\":\"discovery\","
+            "\"node_id\":\"%s\","
+            "\"node_type\":\"climate\","
+            "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
+            "\"firmware\":\"1.0.0\","
+            "\"hardware\":\"ESP32\","
+            "\"sensors\":[\"sht3x\",\"ccs811\",\"lux\"],"
+            "\"heap_free\":%lu,"
+            "\"wifi_rssi\":%d}",
+            s_config->base.node_id,
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+            (unsigned long)heap_free,
+            rssi);
+
+    esp_err_t err = mesh_manager_send_to_root((uint8_t *)discovery_msg, strlen(discovery_msg));
+    
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "🔍 Discovery sent: %s (RSSI=%d)", s_config->base.node_id, rssi);
+    } else {
+        ESP_LOGW(TAG, "Failed to send discovery: %s", esp_err_to_name(err));
+    }
+}
+
+// Отправка heartbeat
+static void send_heartbeat(void) {
+    if (!mesh_manager_is_connected()) {
+        return;
+    }
+
+    uint32_t uptime = (uint32_t)time(NULL) - s_boot_time;
+    uint32_t heap_free = esp_get_free_heap_size();
+    int8_t rssi = get_rssi_to_parent();
+
+    // Создание heartbeat JSON
+    char heartbeat_msg[256];
+    snprintf(heartbeat_msg, sizeof(heartbeat_msg),
+            "{\"type\":\"heartbeat\","
+            "\"node_id\":\"%s\","
+            "\"uptime\":%lu,"
+            "\"heap_free\":%lu,"
+            "\"rssi_to_parent\":%d}",
+            s_config->base.node_id,
+            (unsigned long)uptime,
+            (unsigned long)heap_free,
+            rssi);
+
+    esp_err_t err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
+    
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "💓 Heartbeat sent (uptime=%lus, heap=%luB, RSSI=%d)", 
+                 (unsigned long)uptime, (unsigned long)heap_free, rssi);
+    }
+}
+
+// Отправка телеметрии на ROOT с RSSI
 static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lux) {
     if (!mesh_manager_is_connected()) {
         ESP_LOGW(TAG, "Mesh offline, telemetry skipped");
@@ -187,12 +334,16 @@ static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lu
         return;
     }
 
+    // Получение RSSI к родительскому узлу
+    int8_t rssi = get_rssi_to_parent();
+
     // Создание JSON
     cJSON *data = cJSON_CreateObject();
-    cJSON_AddNumberToObject(data, "temp", temp);
+    cJSON_AddNumberToObject(data, "temperature", temp);
     cJSON_AddNumberToObject(data, "humidity", humidity);
     cJSON_AddNumberToObject(data, "co2", co2);
     cJSON_AddNumberToObject(data, "lux", lux);
+    cJSON_AddNumberToObject(data, "rssi_to_parent", rssi);
 
     char json_buf[512];
     if (mesh_protocol_create_telemetry(s_config->base.node_id, data,
@@ -200,8 +351,8 @@ static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lu
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         
         if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Telemetry sent: %.1f°C, %.0f%%, %dppm, %dlux", 
-                     temp, humidity, co2, lux);
+            ESP_LOGI(TAG, "📊 Telemetry: %.1f°C, %.0f%%, %dppm, %dlux, RSSI=%d", 
+                     temp, humidity, co2, lux, rssi);
         } else {
             ESP_LOGW(TAG, "Failed to send telemetry: %s", esp_err_to_name(err));
         }

@@ -7,6 +7,10 @@ use App\Models\Command;
 use App\Services\MqttService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Http\Requests\StoreNodeRequest;
+use App\Http\Requests\UpdateNodeRequest;
+use App\Http\Requests\SendCommandRequest;
+use Illuminate\Support\Facades\Log;
 
 class NodeController extends Controller
 {
@@ -31,15 +35,11 @@ class NodeController extends Controller
             }
         }
 
-        // Загрузка последней телеметрии
+        // Загрузка последней телеметрии с appends
         $nodes = $query->with(['lastTelemetry'])->get();
 
-        // Добавление вычисляемых полей
-        $nodes->each(function ($node) {
-            $node->is_online = $node->isOnline();
-            $node->status_color = $node->status_color;
-            $node->icon = $node->icon;
-        });
+        // Добавление вычисляемых полей через appends
+        $nodes->makeVisible(['is_online', 'status_color', 'icon']);
 
         return response()->json($nodes);
     }
@@ -71,25 +71,40 @@ class NodeController extends Controller
     }
 
     /**
-     * Создание или обновление узла
+     * Создание нового узла
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreNodeRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'node_id' => 'required|string|max:50',
-            'node_type' => 'required|string|in:ph_ec,climate,relay,water,display,root',
-            'zone' => 'nullable|string|max:100',
-            'mac_address' => 'nullable|string|size:17',
-            'config' => 'nullable|array',
-            'metadata' => 'nullable|array',
-        ]);
+        $validated = $request->validated();
 
-        $node = Node::updateOrCreate(
-            ['node_id' => $validated['node_id']],
-            $validated
-        );
-
-        return response()->json($node, 201);
+        // Создаём новый узел (unique constraint защитит от дублей)
+        try {
+            $node = Node::create($validated);
+            
+            Log::info("Node created via API", [
+                'node_id' => $node->node_id,
+                'node_type' => $node->node_type,
+                'created_by' => 'api',
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Node created successfully',
+                'node' => $node,
+            ], 201);
+            
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle duplicate node_id (SQLite: 19, PostgreSQL/MySQL: 23000)
+            if ($e->errorInfo[0] == 23000 || $e->errorInfo[1] == 19) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'duplicate_node_id',
+                    'message' => 'Узел с таким ID уже существует',
+                ], 409);
+            }
+            
+            throw $e;
+        }
     }
 
     /**
@@ -203,16 +218,46 @@ class NodeController extends Controller
     }
 
     /**
+     * Обновление основных полей узла
+     */
+    public function update(Request $request, string $nodeId): JsonResponse
+    {
+        $node = Node::where('node_id', $nodeId)->firstOrFail();
+
+        $validated = $request->validate([
+            'zone' => 'nullable|string|max:100',
+            'mac_address' => 'nullable|string|size:17',
+            'config' => 'nullable|array',
+            'metadata' => 'nullable|array',
+        ]);
+
+        $node->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Node updated',
+            'node' => $node,
+        ]);
+    }
+
+    /**
      * Удаление узла
      */
     public function destroy(string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
+        
+        // Delete related data
+        $node->telemetry()->delete();
+        $node->events()->delete();
+        $node->commands()->delete();
+        
+        // Delete node
         $node->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Node deleted',
+            'message' => 'Node and all related data deleted',
         ]);
     }
 }

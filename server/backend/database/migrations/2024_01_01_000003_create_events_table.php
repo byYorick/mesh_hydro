@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('node_id');
             $table->enum('level', ['info', 'warning', 'critical', 'emergency']);
             $table->text('message');
-            $table->jsonb('data')->nullable();
+            $table->json('data')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->string('resolved_by')->nullable(); // user_id или 'auto'
             $table->timestamps();

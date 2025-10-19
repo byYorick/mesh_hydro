@@ -15,13 +15,13 @@ return new class extends Migration
             $table->id();
             $table->string('node_id');
             $table->string('command');            // "calibrate", "open_windows", "pump_on"
-            $table->jsonb('params')->nullable();  // Параметры команды
+            $table->json('params')->nullable();  // Параметры команды
             $table->enum('status', ['pending', 'sent', 'acknowledged', 'completed', 'failed'])
                 ->default('pending');
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('acknowledged_at')->nullable();
             $table->timestamp('completed_at')->nullable();
-            $table->jsonb('response')->nullable(); // Ответ от узла
+            $table->json('response')->nullable(); // Ответ от узла
             $table->text('error')->nullable();     // Ошибка если не выполнена
             $table->string('user_id')->nullable(); // Кто отправил команду
             $table->timestamps();
