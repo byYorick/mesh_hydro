@@ -77,6 +77,8 @@ class TelemetryController extends Controller
 
     /**
      * Агрегированные данные (среднее, мин, макс)
+     * 
+     * ⚠️ Требует PostgreSQL с JSONB поддержкой
      */
     public function aggregate(Request $request): JsonResponse
     {
@@ -92,7 +94,7 @@ class TelemetryController extends Controller
         $hours = $validated['hours'] ?? 24;
         $interval = $validated['interval'] ?? '1hour';
 
-        // Определение группировки по времени
+        // Определение группировки по времени (PostgreSQL)
         $groupBy = match($interval) {
             '5min' => "date_trunc('minute', received_at) + INTERVAL '5 min' * FLOOR(EXTRACT(MINUTE FROM received_at) / 5)",
             '15min' => "date_trunc('minute', received_at) + INTERVAL '15 min' * FLOOR(EXTRACT(MINUTE FROM received_at) / 15)",

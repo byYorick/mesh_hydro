@@ -56,6 +56,24 @@ const routes = [
     },
   },
   {
+    path: '/errors',
+    name: 'Errors',
+    component: () => import('@/views/Errors.vue'),
+    meta: {
+      title: 'Ошибки',
+      icon: 'mdi-bug',
+    },
+  },
+  {
+    path: '/documentation',
+    name: 'Documentation',
+    component: () => import('@/views/Documentation.vue'),
+    meta: {
+      title: 'Документация',
+      icon: 'mdi-book-open-variant',
+    },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/AdvancedSettings.vue'),

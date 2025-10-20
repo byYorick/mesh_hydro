@@ -37,16 +37,22 @@
       </v-col>
     </v-row>
 
-    <!-- Memory and Metadata -->
+    <!-- Memory, Metadata and Health -->
     <v-row>
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="4">
         <NodeMemoryCard
           :node="node"
           :loading="loading"
           @refresh="loadTelemetry"
         />
       </v-col>
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="4">
+        <NodeHealthIndicator
+          :node="node"
+          :error-count="nodeErrors.length"
+        />
+      </v-col>
+      <v-col cols="12" md="4">
         <NodeMetadataCard :node="node" />
       </v-col>
     </v-row>
@@ -62,6 +68,17 @@
           :loading="loading"
           @range-changed="onRangeChanged"
           @refresh="loadTelemetry"
+        />
+      </v-col>
+    </v-row>
+
+    <!-- Errors Timeline -->
+    <v-row>
+      <v-col cols="12">
+        <ErrorTimeline
+          :errors="nodeErrors"
+          @view-details="viewErrorDetails"
+          @resolve="resolveError"
         />
       </v-col>
     </v-row>
@@ -99,6 +116,13 @@
         </v-card>
       </v-col>
     </v-row>
+
+    <!-- Error Details Dialog -->
+    <ErrorDetailsDialog
+      v-model="showErrorDialog"
+      :error="selectedError"
+      @error-resolved="handleErrorResolved"
+    />
   </div>
   
   <div v-else class="text-center pa-8">
@@ -112,12 +136,16 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNodesStore } from '@/stores/nodes'
 import { useTelemetryStore } from '@/stores/telemetry'
+import { useErrorsStore } from '@/stores/errors'
 import { useAppStore } from '@/stores/app'
 import AdvancedChart from '@/components/AdvancedChart.vue'
 import NodeActions from '@/components/NodeActions.vue'
 import NodeManagementCard from '@/components/NodeManagementCard.vue'
 import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
 import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
+import NodeHealthIndicator from '@/components/NodeHealthIndicator.vue'
+import ErrorTimeline from '@/components/ErrorTimeline.vue'
+import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
 import { formatDateTime } from '@/utils/time'
 import api from '@/services/api'
 
@@ -125,12 +153,16 @@ const route = useRoute()
 const router = useRouter()
 const nodesStore = useNodesStore()
 const telemetryStore = useTelemetryStore()
+const errorsStore = useErrorsStore()
 const appStore = useAppStore()
 
 const node = ref(null)
 const telemetryData = ref([])
+const nodeErrors = ref([])
 const selectedRange = ref('24h')
 const loading = ref(false)
+const selectedError = ref(null)
+const showErrorDialog = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
@@ -162,7 +194,38 @@ onMounted(async () => {
   const nodeId = route.params.nodeId
   node.value = await nodesStore.fetchNode(nodeId)
   await loadTelemetry()
+  await loadNodeErrors()
 })
+
+async function loadNodeErrors() {
+  try {
+    nodeErrors.value = await errorsStore.fetchNodeErrors(node.value.node_id, {
+      hours: 168, // Last 7 days
+    })
+  } catch (error) {
+    console.error('Error loading node errors:', error)
+  }
+}
+
+function viewErrorDetails(error) {
+  selectedError.value = error
+  showErrorDialog.value = true
+}
+
+async function resolveError(errorId) {
+  try {
+    await errorsStore.resolveError(errorId, 'manual')
+    appStore.showSnackbar('Ошибка решена', 'success')
+    await loadNodeErrors()
+  } catch (error) {
+    appStore.showSnackbar('Ошибка при резолвении', 'error')
+  }
+}
+
+async function handleErrorResolved() {
+  await loadNodeErrors()
+  showErrorDialog.value = false
+}
 
 async function loadTelemetry() {
   loading.value = true

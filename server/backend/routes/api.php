@@ -7,6 +7,8 @@ use App\Http\Controllers\NodeController;
 use App\Http\Controllers\TelemetryController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NodeErrorController;
+use App\Http\Controllers\PidPresetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -75,3 +77,36 @@ Route::middleware('throttle:api')->group(function () {
     });
 });
 
+// Ошибки узлов
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('errors')->group(function () {
+        Route::get('/', [NodeErrorController::class, 'index']);
+        Route::get('/statistics', [NodeErrorController::class, 'statistics']);
+        Route::get('/{id}', [NodeErrorController::class, 'show']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/{id}/resolve', [NodeErrorController::class, 'resolve']);
+            Route::post('/resolve-bulk', [NodeErrorController::class, 'resolveBulk']);
+            Route::delete('/{id}', [NodeErrorController::class, 'destroy']);
+        });
+    });
+    
+    // Ошибки для конкретного узла
+    Route::get('/nodes/{nodeId}/errors', [NodeErrorController::class, 'forNode']);
+});
+
+// PID пресеты
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('pid-presets')->group(function () {
+        Route::get('/', [PidPresetController::class, 'index']);
+        Route::get('/{id}', [PidPresetController::class, 'show']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [PidPresetController::class, 'store']);
+            Route::put('/{id}', [PidPresetController::class, 'update']);
+            Route::delete('/{id}', [PidPresetController::class, 'destroy']);
+        });
+    });
+});

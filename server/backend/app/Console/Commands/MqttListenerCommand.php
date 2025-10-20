@@ -105,6 +105,13 @@ class MqttListenerCommand extends Command
             $mqtt->handleDiscovery($topic, $message);
         });
 
+        // Подписка на ошибки узлов
+        $this->info('📡 Subscribing to: hydro/error/#');
+        $mqtt->subscribe('hydro/error/#', function ($topic, $message) use ($mqtt) {
+            $this->line("❌ [ERROR] {$topic}");
+            $mqtt->handleError($topic, $message);
+        });
+
         $this->newLine();
         $this->info('🎧 MQTT Listener is running (AUTO-DISCOVERY enabled)...');
         $this->info('Press Ctrl+C to stop');

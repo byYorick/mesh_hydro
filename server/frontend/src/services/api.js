@@ -24,31 +24,63 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor
+// Response interceptor with retry logic
 api.interceptors.response.use(
   (response) => {
     return response.data
   },
-  (error) => {
-    if (error.response) {
-      // Server responded with error status
-      console.error('API Error:', error.response.data)
-      
-      if (error.response.status === 401) {
-        // Unauthorized - redirect to login
-        localStorage.removeItem('auth_token')
-        window.location.href = '/login'
-      }
-    } else if (error.request) {
-      // Request made but no response
-      console.error('Network Error:', error.request)
-    } else {
-      console.error('Error:', error.message)
+  async (error) => {
+    const config = error.config
+    
+    // Retry logic для network errors
+    if (!config || !config.retry) {
+      config.retry = { count: 0, limit: 3, delay: 1000 }
     }
     
-    return Promise.reject(error)
+    // Не retry для определенных статусов
+    const noRetryStatuses = [400, 401, 403, 404, 422]
+    if (error.response && noRetryStatuses.includes(error.response.status)) {
+      return handleError(error)
+    }
+    
+    // Retry для network errors или 5xx
+    if (!error.response || error.response.status >= 500) {
+      config.retry.count += 1
+      
+      if (config.retry.count < config.retry.limit) {
+        console.log(`🔄 Retrying request (${config.retry.count}/${config.retry.limit})...`)
+        
+        // Exponential backoff
+        const delay = config.retry.delay * Math.pow(2, config.retry.count - 1)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        
+        return api.request(config)
+      }
+    }
+    
+    return handleError(error)
   }
 )
+
+function handleError(error) {
+  if (error.response) {
+    // Server responded with error status
+    console.error('API Error:', error.response.data)
+    
+    if (error.response.status === 401) {
+      // Unauthorized - redirect to login
+      localStorage.removeItem('auth_token')
+      window.location.href = '/login'
+    }
+  } else if (error.request) {
+    // Request made but no response
+    console.error('Network Error:', error.request)
+  } else {
+    console.error('Error:', error.message)
+  }
+  
+  return Promise.reject(error)
+}
 
 // API methods
 export default {
@@ -157,6 +189,42 @@ export default {
 
   deleteEvent(id) {
     return api.delete(`/events/${id}`)
+  },
+
+  // Errors
+  getErrors(params = {}) {
+    return api.get('/errors', { params })
+  },
+
+  getError(id) {
+    return api.get(`/errors/${id}`)
+  },
+
+  getNodeErrors(nodeId, params = {}) {
+    return api.get(`/nodes/${nodeId}/errors`, { params })
+  },
+
+  getErrorStatistics(hours = 24) {
+    return api.get('/errors/statistics', { params: { hours } })
+  },
+
+  resolveError(errorId, resolvedBy = 'manual', resolutionNotes = null) {
+    return api.post(`/errors/${errorId}/resolve`, {
+      resolved_by: resolvedBy,
+      resolution_notes: resolutionNotes,
+    })
+  },
+
+  resolveBulkErrors(errorIds, resolvedBy = 'manual', resolutionNotes = null) {
+    return api.post('/errors/resolve-bulk', {
+      error_ids: errorIds,
+      resolved_by: resolvedBy,
+      resolution_notes: resolutionNotes,
+    })
+  },
+
+  deleteError(errorId) {
+    return api.delete(`/errors/${errorId}`)
   },
 }
 

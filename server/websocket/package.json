@@ -1,0 +1,12 @@
+{
+  "name": "hydro-websocket",
+  "version": "1.0.0",
+  "description": "WebSocket server for Mesh Hydro using Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.2"
+  }
+}

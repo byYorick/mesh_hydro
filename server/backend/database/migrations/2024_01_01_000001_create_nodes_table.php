@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('mac_address', 17)->nullable(); // "AA:BB:CC:DD:EE:FF"
             $table->boolean('online')->default(false);
             $table->timestamp('last_seen_at')->nullable();
-            $table->json('config')->nullable();   // Конфигурация узла
-            $table->json('metadata')->nullable(); // Метаданные (версия прошивки и т.д.)
+            $table->jsonb('config')->nullable();   // Конфигурация узла (JSONB в PostgreSQL)
+            $table->jsonb('metadata')->nullable(); // Метаданные (версия прошивки и т.д., JSONB в PostgreSQL)
             $table->timestamps();
 
             // Индексы для быстрого поиска
@@ -29,6 +29,12 @@ return new class extends Migration
             $table->index('online');
             $table->index('last_seen_at');
         });
+
+        // GIN индексы для JSONB полей (только PostgreSQL)
+        if (config('database.default') === 'pgsql') {
+            DB::statement('CREATE INDEX nodes_config_gin ON nodes USING GIN (config)');
+            DB::statement('CREATE INDEX nodes_metadata_gin ON nodes USING GIN (metadata)');
+        }
     }
 
     /**

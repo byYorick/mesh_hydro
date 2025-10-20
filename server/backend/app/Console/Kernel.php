@@ -34,6 +34,11 @@ class Kernel extends ConsoleKernel
                 ]);
         })
         ->hourly();
+
+        // Обработка просроченных команд каждые 2 минуты
+        $schedule->command('commands:process-timeouts')
+            ->everyTwoMinutes()
+            ->withoutOverlapping();
     }
 
     /**

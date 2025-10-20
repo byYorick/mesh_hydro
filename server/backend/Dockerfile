@@ -13,7 +13,7 @@ RUN apk add --no-cache \
     libxml2-dev \
     zip \
     unzip \
-    sqlite-dev \
+    postgresql-dev \
     autoconf \
     g++ \
     make
@@ -21,7 +21,8 @@ RUN apk add --no-cache \
 # Установка PHP расширений
 RUN docker-php-ext-install \
     pdo \
-    pdo_sqlite \
+    pdo_pgsql \
+    pgsql \
     mbstring \
     exif \
     pcntl \
@@ -43,9 +44,6 @@ RUN composer install --no-dev --optimize-autoloader --no-scripts
 # Копирование остальных файлов
 COPY . .
 
-# Создание директории для SQLite
-RUN mkdir -p /var/www/html/database && chmod 777 /var/www/html/database
-
 # Права доступа
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
@@ -54,10 +52,8 @@ RUN chown -R www-data:www-data /var/www/html \
 # Генерация ключа приложения
 RUN php artisan key:generate --force || true
 
-# Оптимизация
-RUN php artisan config:cache && \
-    php artisan route:cache && \
-    php artisan view:cache
+# Оптимизация (без config:cache - он будет выполнен в runtime с переменными окружения)
+RUN php artisan route:cache
 
 # Expose порт
 EXPOSE 8000

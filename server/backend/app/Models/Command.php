@@ -26,6 +26,8 @@ class Command extends Model
         'response',       // jsonb - ответ от узла
         'error',          // текст ошибки если не выполнена
         'user_id',        // кто отправил команду
+        'timeout_at',     // timestamp когда команда должна быть отменена
+        'timeout_seconds', // таймаут в секундах
     ];
 
     /**
@@ -37,6 +39,8 @@ class Command extends Model
         'sent_at' => 'datetime',
         'acknowledged_at' => 'datetime',
         'completed_at' => 'datetime',
+        'timeout_at' => 'datetime',
+        'timeout_seconds' => 'integer',
     ];
 
     /**
@@ -155,6 +159,58 @@ class Command extends Model
     public function scopeForNode($query, string $nodeId)
     {
         return $query->where('node_id', $nodeId);
+    }
+
+    /**
+     * Scope: просроченные команды
+     */
+    public function scopeTimedOut($query)
+    {
+        return $query->where('timeout_at', '<', now())
+                    ->whereIn('status', [self::STATUS_PENDING, self::STATUS_SENT, self::STATUS_ACKNOWLEDGED]);
+    }
+
+    /**
+     * Проверка: команда просрочена?
+     */
+    public function isTimedOut(): bool
+    {
+        return $this->timeout_at && $this->timeout_at->isPast() && $this->isPending();
+    }
+
+    /**
+     * Установить таймаут команды
+     */
+    public function setTimeout(int $seconds = 300): void
+    {
+        $this->update([
+            'timeout_seconds' => $seconds,
+            'timeout_at' => now()->addSeconds($seconds),
+        ]);
+    }
+
+    /**
+     * Пометить команду как просроченную
+     */
+    public function markAsTimedOut(): void
+    {
+        $this->update([
+            'status' => self::STATUS_FAILED,
+            'error' => 'Command timed out after ' . $this->timeout_seconds . ' seconds',
+        ]);
+    }
+
+    /**
+     * Создать команду с таймаутом
+     */
+    public static function createWithTimeout(array $data, int $timeoutSeconds = 300): self
+    {
+        $command = self::create(array_merge($data, [
+            'timeout_seconds' => $timeoutSeconds,
+            'timeout_at' => now()->addSeconds($timeoutSeconds),
+        ]));
+
+        return $command;
     }
 }
 

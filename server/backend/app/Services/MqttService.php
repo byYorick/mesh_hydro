@@ -8,6 +8,8 @@ use App\Models\Node;
 use App\Models\Telemetry;
 use App\Models\Event;
 use App\Models\Command;
+use App\Models\NodeError;
+use App\Services\NotificationThrottleService;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
@@ -15,12 +17,14 @@ class MqttService
 {
     private MqttClient $mqtt;
     private string $clientId;
+    private NotificationThrottleService $throttleService;
 
-    public function __construct()
+    public function __construct(NotificationThrottleService $throttleService)
     {
         $host = config('mqtt.host', 'localhost');
         $port = config('mqtt.port', 1883);
         $this->clientId = config('mqtt.client_id', 'hydro-server-') . uniqid();
+        $this->throttleService = $throttleService;
         
         $this->mqtt = new MqttClient($host, $port, $this->clientId);
     }
@@ -640,21 +644,170 @@ class MqttService
     private function sendNotifications(Event $event): void
     {
         try {
+            $eventType = $this->mapEventLevelToType($event->level);
+            $message = "Event: {$event->message} (Node: {$event->node_id})";
+            
+            // Проверяем throttling
+            if (!$this->throttleService->canSendNotification($eventType, $event->node_id, $message)) {
+                Log::debug("Notification throttled", [
+                    'event_id' => $event->id,
+                    'node_id' => $event->node_id,
+                    'level' => $event->level,
+                    'type' => $eventType
+                ]);
+                return;
+            }
+
             // Telegram уведомление
             if (config('telegram.enabled', true)) {
                 app(TelegramService::class)->sendAlert($event);
             }
 
-            // SMS уведомление
-            if (config('sms.enabled', false)) {
+            // SMS уведомление (только для критичных)
+            if (config('sms.enabled', false) && $event->isCritical()) {
                 app(SmsService::class)->sendAlert($event);
             }
+            
+            // Регистрируем отправку для throttling
+            $this->throttleService->markNotificationSent($eventType, $event->node_id, $message);
+            
         } catch (Exception $e) {
             Log::error("Notification sending error", [
                 'event_id' => $event->id,
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Маппинг уровня события в тип для throttling
+     */
+    private function mapEventLevelToType(string $level): string
+    {
+        return match($level) {
+            'critical', 'emergency' => 'critical',
+            'warning', 'error' => 'warning',
+            default => 'info'
+        };
+    }
+
+    /**
+     * Обработка ошибок узлов
+     * Топик: hydro/error/{node_id}
+     */
+    public function handleError(string $topic, string $payload): void
+    {
+        try {
+            $data = json_decode($payload, true);
+            
+            if (!$data || !isset($data['node_id'])) {
+                Log::warning("Invalid error data", [
+                    'topic' => $topic,
+                    'payload' => $payload
+                ]);
+                return;
+            }
+
+            // Сохранение ошибки в БД
+            $error = NodeError::create([
+                'node_id' => $data['node_id'],
+                'error_code' => $data['error_code'] ?? 'UNKNOWN_ERROR',
+                'error_type' => $data['error_type'] ?? NodeError::TYPE_SOFTWARE,
+                'severity' => $data['severity'] ?? NodeError::SEVERITY_MEDIUM,
+                'message' => $data['message'] ?? 'Unknown error occurred',
+                'stack_trace' => $data['stack_trace'] ?? null,
+                'diagnostics' => $data['diagnostics'] ?? [],
+                'occurred_at' => isset($data['timestamp']) 
+                    ? \Carbon\Carbon::createFromTimestamp($data['timestamp'])
+                    : now(),
+            ]);
+
+            Log::error("Node error occurred", [
+                'node_id' => $error->node_id,
+                'error_code' => $error->error_code,
+                'severity' => $error->severity,
+                'message' => $error->message,
+            ]);
+
+            // Создание события для критичных ошибок
+            if ($error->isCritical()) {
+                Event::create([
+                    'node_id' => $error->node_id,
+                    'level' => Event::LEVEL_CRITICAL,
+                    'message' => "Critical error: {$error->message}",
+                    'data' => [
+                        'error_code' => $error->error_code,
+                        'error_type' => $error->error_type,
+                        'diagnostics' => $error->diagnostics,
+                    ],
+                ]);
+
+                // Отправка уведомлений для критичных ошибок
+                $this->sendNotifications($error);
+            }
+
+            // Broadcast error to frontend
+            event(new \App\Events\ErrorOccurred($error));
+
+        } catch (Exception $e) {
+            Log::error("Error handling error (meta!)", [
+                'topic' => $topic,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Отправка уведомлений о критичной ошибке
+     */
+    private function sendErrorNotifications(NodeError $error): void
+    {
+        try {
+            $errorType = $this->mapErrorSeverityToType($error->severity);
+            $message = "Error: {$error->message} (Node: {$error->node_id}, Code: {$error->error_code})";
+            
+            // Проверяем throttling
+            if (!$this->throttleService->canSendNotification($errorType, $error->node_id, $message)) {
+                Log::debug("Error notification throttled", [
+                    'error_id' => $error->id,
+                    'node_id' => $error->node_id,
+                    'severity' => $error->severity,
+                    'type' => $errorType
+                ]);
+                return;
+            }
+
+            // Telegram уведомление
+            if (config('telegram.enabled', true)) {
+                app(TelegramService::class)->sendErrorAlert($error);
+            }
+
+            // SMS уведомление (только для critical)
+            if (config('sms.enabled', false) && $error->isCritical()) {
+                app(SmsService::class)->sendErrorAlert($error);
+            }
+            
+            // Регистрируем отправку для throttling
+            $this->throttleService->markNotificationSent($errorType, $error->node_id, $message);
+            
+        } catch (Exception $e) {
+            Log::error("Notification sending error", [
+                'error_id' => $error->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Маппинг серьезности ошибки в тип для throttling
+     */
+    private function mapErrorSeverityToType(string $severity): string
+    {
+        return match($severity) {
+            'critical' => 'critical',
+            'high', 'medium' => 'warning',
+            default => 'info'
+        };
     }
 
     /**

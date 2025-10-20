@@ -2,13 +2,29 @@
   <v-card
     :color="statusColor"
     variant="tonal"
-    class="node-card"
+    :class="['node-card', { 'node-card-online': isOnline }]"
   >
-    <v-card-title class="d-flex align-center">
-      <v-icon :icon="nodeIcon" class="mr-2"></v-icon>
-      <span>{{ node.node_id }}</span>
+    <v-card-title class="d-flex align-center" :class="{ 'py-2': mobileLayout }">
+      <v-icon :icon="nodeIcon" :class="mobileLayout ? 'mr-2' : 'mr-2'" :size="mobileLayout ? 32 : 24"></v-icon>
       
-      <v-spacer></v-spacer>
+      <div :class="{ 'flex-grow-1': mobileLayout }">
+        <div :class="mobileLayout ? 'text-subtitle-1' : ''">{{ node.node_id }}</div>
+        <div v-if="mobileLayout" class="text-caption text-medium-emphasis">{{ nodeTypeText }}</div>
+      </div>
+      
+      <v-spacer v-if="!mobileLayout"></v-spacer>
+      
+      <!-- Error Badge -->
+      <v-badge
+        v-if="errorCount > 0"
+        :content="errorCount"
+        :color="errorCount > 5 ? 'error' : 'warning'"
+        offset-x="-5"
+        offset-y="5"
+        class="mr-2"
+      >
+        <v-icon icon="mdi-alert-circle" :color="errorCount > 5 ? 'error' : 'warning'"></v-icon>
+      </v-badge>
       
       <v-chip
         :color="statusColor"
@@ -16,17 +32,31 @@
         variant="flat"
       >
         <v-icon :icon="statusIcon" start></v-icon>
-        {{ statusText }}
+        {{ mobileLayout ? '' : statusText }}
       </v-chip>
     </v-card-title>
 
-    <v-card-subtitle>
+    <v-card-subtitle v-if="!mobileLayout">
       {{ nodeTypeText }} • {{ node.zone || 'Без зоны' }}
     </v-card-subtitle>
 
-    <v-card-text>
-      <!-- Node-specific data -->
-      <div v-if="node.node_type === 'ph_ec' && lastData">
+    <v-card-text :class="{ 'pa-2': mobileLayout }">
+      <!-- Mobile: Horizontal scroll для метрик -->
+      <div v-if="mobileLayout && lastData" class="metrics-scroll mb-2">
+        <v-chip
+          v-for="metric in visibleMetrics"
+          :key="metric.key"
+          class="metric-chip"
+          size="small"
+          variant="outlined"
+        >
+          <v-icon :icon="metric.icon" start size="small"></v-icon>
+          {{ metric.value }}
+        </v-chip>
+      </div>
+
+      <!-- Desktop: Node-specific data -->
+      <div v-else-if="node.node_type === 'ph_ec' && lastData">
         <v-row dense>
           <v-col cols="6">
             <div class="text-h4 font-weight-bold">
@@ -222,6 +252,14 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  mobileLayout: {
+    type: Boolean,
+    default: false,
+  },
+  errorCount: {
+    type: Number,
+    default: 0,
+  },
 })
 
 const emit = defineEmits(['command'])
@@ -362,6 +400,36 @@ function getRssiColor(percent) {
   if (percent > 30) return 'warning'
   return 'error'
 }
+
+// Visible metrics для mobile layout
+const visibleMetrics = computed(() => {
+  if (!lastData.value) return []
+  
+  const metrics = []
+  const data = lastData.value
+  
+  // pH/EC metrics
+  if (props.node.node_type === 'ph_ec') {
+    if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
+    if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
+    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+  }
+  
+  // Climate metrics
+  if (props.node.node_type === 'climate') {
+    if (data.temperature != null) metrics.push({ key: 'temp', value: `${data.temperature.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    if (data.humidity != null) metrics.push({ key: 'hum', value: `${data.humidity.toFixed(0)}%`, icon: 'mdi-water-percent' })
+    if (data.co2 != null) metrics.push({ key: 'co2', value: `${data.co2} ppm`, icon: 'mdi-molecule-co2' })
+  }
+  
+  // Water metrics
+  if (props.node.node_type === 'water') {
+    if (data.level != null) metrics.push({ key: 'level', value: `${data.level.toFixed(0)}%`, icon: 'mdi-waves' })
+    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+  }
+  
+  return metrics
+})
 </script>
 
 <style scoped>
