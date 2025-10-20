@@ -11,49 +11,49 @@
         <v-row>
           <!-- pH/EC Node Actions -->
           <template v-if="node.node_type === 'ph_ec'">
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="6" sm="6" md="3">
               <v-btn
                 block
                 color="primary"
                 prepend-icon="mdi-flask"
                 @click="openCalibratePh"
                 :disabled="!isOnline"
-                size="default"
+                size="small"
                 class="text-none"
               >
-                pH калибр.
+                pH
               </v-btn>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="6" sm="6" md="3">
               <v-btn
                 block
                 color="primary"
                 prepend-icon="mdi-waves"
                 @click="openCalibrateEc"
                 :disabled="!isOnline"
-                size="default"
+                size="small"
                 class="text-none"
               >
-                EC калибр.
+                EC
               </v-btn>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="6" sm="6" md="3">
               <v-btn
                 block
                 color="secondary"
                 prepend-icon="mdi-tune-variant"
                 @click="openPidPresets"
                 :disabled="!isOnline"
-                size="default"
+                size="small"
                 class="text-none"
               >
-                PID настройки
+                PID
               </v-btn>
             </v-col>
 
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="6" sm="6" md="3">
               <v-menu>
                 <template v-slot:activator="{ props }">
                   <v-btn
@@ -62,7 +62,7 @@
                     prepend-icon="mdi-pump"
                     v-bind="props"
                     :disabled="!isOnline"
-                    size="default"
+                    size="small"
                     class="text-none"
                   >
                     Насосы

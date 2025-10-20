@@ -275,9 +275,15 @@ function handleCommand({ command, params }) {
   emit('command', { command, params })
 }
 
-// Node online status
+// Node online status - проверяем по last_seen_at (как в backend)
 const isOnline = computed(() => {
-  return props.node.online || props.node.is_online || false
+  if (!props.node.last_seen_at) return false
+  
+  const lastSeen = new Date(props.node.last_seen_at)
+  const seconds = (Date.now() - lastSeen.getTime()) / 1000
+  
+  // Считаем онлайн если last_seen_at < 30 секунд назад (как в backend scope)
+  return seconds < 30
 })
 
 // Status color

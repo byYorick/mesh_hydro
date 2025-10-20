@@ -114,7 +114,7 @@ class NodeSeeder extends Seeder
                 'node_type' => 'relay',
                 'zone' => 'Zone 1',
                 'mac_address' => 'AA:BB:CC:DD:EE:03',
-                'online' => true,
+                'online' => false,
                 'last_seen_at' => now()->subMinutes(2),
                 'config' => [
                     'relays' => [
@@ -176,8 +176,8 @@ class NodeSeeder extends Seeder
                 'node_type' => 'display',
                 'zone' => 'Zone 1',
                 'mac_address' => 'AA:BB:CC:DD:EE:05',
-                'online' => true,
-                'last_seen_at' => now()->subSeconds(30),
+                'online' => false,
+                'last_seen_at' => now()->subMinutes(1),
                 'config' => [
                     'brightness' => 80,
                     'pages' => ['overview', 'ph_ec', 'climate'],
