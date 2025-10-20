@@ -153,6 +153,9 @@ const props = defineProps({
 defineEmits(['view-details', 'resolve'])
 
 const unresolvedCount = computed(() => {
+  if (!Array.isArray(props.errors)) {
+    return 0
+  }
   return props.errors.filter(e => !e.resolved_at).length
 })
 

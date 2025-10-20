@@ -284,6 +284,8 @@ onUnmounted(() => {
 function setupWebSocketListeners() {
   if (!echo) {
     console.warn('Echo not available, falling back to polling')
+    // Подписываемся на fallback события
+    setupFallbackListeners()
     return
   }
 
@@ -359,27 +361,30 @@ function setupWebSocketListeners() {
 
   console.log('✅ WebSocket listeners configured')
   
-  // Fallback event listeners
+  // Также подписываемся на fallback события (на случай отключения WS)
+  setupFallbackListeners()
+}
+
+// Обработка fallback polling событий
+function setupFallbackListeners() {
+  // Слушаем события от fallback polling
   window.addEventListener('echo:fallback', (event) => {
     const { channel, event: eventName, data } = event.detail
     
-    if (channel === 'hydro.nodes' && eventName === 'NodeStatusChanged') {
-      console.log('📡 Fallback telemetry:', data)
-      // Обновляем все узлы из fallback данных
-      if (Array.isArray(data)) {
-        data.forEach(node => {
-          nodesStore.updateNodeRealtime({
-            node_id: node.node_id,
-            online: node.online,
-            last_seen_at: node.last_seen_at,
-          })
-        })
-      }
+    if (channel === 'hydro.nodes' && Array.isArray(data)) {
+      console.log('📡 Fallback nodes update:', data.length, 'nodes')
+      // Обновляем все узлы из fallback polling
+      data.forEach(node => {
+        nodesStore.updateNodeRealtime(node)
+      })
     }
     
-    if (channel === 'hydro.events' && eventName === 'EventCreated') {
-      console.log('🔔 Fallback event:', data)
-      if (Array.isArray(data)) {
+    if (channel === 'hydro.events' && Array.isArray(data)) {
+      console.log('🔔 Fallback events update:', data.length, 'events')
+      // Обновляем события (если метод существует)
+      if (eventsStore.updateEventsFromFallback) {
+        eventsStore.updateEventsFromFallback(data)
+      } else {
         data.forEach(event => {
           eventsStore.addEventRealtime(event)
         })

@@ -18,7 +18,14 @@ COPY . .
 
 # Аргументы сборки
 ARG VITE_API_URL=http://localhost:8000
+ARG VITE_WS_HOST=localhost
+ARG VITE_WS_PORT=8080
+ARG VITE_PUSHER_KEY=hydro-app-key
+
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_HOST=$VITE_WS_HOST
+ENV VITE_WS_PORT=$VITE_WS_PORT
+ENV VITE_PUSHER_KEY=$VITE_PUSHER_KEY
 
 # Сборка production
 RUN npm run build

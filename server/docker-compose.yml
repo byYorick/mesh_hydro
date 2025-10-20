@@ -93,13 +93,15 @@ services:
       - DB_PASSWORD=hydro_secure_pass_2025
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
-      - BROADCAST_DRIVER=pusher
-      - PUSHER_APP_ID=hydro-app
-      - PUSHER_APP_KEY=hydro-app-key
-      - PUSHER_APP_SECRET=hydro-app-secret
-      - PUSHER_HOST=localhost
-      - PUSHER_PORT=6001
-      - PUSHER_SCHEME=http
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=hydro-app
+      - REVERB_APP_KEY=hydro-app-key
+      - REVERB_APP_SECRET=hydro-app-secret
+      - REVERB_HOST=localhost
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8080
     volumes:
       # Монтирование локального кода (только для разработки)
       # - ./backend:/var/www/html
@@ -138,13 +140,15 @@ services:
       - DB_PASSWORD=hydro_secure_pass_2025
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
-      - BROADCAST_DRIVER=pusher
-      - PUSHER_APP_ID=hydro-app
-      - PUSHER_APP_KEY=hydro-app-key
-      - PUSHER_APP_SECRET=hydro-app-secret
-      - PUSHER_HOST=localhost
-      - PUSHER_PORT=6001
-      - PUSHER_SCHEME=http
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=hydro-app
+      - REVERB_APP_KEY=hydro-app-key
+      - REVERB_APP_SECRET=hydro-app-secret
+      - REVERB_HOST=localhost
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8080
     # volumes:
       # Монтирование локального кода (только для разработки)
       # - ./backend:/var/www/html
@@ -160,6 +164,42 @@ services:
     command: php artisan mqtt:listen
 
   # ========================================
+  # Scheduler (Laravel Artisan)
+  # Автоматическое выполнение scheduled tasks
+  # ========================================
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_scheduler
+    restart: unless-stopped
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=hydro_system
+      - DB_USERNAME=hydro
+      - DB_PASSWORD=hydro_secure_pass_2025
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=hydro-app
+      - REVERB_APP_KEY=hydro-app-key
+      - REVERB_APP_SECRET=hydro-app-secret
+      - REVERB_HOST=localhost
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - hydro_network
+    command: php artisan schedule:work
+
+  # ========================================
   # Frontend (Vue.js 3)
   # Веб-интерфейс для мониторинга ESP32
   # ========================================
@@ -169,6 +209,9 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=/api
+        - VITE_WS_HOST=localhost
+        - VITE_WS_PORT=8080
+        - VITE_PUSHER_KEY=hydro-app-key
     container_name: hydro_frontend
     restart: unless-stopped
     ports:
@@ -179,26 +222,44 @@ services:
       - hydro_network
 
   # ========================================
-  # WebSocket Server (Socket.IO) - только для dev
-  # Альтернатива Reverb для разработки
+  # Laravel Reverb WebSocket Server
+  # Встроенный WebSocket сервер Laravel 11
   # ========================================
-  websocket:
+  reverb:
     build:
-      context: ./websocket
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: hydro_websocket
+    container_name: hydro_reverb
     restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
     ports:
-      - "6002:6001"  # Другой порт чтобы не конфликтовать с Reverb
+      - "8080:8080"
     environment:
-      - PORT=6001
-      - APP_ID=hydro-app
-      - APP_KEY=hydro-app-key
-      - APP_SECRET=hydro-app-secret
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=hydro_system
+      - DB_USERNAME=hydro
+      - DB_PASSWORD=hydro_secure_pass_2025
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=hydro-app
+      - REVERB_APP_KEY=hydro-app-key
+      - REVERB_APP_SECRET=hydro-app-secret
+      - REVERB_HOST=localhost
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8080
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - hydro_network
-    profiles:
-      - dev  # Запускается только с --profile dev
+    volumes:
+      - backend_storage:/var/www/html/storage
 
   # ========================================
   # Nginx (Reverse Proxy) - опционально

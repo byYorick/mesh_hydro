@@ -199,11 +199,13 @@ onMounted(async () => {
 
 async function loadNodeErrors() {
   try {
-    nodeErrors.value = await errorsStore.fetchNodeErrors(node.value.node_id, {
+    const result = await errorsStore.fetchNodeErrors(node.value.node_id, {
       hours: 168, // Last 7 days
     })
+    nodeErrors.value = Array.isArray(result) ? result : []
   } catch (error) {
     console.error('Error loading node errors:', error)
+    nodeErrors.value = []
   }
 }
 

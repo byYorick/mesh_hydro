@@ -36,10 +36,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # Копирование composer файлов
-COPY composer.json composer.lock ./
+COPY composer.json ./
 
-# Установка зависимостей PHP
-RUN composer install --no-dev --optimize-autoloader --no-scripts
+# Установка зависимостей PHP (обновление lock файла)
+RUN composer update --no-dev --optimize-autoloader --no-scripts --prefer-dist
 
 # Копирование остальных файлов
 COPY . .

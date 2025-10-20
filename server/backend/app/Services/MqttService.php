@@ -92,6 +92,11 @@ class MqttService
     public function publish(string $topic, string $message, int $qos = 0, bool $retain = false): void
     {
         try {
+            // Автоматическое подключение если не подключен
+            if (!$this->mqtt->isConnected()) {
+                $this->connect();
+            }
+            
             $this->mqtt->publish($topic, $message, $qos, $retain);
             
             Log::debug("MQTT published", [

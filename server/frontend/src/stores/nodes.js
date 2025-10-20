@@ -120,16 +120,17 @@ export const useNodesStore = defineStore('nodes', {
       }
     },
 
-    // Update node in real-time (from WebSocket)
+    // Update node in real-time (from WebSocket or fallback polling)
     updateNodeRealtime(nodeData) {
       const index = this.nodes.findIndex(n => n.node_id === nodeData.node_id)
       
       if (index !== -1) {
+        // Используем online из nodeData, если указано, иначе сохраняем текущее значение
         this.nodes[index] = {
           ...this.nodes[index],
           ...nodeData,
-          online: true,
-          last_seen_at: new Date(),
+          // НЕ переопределяем online если он уже есть в nodeData
+          online: nodeData.online !== undefined ? nodeData.online : this.nodes[index].online,
         }
       } else {
         // Add new node

@@ -27,7 +27,7 @@ class CheckNodesStatusCommand extends Command
     {
         $this->info('Checking nodes status...');
         
-        $timeout = config('hydro.node_offline_timeout', 30);
+        $timeout = config('hydro.node_offline_timeout', 20);
         $offlineThreshold = now()->subSeconds($timeout);
         
         $nodes = Node::all();
@@ -41,6 +41,9 @@ class CheckNodesStatusCommand extends Command
             // Обновление статуса
             if ($node->online !== $isOnline) {
                 $node->update(['online' => $isOnline]);
+                
+                // Broadcast изменение статуса через WebSocket
+                event(new \App\Events\NodeStatusChanged($node, $wasOnline, $isOnline));
             }
 
             if ($isOnline) {
