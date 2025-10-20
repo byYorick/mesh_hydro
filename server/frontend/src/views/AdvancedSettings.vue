@@ -693,7 +693,7 @@
                         <v-chip 
                           v-for="preset in customPresets" 
                           :key="preset.id"
-                          @click="applyCustomPreset(preset)"
+                          @click="applyPreset(preset)"
                           prepend-icon="mdi-star" 
                           color="purple"
                           variant="outlined"
@@ -1512,12 +1512,6 @@ async function saveCustomPreset() {
   } catch (error) {
     showDetailedError('Ошибка сохранения пресета', error, 'saveCustomPreset')
   }
-}
-
-function applyCustomPreset(preset) {
-  Object.assign(settingsStore.pid.ph, preset.ph_config)
-  Object.assign(settingsStore.pid.ec, preset.ec_config)
-  appStore.showSnackbar(`Применён пресет: ${preset.name}`, 'success')
 }
 
 async function deleteCustomPreset(presetId) {
