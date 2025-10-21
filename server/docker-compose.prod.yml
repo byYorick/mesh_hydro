@@ -1,0 +1,354 @@
+# ========================================
+# MESH HYDRO V2 - PRODUCTION DOCKER COMPOSE
+# ========================================
+# 
+# Production-ready конфигурация с:
+#   - Оптимизацией производительности
+#   - Безопасностью
+#   - Мониторингом
+#   - Автоматическим рестартом
+#   - Логированием
+#
+# Запуск:
+#   docker-compose -f docker-compose.prod.yml up -d
+# ========================================
+
+services:
+  # ========================================
+  # PostgreSQL Database (Production)
+  # ========================================
+  postgres:
+    image: postgres:15.4-alpine
+    container_name: hydro_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-hydro_system}
+      POSTGRES_USER: ${DB_USERNAME:-hydro}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}  # Из .env (обязательно!)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Оптимизация для production
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_WORK_MEM: "16MB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "128MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+    ports:
+      - "127.0.0.1:5432:5432"  # Только localhost для безопасности
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups  # Для бэкапов
+    networks:
+      - hydro_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-hydro} -d ${DB_DATABASE:-hydro_system}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # MQTT Broker (Mosquitto) Production
+  # ========================================
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: hydro_mosquitto_prod
+    restart: always
+    ports:
+      - "1883:1883"     # MQTT (для ESP32 с хоста)
+      - "127.0.0.1:9001:9001"  # WebSocket (только localhost)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - hydro_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # Backend (Laravel 11) Production
+  # ========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_backend_prod
+    restart: always
+    ports:
+      - "127.0.0.1:8000:8000"  # Только localhost (через nginx)
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - LOG_LEVEL=warning
+      - LOG_CHANNEL=daily
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-hydro_system}
+      - DB_USERNAME=${DB_USERNAME:-hydro}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=${REVERB_APP_ID:-hydro-app}
+      - REVERB_APP_KEY=${REVERB_APP_KEY}
+      - REVERB_APP_SECRET=${REVERB_APP_SECRET}
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8080
+      - CACHE_DRIVER=file
+      - QUEUE_CONNECTION=database
+      - SESSION_DRIVER=file
+      - SESSION_LIFETIME=120
+    volumes:
+      - backend_storage:/var/www/html/storage
+      - backend_logs:/var/www/html/storage/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks:
+      - hydro_network
+    command: >
+      sh -c "php artisan config:cache &&
+             php artisan route:cache &&
+             php artisan view:cache &&
+             php artisan migrate --force &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+    healthcheck:
+      test: ["CMD", "php", "artisan", "health:check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ========================================
+  # MQTT Listener Production
+  # ========================================
+  mqtt_listener:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_mqtt_listener_prod
+    restart: always
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - LOG_LEVEL=info
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-hydro_system}
+      - DB_USERNAME=${DB_USERNAME:-hydro}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=${REVERB_APP_ID:-hydro-app}
+      - REVERB_APP_KEY=${REVERB_APP_KEY}
+      - REVERB_APP_SECRET=${REVERB_APP_SECRET}
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+    volumes:
+      - backend_logs:/var/www/html/storage/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+      backend:
+        condition: service_started
+    networks:
+      - hydro_network
+    command: php artisan mqtt:listen
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ========================================
+  # Scheduler Production
+  # ========================================
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_scheduler_prod
+    restart: always
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - LOG_LEVEL=info
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-hydro_system}
+      - DB_USERNAME=${DB_USERNAME:-hydro}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=${REVERB_APP_ID:-hydro-app}
+      - REVERB_APP_KEY=${REVERB_APP_KEY}
+      - REVERB_APP_SECRET=${REVERB_APP_SECRET}
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+    volumes:
+      - backend_logs:/var/www/html/storage/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - hydro_network
+    command: php artisan schedule:work
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ========================================
+  # Frontend (Vue.js) Production
+  # ========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
+        - VITE_WS_HOST=${DOMAIN:-localhost}
+        - VITE_WS_PORT=8080
+        - VITE_PUSHER_KEY=${REVERB_APP_KEY}
+    container_name: hydro_frontend_prod
+    restart: always
+    ports:
+      - "127.0.0.1:3000:80"  # Только localhost (через nginx)
+    depends_on:
+      - backend
+    networks:
+      - hydro_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # Laravel Reverb WebSocket Server Production
+  # ========================================
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hydro_reverb_prod
+    restart: always
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "127.0.0.1:8080:8080"  # Только localhost (через nginx)
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - LOG_LEVEL=warning
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE:-hydro_system}
+      - DB_USERNAME=${DB_USERNAME:-hydro}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - BROADCAST_DRIVER=reverb
+      - REVERB_APP_ID=${REVERB_APP_ID:-hydro-app}
+      - REVERB_APP_KEY=${REVERB_APP_KEY}
+      - REVERB_APP_SECRET=${REVERB_APP_SECRET}
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8080
+      - REVERB_SCHEME=http
+      - REVERB_SERVER_HOST=0.0.0.0
+      - REVERB_SERVER_PORT=8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hydro_network
+    volumes:
+      - backend_logs:/var/www/html/storage/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ========================================
+  # Nginx Reverse Proxy (Production)
+  # ========================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hydro_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro  # SSL сертификаты
+      - nginx_cache:/var/cache/nginx
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+      - reverb
+    networks:
+      - hydro_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  hydro_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ========================================
+# Volumes (Persistent Storage)
+# ========================================
+volumes:
+  postgres_data:
+    driver: local
+  mosquitto_data:
+    driver: local
+  mosquitto_log:
+    driver: local
+  backend_storage:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_cache:
+    driver: local
+  nginx_logs:
+    driver: local
+
