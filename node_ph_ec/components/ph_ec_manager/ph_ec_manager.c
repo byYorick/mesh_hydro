@@ -381,11 +381,12 @@ static void send_telemetry(void) {
         pump_ml[i] = pump_controller_get_total_ml((pump_id_t)i);
     }
     
-    // Создание JSON telemetry
+    // Создание JSON telemetry с node_type
     char telemetry_msg[1024];
     snprintf(telemetry_msg, sizeof(telemetry_msg),
             "{\"type\":\"telemetry\","
             "\"node_id\":\"%s\","
+            "\"node_type\":\"ph_ec\","
             "\"timestamp\":%lu,"
             "\"data\":{"
             "\"ph\":%.2f,"
@@ -443,6 +444,7 @@ static void send_heartbeat(void) {
     snprintf(heartbeat_msg, sizeof(heartbeat_msg),
             "{\"type\":\"heartbeat\","
             "\"node_id\":\"%s\","
+            "\"node_type\":\"ph_ec\","
             "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
             "\"uptime\":%lu,"
             "\"heap_free\":%lu,"

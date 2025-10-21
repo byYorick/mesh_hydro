@@ -2,11 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Event;
-use App\Models\Node;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Exception;
+use Illuminate\Support\Facades\Http;
 
 class TelegramService
 {
@@ -16,175 +13,206 @@ class TelegramService
 
     public function __construct()
     {
-        $this->botToken = config('telegram.bot_token', '');
-        $this->chatId = config('telegram.chat_id', '');
-        $this->enabled = config('telegram.enabled', true) && !empty($this->botToken);
+        // Попробовать загрузить из БД, если не удалось - из конфига
+        try {
+            $this->botToken = \App\Models\Setting::get('telegram.bot_token', config('telegram.bot_token', ''));
+            $this->chatId = \App\Models\Setting::get('telegram.chat_id', config('telegram.chat_id', ''));
+            $this->enabled = \App\Models\Setting::get('telegram.enabled', config('telegram.enabled', false));
+        } catch (\Exception $e) {
+            // Если БД недоступна, использовать конфиг
+            $this->botToken = config('telegram.bot_token', '');
+            $this->chatId = config('telegram.chat_id', '');
+            $this->enabled = config('telegram.enabled', false);
+        }
+    }
+
+    /**
+     * Отправка алерта в Telegram
+     */
+    public function sendAlert(string $message, string $level = 'info'): bool
+    {
+        if (!$this->enabled || empty($this->botToken) || empty($this->chatId)) {
+            Log::debug("Telegram disabled or not configured", [
+                'enabled' => $this->enabled,
+                'has_token' => !empty($this->botToken),
+                'has_chat_id' => !empty($this->chatId)
+            ]);
+            return false;
+        }
+
+        $emoji = $this->getEmojiForLevel($level);
+        $formattedMessage = $this->formatMessage($emoji, $message, $level);
+
+        try {
+            $response = Http::post("https://api.telegram.org/bot{$this->botToken}/sendMessage", [
+                'chat_id' => $this->chatId,
+                'text' => $formattedMessage,
+                'parse_mode' => 'HTML',
+                'disable_web_page_preview' => true,
+            ]);
+
+            if ($response->successful()) {
+                Log::info("Telegram alert sent", [
+                    'level' => $level,
+                    'message' => $message
+                ]);
+                return true;
+            } else {
+                Log::error("Telegram API error", [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error("Failed to send Telegram alert", [
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 
     /**
      * Отправка алерта о критичном событии
      */
-    public function sendAlert(Event $event): void
+    public function sendErrorAlert($error): bool
     {
-        if (!$this->enabled) {
-            Log::debug('Telegram disabled, skipping alert');
-            return;
-        }
-
-        try {
-            $message = $this->formatAlertMessage($event);
-            $this->sendMessage($message, true);
-            
-            Log::info('Telegram alert sent', [
-                'event_id' => $event->id,
-                'level' => $event->level
-            ]);
-        } catch (Exception $e) {
-            Log::error('Telegram alert failed', [
-                'event_id' => $event->id,
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Отправка уведомления о состоянии узла
-     */
-    public function sendNodeStatus(Node $node, string $status): void
-    {
-        if (!$this->enabled) {
-            return;
-        }
-
-        try {
-            $emoji = $status === 'online' ? '✅' : '❌';
-            $message = "{$emoji} <b>{$node->node_id}</b>\n";
-            $message .= "Status: <b>{$status}</b>\n";
-            $message .= "Type: {$node->node_type}\n";
-            $message .= "Zone: {$node->zone}\n";
-            
-            $this->sendMessage($message);
-            
-            Log::info('Telegram node status sent', [
-                'node_id' => $node->node_id,
-                'status' => $status
-            ]);
-        } catch (Exception $e) {
-            Log::error('Telegram node status failed', [
-                'node_id' => $node->node_id,
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Отправка обычного сообщения
-     */
-    public function sendMessage(string $text, bool $disableNotification = false): void
-    {
-        if (!$this->enabled) {
-            return;
-        }
-
-        if (empty($this->chatId)) {
-            Log::warning('Telegram chat_id not configured');
-            return;
-        }
-
-        try {
-            $response = Http::post($this->getApiUrl('sendMessage'), [
-                'chat_id' => $this->chatId,
-                'text' => $text,
-                'parse_mode' => 'HTML',
-                'disable_notification' => $disableNotification,
-            ]);
-
-            if (!$response->successful()) {
-                throw new Exception('Telegram API error: ' . $response->body());
-            }
-
-            Log::debug('Telegram message sent', [
-                'chat_id' => $this->chatId,
-                'length' => strlen($text)
-            ]);
-        } catch (Exception $e) {
-            Log::error('Telegram send message failed', [
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-
-    /**
-     * Форматирование сообщения об алерте
-     */
-    private function formatAlertMessage(Event $event): string
-    {
-        $emoji = $this->getLevelEmoji($event->level);
-        $node = $event->node;
+        $level = $this->mapSeverityToLevel($error->level ?? $error->severity ?? 'info');
         
-        $message = "{$emoji} <b>ALERT: {$event->level}</b>\n\n";
-        $message .= "Node: <b>{$event->node_id}</b>\n";
+        $nodeId = $this->escapeHtml($error->node_id ?? 'unknown');
+        $errorMessage = $this->escapeHtml($error->message ?? 'Unknown error');
         
-        if ($node) {
-            $message .= "Type: {$node->node_type}\n";
-            $message .= "Zone: {$node->zone}\n";
-        }
-        
-        $message .= "\nMessage:\n<i>{$event->message}</i>\n";
-        $message .= "\nTime: " . $event->created_at->format('Y-m-d H:i:s');
-        
-        // Добавление данных события если есть
-        if (!empty($event->data)) {
-            $message .= "\n\nData:\n";
-            foreach ($event->data as $key => $value) {
-                $message .= "• {$key}: {$value}\n";
+        $message = sprintf(
+            "<b>Узел:</b> %s\n<b>Событие:</b> %s\n<b>Время:</b> %s",
+            $nodeId,
+            $errorMessage,
+            now()->format('d.m.Y H:i:s')
+        );
+
+        // Добавить данные если есть
+        if (isset($error->data) && is_array($error->data)) {
+            $message .= "\n\n<b>Данные:</b>\n";
+            foreach ($error->data as $key => $value) {
+                $formattedValue = $this->formatValue($value);
+                $message .= "• {$key}: {$formattedValue}\n";
             }
         }
-        
-        return $message;
+
+        return $this->sendAlert($message, $level);
     }
 
     /**
-     * Получить эмодзи для уровня события
+     * Отправка алерта о проблеме с нодой
      */
-    private function getLevelEmoji(string $level): string
+    public function sendNodeOfflineAlert(string $nodeId): bool
+    {
+        $message = sprintf(
+            "<b>⚠️ Узел оффлайн</b>\n\nУзел: %s\nВремя: %s",
+            $nodeId,
+            now()->format('d.m.Y H:i:s')
+        );
+
+        return $this->sendAlert($message, 'warning');
+    }
+
+    /**
+     * Отправка алерта об успешной калибровке
+     */
+    public function sendCalibrationAlert(string $nodeId, int $pumpId, float $mlPerSecond): bool
+    {
+        $message = sprintf(
+            "<b>✅ Насос откалиброван</b>\n\nУзел: %s\nНасос: #%d\nПроизводительность: %.2f мл/с",
+            $nodeId,
+            $pumpId,
+            $mlPerSecond
+        );
+
+        return $this->sendAlert($message, 'info');
+    }
+
+    /**
+     * Получить emoji для уровня
+     */
+    private function getEmojiForLevel(string $level): string
     {
         return match($level) {
-            Event::LEVEL_INFO => 'ℹ️',
-            Event::LEVEL_WARNING => '⚠️',
-            Event::LEVEL_CRITICAL => '🚨',
-            Event::LEVEL_EMERGENCY => '🔥',
-            default => '❓',
+            'emergency' => '🚨',
+            'critical' => '🔴',
+            'warning' => '🟡',
+            'info' => '🟢',
+            default => 'ℹ️'
         };
     }
 
     /**
-     * Получить URL API метода
+     * Форматирование сообщения
      */
-    private function getApiUrl(string $method): string
+    private function formatMessage(string $emoji, string $message, string $level): string
     {
-        return "https://api.telegram.org/bot{$this->botToken}/{$method}";
+        $levelName = strtoupper($level);
+        $timestamp = now()->format('H:i:s');
+        
+        return "{$emoji} <b>[{$levelName}]</b> {$timestamp}\n\n{$message}";
     }
 
     /**
-     * Проверка доступности Telegram API
+     * Маппинг severity в level
      */
-    public function checkConnection(): bool
+    private function mapSeverityToLevel(string $severity): string
     {
-        if (!$this->enabled) {
-            return false;
-        }
+        return match($severity) {
+            'emergency' => 'emergency',
+            'critical' => 'critical',
+            'high' => 'critical',
+            'warning', 'medium' => 'warning',
+            default => 'info'
+        };
+    }
 
-        try {
-            $response = Http::get($this->getApiUrl('getMe'));
-            return $response->successful();
-        } catch (Exception $e) {
-            Log::error('Telegram connection check failed', [
-                'error' => $e->getMessage()
-            ]);
-            return false;
+    /**
+     * Проверка настройки Telegram
+     */
+    public function isConfigured(): bool
+    {
+        return $this->enabled && !empty($this->botToken) && !empty($this->chatId);
+    }
+
+    /**
+     * Тестовое сообщение
+     */
+    public function sendTestMessage(): bool
+    {
+        return $this->sendAlert(
+            "🌿 <b>Hydro Mesh System</b>\n\nTelegram уведомления настроены и работают!",
+            'info'
+        );
+    }
+
+    /**
+     * Экранирование HTML спецсимволов
+     */
+    private function escapeHtml(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Форматирование значения для вывода
+     */
+    private function formatValue($value): string
+    {
+        if (is_array($value) || is_object($value)) {
+            return json_encode($value);
         }
+        
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        
+        if (is_float($value)) {
+            return number_format($value, 2, '.', '');
+        }
+        
+        return (string)$value;
     }
 }
-

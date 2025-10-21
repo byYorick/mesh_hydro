@@ -20,6 +20,7 @@ static const char *MSG_TYPE_EVENT = "event";
 static const char *MSG_TYPE_HEARTBEAT = "heartbeat";
 static const char *MSG_TYPE_REQUEST = "request";
 static const char *MSG_TYPE_RESPONSE = "response";
+static const char *MSG_TYPE_CONFIG_RESPONSE = "config_response";
 
 // Константы уровней событий
 static const char *EVENT_LEVEL_INFO = "info";
@@ -35,6 +36,7 @@ static mesh_msg_type_t str_to_msg_type(const char *str) {
     if (strcmp(str, MSG_TYPE_HEARTBEAT) == 0) return MESH_MSG_HEARTBEAT;
     if (strcmp(str, MSG_TYPE_REQUEST) == 0) return MESH_MSG_REQUEST;
     if (strcmp(str, MSG_TYPE_RESPONSE) == 0) return MESH_MSG_RESPONSE;
+    if (strcmp(str, MSG_TYPE_CONFIG_RESPONSE) == 0) return MESH_MSG_RESPONSE;  // Алиас
     return MESH_MSG_UNKNOWN;
 }
 
@@ -100,11 +102,12 @@ bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg) {
     return true;
 }
 
-bool mesh_protocol_create_telemetry(const char *node_id, cJSON *data, char *out_json, size_t max_len) {
+bool mesh_protocol_create_telemetry(const char *node_id, const char *node_type, cJSON *data, char *out_json, size_t max_len) {
     cJSON *root = cJSON_CreateObject();
     
     cJSON_AddStringToObject(root, "type", MSG_TYPE_TELEMETRY);
     cJSON_AddStringToObject(root, "node_id", node_id);
+    cJSON_AddStringToObject(root, "node_type", node_type);
     cJSON_AddNumberToObject(root, "timestamp", (double)mesh_protocol_get_timestamp());
     
     if (data != NULL) {
@@ -227,11 +230,12 @@ bool mesh_protocol_create_event(const char *node_id, mesh_event_level_t level, c
     return true;
 }
 
-bool mesh_protocol_create_heartbeat(const char *node_id, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len) {
+bool mesh_protocol_create_heartbeat(const char *node_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len) {
     cJSON *root = cJSON_CreateObject();
     
     cJSON_AddStringToObject(root, "type", MSG_TYPE_HEARTBEAT);
     cJSON_AddStringToObject(root, "node_id", node_id);
+    cJSON_AddStringToObject(root, "node_type", node_type);
     cJSON_AddNumberToObject(root, "timestamp", (double)mesh_protocol_get_timestamp());
     cJSON_AddNumberToObject(root, "uptime", uptime);
     cJSON_AddNumberToObject(root, "heap_free", heap_free);

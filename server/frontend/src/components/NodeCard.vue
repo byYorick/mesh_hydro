@@ -56,7 +56,7 @@
       </div>
 
       <!-- Desktop: Node-specific data -->
-      <div v-else-if="node.node_type === 'ph_ec' && lastData">
+      <div v-else-if="(node.node_type === 'ph_ec' || node.node_type === 'ph') && lastData">
         <v-row dense>
           <v-col cols="6">
             <div class="text-h4 font-weight-bold">
@@ -66,9 +66,26 @@
           </v-col>
           <v-col cols="6">
             <div class="text-h4 font-weight-bold">
+              {{ lastData.temp?.toFixed(1) || '-' }}°C
+            </div>
+            <div class="text-caption">Температура</div>
+          </v-col>
+        </v-row>
+      </div>
+
+      <div v-else-if="node.node_type === 'ec' && lastData">
+        <v-row dense>
+          <v-col cols="6">
+            <div class="text-h4 font-weight-bold">
               {{ lastData.ec?.toFixed(2) || '-' }}
             </div>
             <div class="text-caption">EC (mS/cm)</div>
+          </v-col>
+          <v-col cols="6">
+            <div class="text-h4 font-weight-bold">
+              {{ lastData.temp?.toFixed(1) || '-' }}°C
+            </div>
+            <div class="text-caption">Температура</div>
           </v-col>
         </v-row>
       </div>
@@ -312,6 +329,8 @@ const statusText = computed(() => {
 const nodeIcon = computed(() => {
   const icons = {
     'ph_ec': 'mdi-flask',
+    'ph': 'mdi-flask-outline',
+    'ec': 'mdi-flash',
     'climate': 'mdi-thermometer',
     'relay': 'mdi-electric-switch',
     'water': 'mdi-water',
@@ -325,6 +344,8 @@ const nodeIcon = computed(() => {
 const nodeTypeText = computed(() => {
   const types = {
     'ph_ec': 'pH/EC Сенсор',
+    'ph': 'pH Контроллер',
+    'ec': 'EC Контроллер',
     'climate': 'Климат Сенсор',
     'relay': 'Реле',
     'water': 'Уровень Воды',
@@ -415,8 +436,12 @@ const visibleMetrics = computed(() => {
   const data = lastData.value
   
   // pH/EC metrics
-  if (props.node.node_type === 'ph_ec') {
+  if (props.node.node_type === 'ph_ec' || props.node.node_type === 'ph') {
     if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
+    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+  }
+  
+  if (props.node.node_type === 'ec') {
     if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
     if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
   }

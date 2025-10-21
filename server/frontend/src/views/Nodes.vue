@@ -101,7 +101,7 @@ const search = ref('')
 const filterType = ref(null)
 const filterStatus = ref(null)
 
-const nodeTypes = ['ph_ec', 'climate', 'relay', 'water', 'display', 'root']
+const nodeTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root']
 
 // Filtered nodes
 const filteredNodes = computed(() => {

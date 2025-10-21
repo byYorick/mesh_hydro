@@ -32,6 +32,15 @@ typedef struct {
     bool enabled;
 } pump_pid_t;
 
+// Калибровка насоса (мл/сек)
+typedef struct {
+    float ml_per_second;       ///< Миллилитров в секунду
+    uint32_t calibration_time_ms;  ///< Время калибровки (мс)
+    float calibration_volume_ml;   ///< Объем при калибровке (мл)
+    uint64_t last_calibrated;  ///< Timestamp последней калибровки
+    bool is_calibrated;        ///< Флаг калибровки
+} pump_calibration_t;
+
 // Конфигурация pH/EC узла
 typedef struct {
     base_config_t base;
@@ -64,6 +73,62 @@ typedef struct {
     float ph_cal_offset;
     float ec_cal_offset;
 } ph_ec_node_config_t;
+
+// Конфигурация pH узла (только pH, 2 насоса)
+typedef struct {
+    base_config_t base;
+    
+    // Целевое значение
+    float ph_target;
+    
+    // Рабочие диапазоны
+    float ph_min, ph_max;
+    
+    // PID параметры (2 насоса: UP, DOWN)
+    pump_pid_t pump_pid[2];
+    
+    // Калибровка насосов (2 насоса: UP, DOWN)
+    pump_calibration_t pump_calibration[2];
+    
+    // Safety
+    uint32_t max_pump_time_ms;
+    uint32_t cooldown_ms;
+    
+    // Автономный режим
+    bool autonomous_enabled;
+    uint32_t mesh_timeout_ms;
+    
+    // Калибровка датчика pH
+    float ph_cal_offset;
+} ph_node_config_t;
+
+// Конфигурация EC узла (только EC, 3 насоса)
+typedef struct {
+    base_config_t base;
+    
+    // Целевое значение
+    float ec_target;
+    
+    // Рабочие диапазоны
+    float ec_min, ec_max;
+    
+    // PID параметры (3 насоса: A, B, C)
+    pump_pid_t pump_pid[3];
+    
+    // Калибровка насосов (3 насоса: A, B, C)
+    pump_calibration_t pump_calibration[3];
+    
+    // Safety
+    uint32_t max_pump_time_ms;
+    uint32_t cooldown_ms;
+    
+    // Автономный режим
+    bool autonomous_enabled;
+    uint32_t mesh_timeout_ms;
+    
+    // Калибровка датчика EC
+    float ec_cal_offset;
+} ec_node_config_t;
 
 // Конфигурация Climate узла
 typedef struct {

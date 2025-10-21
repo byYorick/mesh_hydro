@@ -76,7 +76,7 @@ const routes = [
   {
     path: '/settings',
     name: 'Settings',
-    component: () => import('@/views/AdvancedSettings.vue'),
+    component: () => import('@/views/Settings.vue'),
     meta: {
       title: 'Настройки',
       icon: 'mdi-cog',

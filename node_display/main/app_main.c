@@ -272,26 +272,36 @@ static void send_heartbeat(void) {
     uint32_t heap_free = esp_get_free_heap_size();
     int8_t rssi = get_rssi_to_parent();
     
-    // Создание heartbeat JSON с MAC адресом
-    char heartbeat_msg[384];
-    snprintf(heartbeat_msg, sizeof(heartbeat_msg),
-            "{\"type\":\"heartbeat\","
-            "\"node_id\":\"%s\","
-            "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
-            "\"uptime\":%lu,"
-            "\"heap_free\":%lu,"
-            "\"rssi_to_parent\":%d}",
-            s_config.base.node_id,
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-            (unsigned long)uptime,
-            (unsigned long)heap_free,
-            rssi);
+    // Создание heartbeat JSON с node_type, MAC и RSSI
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "type", "heartbeat");
+    cJSON_AddStringToObject(root, "node_id", s_config.base.node_id);
+    cJSON_AddStringToObject(root, "node_type", "display");
     
-    esp_err_t err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    cJSON_AddStringToObject(root, "mac_address", mac_str);
+    
+    cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+    cJSON_AddNumberToObject(root, "uptime", uptime);
+    cJSON_AddNumberToObject(root, "heap_free", heap_free);
+    cJSON_AddNumberToObject(root, "rssi_to_parent", rssi);
+    
+    char *heartbeat_msg = cJSON_PrintUnformatted(root);
+    esp_err_t err = ESP_FAIL;
+    if (heartbeat_msg) {
+        err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
+    }
+    cJSON_Delete(root);
     
     if (err == ESP_OK) {
         ESP_LOGD(TAG, "💓 Heartbeat sent (uptime=%lus, heap=%luB, RSSI=%d)", 
                  (unsigned long)uptime, (unsigned long)heap_free, rssi);
+    }
+    
+    if (heartbeat_msg) {
+        free(heartbeat_msg);
     }
 }
 

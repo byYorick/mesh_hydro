@@ -47,6 +47,15 @@ Route::middleware('throttle:api')->group(function () {
             Route::delete('/{nodeId}', [NodeController::class, 'destroy']);
             Route::post('/{nodeId}/command', [NodeController::class, 'sendCommand']);
             Route::put('/{nodeId}/config', [NodeController::class, 'updateConfig']);
+            
+            // Управление насосами
+            Route::post('/{nodeId}/pump/run', [NodeController::class, 'runPump']);
+            Route::post('/{nodeId}/pump/calibrate', [NodeController::class, 'calibratePump']);
+            Route::get('/{nodeId}/pump/calibrations', [NodeController::class, 'getPumpCalibrations']);
+            
+            // Запрос конфигурации
+            Route::get('/{nodeId}/config/request', [NodeController::class, 'requestConfig']);
+            Route::get('/{nodeId}/config/history', [NodeController::class, 'getConfigHistory']);
         });
     });
 });
@@ -107,6 +116,52 @@ Route::middleware('throttle:api')->group(function () {
             Route::post('/', [PidPresetController::class, 'store']);
             Route::put('/{id}', [PidPresetController::class, 'update']);
             Route::delete('/{id}', [PidPresetController::class, 'destroy']);
+        });
+    });
+});
+
+// Расписания (Schedules)
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('schedules')->group(function () {
+        Route::get('/node/{nodeId}', [\App\Http\Controllers\ScheduleController::class, 'index']);
+        Route::get('/node/{nodeId}/active', [\App\Http\Controllers\ScheduleController::class, 'getActive']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/node/{nodeId}', [\App\Http\Controllers\ScheduleController::class, 'store']);
+            Route::put('/node/{nodeId}/{scheduleId}', [\App\Http\Controllers\ScheduleController::class, 'update']);
+            Route::delete('/node/{nodeId}/{scheduleId}', [\App\Http\Controllers\ScheduleController::class, 'destroy']);
+        });
+    });
+});
+
+// Docker управление
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('docker')->group(function () {
+        Route::get('/status', [\App\Http\Controllers\DockerController::class, 'status']);
+        Route::get('/logs', [\App\Http\Controllers\DockerController::class, 'getLogs']);
+        
+        // Write operations (очень строгий rate limit)
+        Route::middleware('throttle:10,1')->group(function () {
+            Route::post('/restart/all', [\App\Http\Controllers\DockerController::class, 'restartAll']);
+            Route::post('/restart/container', [\App\Http\Controllers\DockerController::class, 'restartContainer']);
+            Route::post('/start/all', [\App\Http\Controllers\DockerController::class, 'startAll']);
+            Route::post('/stop/all', [\App\Http\Controllers\DockerController::class, 'stopAll']);
+        });
+    });
+});
+
+// Настройки системы
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('settings')->group(function () {
+        Route::get('/', [\App\Http\Controllers\SettingsController::class, 'index']);
+        Route::get('/telegram', [\App\Http\Controllers\SettingsController::class, 'getTelegram']);
+        Route::get('/telegram/chat-id', [\App\Http\Controllers\SettingsController::class, 'getChatId']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/telegram', [\App\Http\Controllers\SettingsController::class, 'saveTelegram']);
+            Route::post('/telegram/test', [\App\Http\Controllers\SettingsController::class, 'testTelegram']);
         });
     });
 });

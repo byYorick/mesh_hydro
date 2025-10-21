@@ -27,15 +27,23 @@
         />
       </v-col>
 
-      <!-- Actions Panel -->
-      <v-col cols="12" md="8">
-        <NodeActions
-          :node="node"
-          @command="sendCommand"
-          @config-update="updateConfig"
-        />
-      </v-col>
-    </v-row>
+    <!-- Actions Panel -->
+    <v-col cols="12" md="8">
+      <!-- pH Node Component -->
+      <PhNode v-if="node.node_type === 'ph'" :node="node" />
+      
+      <!-- EC Node Component -->
+      <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
+      
+      <!-- Generic Node Actions -->
+      <NodeActions
+        v-else
+        :node="node"
+        @command="sendCommand"
+        @config-update="updateConfig"
+      />
+    </v-col>
+  </v-row>
 
     <!-- Memory, Metadata and Health -->
     <v-row>
@@ -146,6 +154,8 @@ import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
 import NodeHealthIndicator from '@/components/NodeHealthIndicator.vue'
 import ErrorTimeline from '@/components/ErrorTimeline.vue'
 import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
+import PhNode from '@/components/PhNode.vue'
+import EcNode from '@/components/EcNode.vue'
 import { formatDateTime } from '@/utils/time'
 import api from '@/services/api'
 

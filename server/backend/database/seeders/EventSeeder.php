@@ -11,7 +11,7 @@ class EventSeeder extends Seeder
     {
         $events = [
             [
-                'node_id' => 'ph_ec_001',
+                'node_id' => 'ph_001',
                 'level' => 'warning',
                 'message' => 'pH is below optimal range',
                 'data' => ['ph' => 5.8, 'threshold' => 6.0],
@@ -45,7 +45,16 @@ class EventSeeder extends Seeder
                 'resolved_at' => null,
             ],
             [
-                'node_id' => 'ph_ec_001',
+                'node_id' => 'ec_001',
+                'level' => 'warning',
+                'message' => 'EC above optimal range',
+                'data' => ['ec' => 2.6, 'threshold' => 2.5],
+                'created_at' => now()->subHours(2),
+                'resolved_at' => now()->subHour(),
+                'resolved_by' => 'auto',
+            ],
+            [
+                'node_id' => 'ph_001',
                 'level' => 'emergency',
                 'message' => 'pH critically low - immediate action required',
                 'data' => ['ph' => 5.2, 'threshold' => 5.5],

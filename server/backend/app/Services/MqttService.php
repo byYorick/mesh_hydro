@@ -160,7 +160,7 @@ class MqttService
             }
 
             // Валидация node_type
-            $validTypes = ['ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
+            $validTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
             $nodeType = isset($data['type']) && in_array($data['type'], $validTypes) 
                 ? $data['type'] 
                 : 'unknown';
@@ -537,8 +537,14 @@ class MqttService
         if (str_starts_with($nodeId, 'climate_')) {
             return 'climate';
         }
+        if (str_starts_with($nodeId, 'ph_')) {
+            return 'ph';  // НОВЫЙ: отдельная нода pH
+        }
+        if (str_starts_with($nodeId, 'ec_')) {
+            return 'ec';  // НОВЫЙ: отдельная нода EC
+        }
         if (str_starts_with($nodeId, 'ph_ec_')) {
-            return 'ph_ec';
+            return 'ph_ec';  // СТАРЫЙ: объединенная нода
         }
         if (str_starts_with($nodeId, 'relay_')) {
             return 'relay';
@@ -558,8 +564,14 @@ class MqttService
         // Определяем по наличию сенсоров в данных
         if (isset($data['sensors'])) {
             $sensors = $data['sensors'];
-            if (in_array('ph', $sensors) || in_array('ec', $sensors)) {
-                return 'ph_ec';
+            if (in_array('ph', $sensors) && !in_array('ec', $sensors)) {
+                return 'ph';  // Только pH датчик
+            }
+            if (in_array('ec', $sensors) && !in_array('ph', $sensors)) {
+                return 'ec';  // Только EC датчик
+            }
+            if (in_array('ph', $sensors) && in_array('ec', $sensors)) {
+                return 'ph_ec';  // Оба датчика
             }
             if (in_array('temperature', $sensors) || in_array('humidity', $sensors)) {
                 return 'climate';
@@ -791,8 +803,14 @@ class MqttService
             }
 
             // Telegram уведомление
-            if (config('telegram.enabled', true)) {
-                app(TelegramService::class)->sendErrorAlert($error);
+            if (config('telegram.enabled', false)) {
+                try {
+                    app(TelegramService::class)->sendErrorAlert($error);
+                } catch (\Exception $e) {
+                    Log::error("Failed to send Telegram alert", [
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             // SMS уведомление (только для critical)
@@ -832,6 +850,101 @@ class MqttService
             return $this->mqtt->isConnected();
         } catch (Exception $e) {
             return false;
+        }
+    }
+
+    /**
+     * Обработка ответа с конфигурацией от узла
+     */
+    public function handleConfigResponse(string $topic, string $payload): void
+    {
+        try {
+            Log::info("📋 handleConfigResponse called", [
+                'topic' => $topic,
+                'payload_length' => strlen($payload)
+            ]);
+            
+            $data = json_decode($payload, true);
+            
+            if (!$data || !isset($data['node_id'], $data['config'])) {
+                Log::warning("Invalid config_response data", [
+                    'topic' => $topic,
+                    'payload' => $payload,
+                    'json_error' => json_last_error_msg()
+                ]);
+                return;
+            }
+
+            $nodeId = $data['node_id'];
+            $config = $data['config'];
+            
+            // Проверка что config - это массив
+            if (!is_array($config)) {
+                Log::warning("Config is not an array", [
+                    'node_id' => $nodeId,
+                    'config_type' => gettype($config)
+                ]);
+                return;
+            }
+            
+            Log::info("📋 Config response received", [
+                'node_id' => $nodeId,
+                'config_keys' => array_keys($config)
+            ]);
+            
+            // Сохранение конфигурации в кэш (1 час)
+            Cache::put("node_config:{$nodeId}", $config, 3600);
+            
+            // Обновление узла в БД
+            $node = Node::where('node_id', $nodeId)->first();
+            if ($node) {
+                $node->update([
+                    'config' => $config,
+                    'last_seen_at' => now()
+                ]);
+                
+                Log::info("📋 Node config updated in DB", ['node_id' => $nodeId]);
+            }
+            
+            // Сохранение калибровки насосов в БД
+            if (isset($config['pumps_calibration']) && is_array($config['pumps_calibration'])) {
+                foreach ($config['pumps_calibration'] as $pumpCal) {
+                    if (isset($pumpCal['pump_id'])) {
+                        \App\Models\PumpCalibration::updateOrCreate(
+                            [
+                                'node_id' => $nodeId,
+                                'pump_id' => $pumpCal['pump_id']
+                            ],
+                            [
+                                'ml_per_second' => $pumpCal['ml_per_second'] ?? 1.0,
+                                'calibration_volume_ml' => $pumpCal['calibration_volume_ml'] ?? null,
+                                'calibration_time_ms' => $pumpCal['calibration_time_ms'] ?? null,
+                                'is_calibrated' => $pumpCal['is_calibrated'] ?? false,
+                                'calibrated_at' => isset($pumpCal['last_calibrated']) && $pumpCal['last_calibrated'] > 0
+                                    ? \Carbon\Carbon::createFromTimestamp($pumpCal['last_calibrated'])
+                                    : null,
+                            ]
+                        );
+                    }
+                }
+                
+                Log::info("📋 Pump calibrations saved", [
+                    'node_id' => $nodeId,
+                    'pumps_count' => count($config['pumps_calibration'])
+                ]);
+            }
+            
+            // Отправка события через WebSocket
+            broadcast(new \App\Events\NodeConfigUpdated($nodeId, $config));
+            
+            Log::info("📋 Config response processed successfully", ['node_id' => $nodeId]);
+            
+        } catch (Exception $e) {
+            Log::error("Error handling config_response", [
+                'topic' => $topic,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 }
