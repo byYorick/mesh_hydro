@@ -57,6 +57,21 @@ bool ph_sensor_is_stable(void);
  */
 bool ph_sensor_is_connected(void);
 
+/**
+ * @brief Проверка режима mock
+ * 
+ * @return true если датчик работает в mock режиме
+ */
+bool ph_sensor_is_mock_mode(void);
+
+/**
+ * @brief Принудительное переключение в mock режим
+ * 
+ * @param enable true - включить mock, false - отключить
+ * @return ESP_OK при успехе
+ */
+esp_err_t ph_sensor_force_mock_mode(bool enable);
+
 #ifdef __cplusplus
 }
 #endif

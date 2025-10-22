@@ -243,9 +243,33 @@ onMounted(async () => {
 // Send command to node
 async function sendCommand(nodeId, { command, params }) {
   try {
-    await nodesStore.sendCommand(nodeId, command, params)
-    appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    // Специальная обработка для команды run_pump
+    if (command === 'run_pump') {
+      // Определяем pump_id на основе типа насоса
+      const pumpIdMap = {
+        'ph_up': 0,
+        'ph_down': 1,
+        'ec_up': 2,
+        'ec_down': 3,
+        'water': 4
+      }
+      
+      const pumpId = pumpIdMap[params.pump] || 0
+      
+      // Отправляем запрос на запуск насоса
+      await api.post(`/nodes/${nodeId}/pump/run`, {
+        pump_id: pumpId,
+        duration_sec: params.duration
+      })
+      
+      appStore.showSnackbar(`Насос ${params.pump} запущен на ${params.duration} сек`, 'success')
+    } else {
+      // Обычные команды через стандартный API
+      await nodesStore.sendCommand(nodeId, command, params)
+      appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    }
   } catch (error) {
+    console.error('Error sending command:', error)
     appStore.showSnackbar('Ошибка отправки команды', 'error')
   }
 }

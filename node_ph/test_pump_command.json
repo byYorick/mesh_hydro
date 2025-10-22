@@ -1,0 +1,10 @@
+{
+  "type": "command",
+  "command_id": null,
+  "node_id": "ph_3f0c00",
+  "command": "run_pump_manual",
+  "params": {
+    "pump_id": 0,
+    "duration_sec": 2
+  }
+}

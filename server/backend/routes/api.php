@@ -33,10 +33,15 @@ Route::middleware('throttle:api')->group(function () {
     });
 });
 
+// Fallback polling routes с более мягким rate limiting
+Route::middleware('throttle:120,1')->group(function () {
+    Route::get('/nodes', [NodeController::class, 'index']);
+    Route::get('/events', [EventController::class, 'index']);
+});
+
 // Узлы (Nodes) - с более строгим rate limiting для write operations
 Route::middleware('throttle:api')->group(function () {
     Route::prefix('nodes')->group(function () {
-        Route::get('/', [NodeController::class, 'index']);
         Route::get('/{nodeId}', [NodeController::class, 'show']);
         Route::get('/{nodeId}/statistics', [NodeController::class, 'statistics']);
         

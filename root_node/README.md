@@ -46,7 +46,7 @@ CONFIG_WIFI_PASSWORD="YourWiFiPassword"
 
 Отредактируй `components/mqtt_client/mqtt_client_manager.c`:
 ```c
-#define MQTT_BROKER_URI "mqtt://192.168.1.100:1883"
+#define MQTT_BROKER_URI "mqtt://192.168.0.167:1883"
 #define MQTT_USERNAME   "hydro_root"
 #define MQTT_PASSWORD   "hydro_pass"
 ```
@@ -104,7 +104,7 @@ I climate_logic: Climate fallback logic initialized
 I ROOT: ========================================
 I ROOT: === ROOT NODE Running ===
 I ROOT: Mesh ID: HYDRO1
-I ROOT: MQTT Broker: mqtt://192.168.1.100:1883
+I ROOT: MQTT Broker: mqtt://192.168.0.167:1883
 I ROOT: ========================================
 ```
 
@@ -124,7 +124,7 @@ idf.py build flash
 ### Тест 2: Проверка MQTT
 ```bash
 # Подписка на все топики
-mosquitto_sub -h 192.168.1.100 -t "hydro/#" -v
+mosquitto_sub -h 192.168.0.167 -t "hydro/#" -v
 
 # Должны появляться сообщения от узлов
 ```
@@ -132,7 +132,7 @@ mosquitto_sub -h 192.168.1.100 -t "hydro/#" -v
 ### Тест 3: Отправка команды
 ```bash
 # Отправить команду через MQTT
-mosquitto_pub -h 192.168.1.100 -t "hydro/command/climate_001" \
+mosquitto_pub -h 192.168.0.167 -t "hydro/command/climate_001" \
   -m '{"type":"command","node_id":"climate_001","command":"restart"}'
 
 # В логах ROOT:

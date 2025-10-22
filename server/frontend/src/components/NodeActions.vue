@@ -6,11 +6,23 @@
         <v-icon icon="mdi-lightning-bolt" class="mr-2"></v-icon>
         Быстрые действия
       </v-card-title>
+      
+      <!-- Debug info -->
+      <v-alert type="info" variant="tonal" density="compact" class="ma-2">
+        <div class="text-caption">
+          <strong>Debug:</strong><br>
+          isOnline: {{ isOnline }}<br>
+          isPumpRunning: {{ isPumpRunning }}<br>
+          last_seen_at: {{ node.last_seen_at }}<br>
+          online: {{ node.online }}<br>
+          is_online: {{ node.is_online }}
+        </div>
+      </v-alert>
 
       <v-card-text>
         <v-row>
           <!-- pH/EC Node Actions -->
-          <template v-if="node.node_type === 'ph_ec'">
+          <template v-if="node.node_type === 'ph_ec' || node.node_type === 'ph'">
             <v-col cols="6" sm="6" md="3">
               <v-btn
                 block
@@ -61,7 +73,8 @@
                     color="info"
                     prepend-icon="mdi-pump"
                     v-bind="props"
-                    :disabled="!isOnline"
+                    :disabled="!isOnline || isPumpRunning"
+                    :loading="isPumpRunning"
                     size="small"
                     class="text-none"
                   >
@@ -69,16 +82,16 @@
                   </v-btn>
                 </template>
                 <v-list>
-                  <v-list-item @click="runPump('ph_up')">
+                  <v-list-item @click="runPump('ph_up')" :disabled="isPumpRunning">
                     <v-list-item-title>pH Up</v-list-item-title>
                   </v-list-item>
-                  <v-list-item @click="runPump('ph_down')">
+                  <v-list-item @click="runPump('ph_down')" :disabled="isPumpRunning">
                     <v-list-item-title>pH Down</v-list-item-title>
                   </v-list-item>
-                  <v-list-item @click="runPump('ec_up')">
+                  <v-list-item @click="runPump('ec_up')" :disabled="isPumpRunning">
                     <v-list-item-title>EC Up</v-list-item-title>
                   </v-list-item>
-                  <v-list-item @click="runPump('water')">
+                  <v-list-item @click="runPump('water')" :disabled="isPumpRunning">
                     <v-list-item-title>Вода</v-list-item-title>
                   </v-list-item>
                 </v-list>
@@ -196,9 +209,12 @@
     </v-card>
 
     <!-- Pump Duration Dialog -->
-    <v-dialog v-model="pumpDialog" max-width="400">
+    <v-dialog v-model="pumpDialog" max-width="500">
       <v-card>
-        <v-card-title>Запуск насоса: {{ selectedPump }}</v-card-title>
+        <v-card-title>
+          <v-icon icon="mdi-pump" class="mr-2"></v-icon>
+          {{ isCalibrationMode ? 'Калибровка насоса' : 'Запуск насоса' }}: {{ selectedPump }}
+        </v-card-title>
         <v-card-text>
           <v-text-field
             v-model.number="pumpDuration"
@@ -207,12 +223,50 @@
             min="1"
             max="300"
             variant="outlined"
+            class="mb-3"
           ></v-text-field>
+          
+          <!-- Калибровка насоса -->
+          <v-expand-transition>
+            <div v-if="isCalibrationMode">
+              <v-divider class="mb-3"></v-divider>
+              <h4 class="mb-3">Параметры калибровки</h4>
+              
+              <v-text-field
+                v-model.number="calibrationVolume"
+                label="Объем (мл)"
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="1000"
+                variant="outlined"
+                class="mb-3"
+                hint="Измерьте точный объем жидкости"
+              ></v-text-field>
+              
+              <v-alert type="info" variant="tonal" density="compact">
+                <div class="text-caption">
+                  <strong>Инструкция:</strong><br>
+                  1. Подготовьте мерный стакан<br>
+                  2. Запустите насос на указанное время<br>
+                  3. Измерьте точный объем жидкости<br>
+                  4. Введите измеренный объем
+                </div>
+              </v-alert>
+            </div>
+          </v-expand-transition>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn @click="pumpDialog = false">Отмена</v-btn>
-          <v-btn color="primary" @click="executePump">Запустить</v-btn>
+          <v-btn @click="pumpDialog = false" :disabled="isPumpRunning">Отмена</v-btn>
+          <v-btn 
+            color="primary" 
+            @click="isCalibrationMode ? executeCalibration() : executePump()"
+            :disabled="(isCalibrationMode && (!calibrationVolume || calibrationVolume <= 0)) || isPumpRunning"
+            :loading="isPumpRunning"
+          >
+            {{ isCalibrationMode ? 'Калибровать' : (isPumpRunning ? `Запуск... ${remainingSeconds}s` : 'Запустить') }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -410,7 +464,7 @@
 </style>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { axios as api } from '@/services/api'
 import ConfigEditor from './ConfigEditor.vue'
@@ -431,6 +485,16 @@ const pumpDialog = ref(false)
 const rebootDialog = ref(false)
 const selectedPump = ref(null)
 const pumpDuration = ref(5)
+const calibrationVolume = ref(10) // мл
+const isCalibrationMode = ref(false)
+const isPumpRunning = ref(false)
+const remainingSeconds = ref(0)
+let pumpIntervalId = null
+
+// Отслеживаем изменения isPumpRunning
+watch(isPumpRunning, (newVal, oldVal) => {
+  console.log('🔄 isPumpRunning изменился:', oldVal, '->', newVal)
+})
 
 // PID Presets
 const pidPresetsDialog = ref(false)
@@ -441,7 +505,30 @@ const customPresets = ref([])
 const selectedPreset = ref(null)
 
 const isOnline = computed(() => {
-  return props.node?.online || props.node?.is_online
+  // Проверяем по last_seen_at (как в NodeCard)
+  if (props.node?.last_seen_at) {
+    const lastSeen = new Date(props.node.last_seen_at)
+    const seconds = (Date.now() - lastSeen.getTime()) / 1000
+    const online = seconds < 20
+    console.log('🔍 Проверка isOnline:', {
+      last_seen_at: props.node.last_seen_at,
+      lastSeen: lastSeen,
+      seconds: seconds,
+      online: online,
+      node: props.node
+    })
+    return online
+  }
+  
+  // Fallback на старые поля
+  const fallbackOnline = props.node?.online || props.node?.is_online
+  console.log('🔍 Fallback isOnline:', {
+    online: props.node?.online,
+    is_online: props.node?.is_online,
+    fallbackOnline: fallbackOnline,
+    node: props.node
+  })
+  return fallbackOnline
 })
 
 function sendCommand(command, params = {}) {
@@ -449,26 +536,127 @@ function sendCommand(command, params = {}) {
 }
 
 function openCalibratePh() {
-  // Open command dialog with calibrate_ph preset
-  sendCommand('calibrate_ph', { ph_value: 7.0 })
+  // Открываем диалог калибровки насоса pH
+  selectedPump.value = 'ph_up'
+  pumpDuration.value = 5
+  calibrationVolume.value = 10
+  isCalibrationMode.value = true
+  pumpDialog.value = true
 }
 
 function openCalibrateEc() {
-  sendCommand('calibrate_ec', { ec_value: 1.413 })
+  // Открываем диалог калибровки насоса EC
+  selectedPump.value = 'ec_up'
+  pumpDuration.value = 5
+  calibrationVolume.value = 10
+  isCalibrationMode.value = true
+  pumpDialog.value = true
 }
 
 function runPump(pump) {
   selectedPump.value = pump
   pumpDuration.value = 5
+  isCalibrationMode.value = false
   pumpDialog.value = true
 }
 
-function executePump() {
-  sendCommand('run_pump', {
-    pump: selectedPump.value,
-    duration: pumpDuration.value,
-  })
-  pumpDialog.value = false
+async function executePump() {
+  try {
+    console.log('🚀 executePump вызван, isPumpRunning:', isPumpRunning.value)
+    if (isPumpRunning.value) {
+      console.log('⚠️ Насос уже запущен, игнорируем запрос')
+      return
+    }
+    
+    // Определяем pump_id на основе типа насоса
+    const pumpIdMap = {
+      'ph_up': 0,
+      'ph_down': 1,
+      'ec_up': 2,
+      'ec_down': 3,
+      'water': 4
+    }
+    
+    const pumpId = pumpIdMap[selectedPump.value] || 0
+    console.log('🔧 Запуск насоса:', selectedPump.value, 'pump_id:', pumpId, 'duration:', pumpDuration.value)
+    
+    // Отправляем запрос на запуск насоса
+    const response = await api.post(`/nodes/${props.node.node_id}/pump/run`, {
+      pump_id: pumpId,
+      duration_sec: pumpDuration.value
+    })
+    
+    console.log('📡 Ответ сервера:', response.data)
+    
+    if (response.data.success) {
+      console.log('✅ Насос успешно запущен')
+      // Блокируем кнопки и показываем загрузку на время выполнения
+      isPumpRunning.value = true
+      remainingSeconds.value = Math.max(1, Math.round(Number(pumpDuration.value) || 0))
+      console.log('⏰ Устанавливаем таймер на', remainingSeconds.value, 'секунд')
+      
+      if (pumpIntervalId) clearInterval(pumpIntervalId)
+      pumpIntervalId = setInterval(() => {
+        if (remainingSeconds.value > 0) {
+          remainingSeconds.value -= 1
+          console.log('⏱️ Осталось секунд:', remainingSeconds.value)
+        }
+        if (remainingSeconds.value <= 0) {
+          console.log('🏁 Таймер завершен, разблокируем кнопки')
+          clearInterval(pumpIntervalId)
+          pumpIntervalId = null
+          isPumpRunning.value = false
+          pumpDialog.value = false
+        }
+      }, 1000)
+    } else {
+      console.log('❌ Сервер вернул success: false')
+    }
+  } catch (error) {
+    console.error('❌ Ошибка запуска насоса:', error)
+    console.error('❌ Детали ошибки:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: error.config
+    })
+    // Показываем уведомление об ошибке
+    isPumpRunning.value = false
+  }
+}
+
+async function executeCalibration() {
+  try {
+    // Определяем pump_id на основе типа насоса
+    const pumpIdMap = {
+      'ph_up': 0,
+      'ph_down': 1,
+      'ec_up': 2,
+      'ec_down': 3,
+      'water': 4
+    }
+    
+    const pumpId = pumpIdMap[selectedPump.value] || 0
+    
+    // Отправляем запрос на калибровку
+    const response = await api.post(`/nodes/${props.node.node_id}/pump/calibrate`, {
+      pump_id: pumpId,
+      duration_sec: pumpDuration.value,
+      volume_ml: calibrationVolume.value
+    })
+    
+    if (response.data.success) {
+      console.log('✅ Калибровка насоса успешно сохранена')
+      // Показываем уведомление об успехе
+      // Можно добавить snackbar здесь
+    }
+    
+    pumpDialog.value = false
+  } catch (error) {
+    console.error('❌ Ошибка калибровки насоса:', error)
+    // Показываем уведомление об ошибке
+    // Можно добавить snackbar здесь
+  }
 }
 
 function toggleRelay(relayId) {

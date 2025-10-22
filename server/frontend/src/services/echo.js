@@ -139,7 +139,7 @@ function startFallbackPolling() {
   console.log('🔄 Starting fallback polling mode')
   fallbackMode = true
   
-  // Polling каждые 5 секунд
+  // Polling каждые 10 секунд (уменьшаем нагрузку на API)
   fallbackInterval = setInterval(async () => {
     try {
       // Импортируем API сервис динамически чтобы избежать циклических зависимостей
@@ -174,7 +174,7 @@ function startFallbackPolling() {
     } catch (error) {
       console.warn('Fallback polling error:', error)
     }
-  }, 5000)
+  }, 10000)
 }
 
 function stopFallbackPolling() {

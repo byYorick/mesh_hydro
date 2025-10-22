@@ -32,9 +32,9 @@
 
 static const char *TAG = "ph_node";
 
-// I2C конфигурация для ESP32-C3
-#define I2C_MASTER_SCL_IO   9
-#define I2C_MASTER_SDA_IO   8
+// I2C конфигурация для ESP32 (стандартные пины)
+#define I2C_MASTER_SCL_IO   22
+#define I2C_MASTER_SDA_IO   21
 #define I2C_MASTER_FREQ_HZ  100000
 #define I2C_MASTER_NUM      I2C_NUM_0
 
@@ -90,7 +90,7 @@ void app_main(void)
     // [Step 5/8] Pumps init (2 насоса)
     ESP_LOGI(TAG, "[Step 5/8] Pumps init (2x PWM)...");
     ESP_ERROR_CHECK(pump_controller_init());
-    ESP_LOGI(TAG, "  - 2 pumps ready (GPIO 2,3)");
+    ESP_LOGI(TAG, "  - 2 pumps ready (GPIO 12,13 - pH UP/DOWN)");
     
     // [Step 6/8] Mesh NODE mode init
     ESP_LOGI(TAG, "[Step 6/8] Mesh NODE mode init...");
@@ -219,11 +219,19 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
     
     mesh_message_t msg;
     
+    ESP_LOGI(TAG, "=== JSON PARSING DEBUG ===");
+    ESP_LOGI(TAG, "Data length: %d", (int)len);
+    ESP_LOGI(TAG, "Data: %s", data_copy);
+    
     if (!mesh_protocol_parse(data_copy, &msg)) {
         ESP_LOGE(TAG, "Failed to parse mesh message");
         free(data_copy);
         return;
     }
+    
+    ESP_LOGI(TAG, "JSON parsed successfully");
+    ESP_LOGI(TAG, "Message type: %d", msg.type);
+    ESP_LOGI(TAG, "Node ID: %s", msg.node_id);
 
     // Проверка что сообщение для нас
     if (strcmp(msg.node_id, s_node_config.base.node_id) != 0) {
@@ -237,12 +245,28 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
     // Обработка по типу сообщения
     switch (msg.type) {
         case MESH_MSG_COMMAND: {
+            ESP_LOGI(TAG, "=== PROCESSING COMMAND ===");
+            ESP_LOGI(TAG, "msg.data: %s", msg.data ? "found" : "NULL");
+            
+            if (msg.data) {
+                char *data_str = cJSON_PrintUnformatted(msg.data);
+                ESP_LOGI(TAG, "msg.data content: %s", data_str ? data_str : "NULL");
+                if (data_str) free(data_str);
+            }
+            
             cJSON *cmd = cJSON_GetObjectItem(msg.data, "command");
             cJSON *params = cJSON_GetObjectItem(msg.data, "params");
             
+            ESP_LOGI(TAG, "Command: %s", cmd ? (cJSON_IsString(cmd) ? cmd->valuestring : "NOT_STRING") : "NULL");
+            ESP_LOGI(TAG, "Params: %s", params ? "found" : "NULL");
+            
             if (cmd && cJSON_IsString(cmd)) {
+                ESP_LOGI(TAG, "Calling ph_manager_handle_command...");
                 // Передаем params (или msg.data если params нет)
                 ph_manager_handle_command(cmd->valuestring, params ? params : msg.data);
+                ESP_LOGI(TAG, "ph_manager_handle_command returned");
+            } else {
+                ESP_LOGW(TAG, "Invalid command format");
             }
             break;
         }

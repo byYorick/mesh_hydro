@@ -181,7 +181,7 @@
       <!-- Quick actions based on node type -->
       <template v-if="isOnline">
         <!-- pH/EC Quick Actions -->
-        <v-menu v-if="node.node_type === 'ph_ec'">
+        <v-menu v-if="node.node_type === 'ph_ec' || node.node_type === 'ph'">
           <template v-slot:activator="{ props }">
             <v-btn
               size="small"
@@ -299,8 +299,8 @@ const isOnline = computed(() => {
   const lastSeen = new Date(props.node.last_seen_at)
   const seconds = (Date.now() - lastSeen.getTime()) / 1000
   
-  // Считаем онлайн если last_seen_at < 30 секунд назад (как в backend scope)
-  return seconds < 30
+  // Считаем онлайн если last_seen_at < 20 секунд назад (синхронизировано с backend)
+  return seconds < 20
 })
 
 // Status color
@@ -310,9 +310,9 @@ const statusColor = computed(() => {
   const lastSeen = new Date(props.node.last_seen_at)
   const seconds = (Date.now() - lastSeen.getTime()) / 1000
   
-  if (seconds < 30) return 'success'
-  if (seconds < 60) return 'warning'
-  return 'error'
+  if (seconds < 20) return 'success'   // Онлайн: < 20 секунд
+  if (seconds < 40) return 'warning'   // Предупреждение: 20-40 секунд
+  return 'error'                       // Офлайн: > 40 секунд
 })
 
 // Status icon

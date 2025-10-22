@@ -9,6 +9,7 @@
 #include "esp_wifi.h"
 #include "esp_system.h"
 #include "esp_mac.h"
+#include "mesh_config.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -24,8 +25,8 @@ static const char *TAG = "mqtt_manager";
 #define MQTT_TOPIC_COMMAND      "hydro/command/#"
 #define MQTT_TOPIC_CONFIG       "hydro/config/#"
 
-// MQTT конфигурация (TODO: переместить в sdkconfig)
-#define MQTT_BROKER_URI         "mqtt://192.168.1.100:1883"
+// MQTT конфигурация берётся из mesh_config.h
+// MQTT_BROKER_URI уже определён в mesh_config.h: "mqtt://192.168.0.167:1883"
 // Mosquitto настроен с allow_anonymous, поэтому username/password не нужны
 #define MQTT_USERNAME           NULL
 #define MQTT_PASSWORD           NULL

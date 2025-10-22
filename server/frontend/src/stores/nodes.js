@@ -125,12 +125,10 @@ export const useNodesStore = defineStore('nodes', {
       const index = this.nodes.findIndex(n => n.node_id === nodeData.node_id)
       
       if (index !== -1) {
-        // Используем online из nodeData, если указано, иначе сохраняем текущее значение
+        // Обновляем узел с данными из nodeData
         this.nodes[index] = {
           ...this.nodes[index],
           ...nodeData,
-          // НЕ переопределяем online если он уже есть в nodeData
-          online: nodeData.online !== undefined ? nodeData.online : this.nodes[index].online,
         }
       } else {
         // Add new node

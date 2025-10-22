@@ -280,7 +280,21 @@ class NodeController extends Controller
      */
     public function runPump(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
     {
+        // Простое отладочное сообщение
+        error_log("=== RUNPUMP CALLED ===");
+        error_log("Node ID: " . $nodeId);
+        error_log("Request data: " . json_encode($request->all()));
+        error_log("Request method: " . $request->method());
+        error_log("Request headers: " . json_encode($request->headers->all()));
+        
         $node = Node::where('node_id', $nodeId)->firstOrFail();
+
+        // Отладочная информация
+        Log::info("runPump request data", [
+            'node_id' => $nodeId,
+            'request_data' => $request->all(),
+            'content_type' => $request->header('Content-Type'),
+        ]);
 
         $validated = $request->validate([
             'pump_id' => 'required|integer|min:0|max:5',

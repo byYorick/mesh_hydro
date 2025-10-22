@@ -45,6 +45,7 @@ static void heartbeat_task(void *arg);
 static void send_discovery(void);
 static void send_telemetry(void);
 static void send_heartbeat(void);
+static void send_event(mesh_event_level_t level, const char *message, float value);
 static int8_t get_rssi_to_parent(void);
 static void read_sensor(void);
 static void control_ph(void);
@@ -333,8 +334,16 @@ static void read_sensor(void) {
     esp_err_t ret = ph_sensor_read(&ph);
     
     if (ret == ESP_OK) {
-        s_current_ph = ph + s_config->ph_cal_offset;
-        ESP_LOGI(TAG, "pH: %.2f (target: %.2f)", s_current_ph, s_config->ph_target);
+        // Дополнительная валидация в менеджере
+        if (ph < 0.0f || ph > 14.0f) {
+            ESP_LOGE(TAG, "CRITICAL: Invalid pH from sensor: %.2f - using last value", ph);
+            ESP_LOGW(TAG, "Current pH: %.2f (last valid)", s_current_ph);
+        } else {
+            s_current_ph = ph + s_config->ph_cal_offset;
+            ESP_LOGI(TAG, "pH: %.2f (target: %.2f, mock=%s)", 
+                     s_current_ph, s_config->ph_target, 
+                     ph_sensor_is_mock_mode() ? "YES" : "NO");
+        }
     } else {
         ESP_LOGW(TAG, "Failed to read pH sensor, using last value: %.2f", s_current_ph);
     }
@@ -451,7 +460,9 @@ static int8_t get_rssi_to_parent(void) {
 
 // Обработка команд
 void ph_manager_handle_command(const char *command, cJSON *params) {
-    ESP_LOGI(TAG, "Command received: %s", command);
+    ESP_LOGI(TAG, "=== PH_MANAGER_HANDLE_COMMAND ===");
+    ESP_LOGI(TAG, "Command received: %s", command ? command : "NULL");
+    ESP_LOGI(TAG, "Params: %s", params ? "found" : "NULL");
     
     if (strcmp(command, "set_ph_target") == 0) {
         cJSON *target = cJSON_GetObjectItem(params, "target");
@@ -503,8 +514,32 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
         ESP_LOGI(TAG, "Pump stats reset");
     }
     else if (strcmp(command, "run_pump_manual") == 0) {
+        ESP_LOGI(TAG, "=== RUN PUMP MANUAL COMMAND ===");
+        
+        // Диагностика блокировок перед запуском
+        if (s_emergency_mode) {
+            ESP_LOGW(TAG, "Manual pump blocked: EMERGENCY mode active");
+            return;
+        }
+        if (!mesh_manager_is_connected()) {
+            ESP_LOGW(TAG, "Manual pump: mesh not connected (command will still be executed locally)");
+        }
+        
+        // Отладочный вывод параметров
+        if (params) {
+            char *params_str = cJSON_PrintUnformatted(params);
+            ESP_LOGI(TAG, "Command params: %s", params_str ? params_str : "NULL");
+            if (params_str) free(params_str);
+        } else {
+            ESP_LOGW(TAG, "Command params is NULL!");
+        }
+        
         cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
         cJSON *duration_sec = cJSON_GetObjectItem(params, "duration_sec");
+        
+        ESP_LOGI(TAG, "pump_id: %s, duration_sec: %s", 
+                 pump_id ? "found" : "NULL", 
+                 duration_sec ? "found" : "NULL");
         
         if (cJSON_IsNumber(pump_id) && cJSON_IsNumber(duration_sec)) {
             int pump = pump_id->valueint;
@@ -524,8 +559,10 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
             pump_id_t pid = (pump == 0) ? PUMP_PH_UP : PUMP_PH_DOWN;
             uint32_t duration_ms = (uint32_t)(duration * 1000.0f);
             
-            ESP_LOGI(TAG, "Manual pump run: PUMP_%s for %.1f sec", 
-                     (pump == 0) ? "UP" : "DOWN", duration);
+            ESP_LOGI(TAG, "Manual pump run: PUMP_%s (id=%d) for %.1f sec (%lu ms)", 
+                     (pump == 0) ? "UP" : "DOWN", pump, duration, (unsigned long)duration_ms);
+            // Информативный вывод текущей калибровки
+            ESP_LOGI(TAG, "Calibration: pump %d = %.2f ml/s", pump, s_config->pump_calibration[pump].ml_per_second);
             pump_controller_run(pid, duration_ms);
         }
     }
@@ -565,6 +602,50 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
                 ESP_LOGE(TAG, "Failed to save calibration to NVS");
             }
         }
+    }
+    else if (strcmp(command, "force_mock_mode") == 0) {
+        cJSON *enable = cJSON_GetObjectItem(params, "enable");
+        if (cJSON_IsBool(enable)) {
+            bool mock_enable = cJSON_IsTrue(enable);
+            ph_sensor_force_mock_mode(mock_enable);
+            ESP_LOGI(TAG, "Mock mode %s", mock_enable ? "enabled" : "disabled");
+        }
+    }
+    else if (strcmp(command, "get_sensor_status") == 0) {
+        // Проверка подключения к mesh
+        if (!mesh_manager_is_connected()) {
+            ESP_LOGW(TAG, "Cannot send status: mesh offline");
+            return;
+        }
+        
+        cJSON *root = cJSON_CreateObject();
+        if (!root) {
+            ESP_LOGE(TAG, "Failed to create root JSON object");
+            return;
+        }
+        
+        cJSON_AddStringToObject(root, "type", "sensor_status");
+        cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
+        cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+        
+        cJSON *status = cJSON_CreateObject();
+        if (status) {
+            cJSON_AddBoolToObject(status, "connected", ph_sensor_is_connected());
+            cJSON_AddBoolToObject(status, "mock_mode", ph_sensor_is_mock_mode());
+            cJSON_AddBoolToObject(status, "stable", ph_sensor_is_stable());
+            cJSON_AddNumberToObject(status, "current_ph", s_current_ph);
+            cJSON_AddNumberToObject(status, "ph_target", s_config->ph_target);
+            cJSON_AddItemToObject(root, "status", status);
+        }
+        
+        char *json_str = cJSON_PrintUnformatted(root);
+        if (json_str) {
+            mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+            ESP_LOGI(TAG, "Sensor status sent");
+            free(json_str);
+        }
+        
+        cJSON_Delete(root);
     }
     else if (strcmp(command, "get_config") == 0) {
         // Проверка подключения к mesh
@@ -720,11 +801,15 @@ void ph_manager_handle_config_update(cJSON *config_json) {
             s_config->pump_pid[1].ki = (float)ki->valuedouble;
             s_config->pump_pid[1].kd = (float)kd->valuedouble;
             
-            // Переинициализация PID
-            pid_init(&s_pid_ph_up, s_config->pump_pid[0].kp, 
-                     s_config->pump_pid[0].ki, s_config->pump_pid[0].kd);
-            pid_init(&s_pid_ph_down, s_config->pump_pid[1].kp,
-                     s_config->pump_pid[1].ki, s_config->pump_pid[1].kd);
+            // Переинициализация адаптивных PID
+            adaptive_pid_init(&s_pid_ph_up, s_config->ph_target,
+                             s_config->pump_pid[0].kp, 
+                             s_config->pump_pid[0].ki, 
+                             s_config->pump_pid[0].kd);
+            adaptive_pid_init(&s_pid_ph_down, s_config->ph_target,
+                             s_config->pump_pid[1].kp,
+                             s_config->pump_pid[1].ki, 
+                             s_config->pump_pid[1].kd);
             
             config_changed = true;
             ESP_LOGI(TAG, "PID params updated: Kp=%.2f Ki=%.2f Kd=%.2f", 

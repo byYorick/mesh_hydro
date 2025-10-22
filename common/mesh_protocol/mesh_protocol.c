@@ -95,7 +95,12 @@ bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg) {
     if (data_obj != NULL) {
         msg->data = cJSON_Duplicate(data_obj, true);
     } else {
-        msg->data = NULL;
+        // Для команд и конфигов данные могут быть в корне
+        if (msg->type == MESH_MSG_COMMAND || msg->type == MESH_MSG_CONFIG) {
+            msg->data = cJSON_Duplicate(root, true);
+        } else {
+            msg->data = NULL;
+        }
     }
 
     cJSON_Delete(root);

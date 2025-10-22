@@ -82,13 +82,29 @@
                     <v-btn
                       block
                       :color="pump.id === 0 ? 'success' : 'error'"
-                      prepend-icon="mdi-play"
+                      :prepend-icon="runningPump === pump.id ? 'mdi-stop' : 'mdi-play'"
                       @click="runPump(pump.id)"
-                      :disabled="!node.online || loading"
+                      :disabled="!node.online || loading || runningPump !== null"
                       :loading="runningPump === pump.id"
+                      :variant="runningPump === pump.id ? 'elevated' : 'flat'"
                     >
-                      Запустить
+                      {{ runningPump === pump.id ? 'Работает...' : 'Запустить' }}
                     </v-btn>
+                  </v-col>
+                </v-row>
+                
+                <!-- Прогресс-бар для работающего насоса -->
+                <v-row v-if="runningPump === pump.id" class="mt-2">
+                  <v-col cols="12">
+                    <v-progress-linear
+                      :model-value="pumpProgress[pump.id] || 0"
+                      color="success"
+                      height="6"
+                      rounded
+                    ></v-progress-linear>
+                    <div class="text-caption text-center mt-1">
+                      Насос работает: {{ Math.round((pumpProgress[pump.id] || 0) * (pumpDuration[pump.id] || 0) / 100) }}с / {{ pumpDuration[pump.id] || 0 }}с
+                    </div>
                   </v-col>
                 </v-row>
               </v-card-text>
@@ -155,12 +171,13 @@
                       <v-btn
                         block
                         color="primary"
-                        prepend-icon="mdi-auto-fix"
+                        :prepend-icon="calibratingPump === pump.id ? 'mdi-stop' : 'mdi-auto-fix'"
                         @click="calibratePump(pump.id)"
-                        :disabled="!node.online || loading"
+                        :disabled="!node.online || loading || calibratingPump !== null || runningPump !== null"
                         :loading="calibratingPump === pump.id"
+                        :variant="calibratingPump === pump.id ? 'elevated' : 'flat'"
                       >
-                        Калибровать
+                        {{ calibratingPump === pump.id ? 'Калибровка...' : 'Калибровать' }}
                       </v-btn>
                     </v-col>
                   </v-row>
@@ -219,7 +236,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vue-toastification'
 import axios from 'axios'
 
@@ -247,6 +264,8 @@ const runningPump = ref(null)
 const calibratingPump = ref(null)
 const requestingConfig = ref(false)
 const lastConfigRequest = ref(null)
+const pumpProgress = ref({})
+const pumpTimers = ref({})
 
 // Вычисляемые значения
 const currentPh = computed(() => {
@@ -281,6 +300,10 @@ const loadCalibrations = async () => {
   }
 }
 
+// Debounce для предотвращения множественных нажатий
+const pumpDebounce = ref({})
+const calibrationDebounce = ref({})
+
 // Запуск насоса
 const runPump = async (pumpId) => {
   if (!pumpDuration.value[pumpId] || pumpDuration.value[pumpId] <= 0) {
@@ -288,7 +311,32 @@ const runPump = async (pumpId) => {
     return
   }
 
+  // Проверяем debounce
+  if (pumpDebounce.value[pumpId]) {
+    toast.warning('Подождите, насос уже запускается...')
+    return
+  }
+
   runningPump.value = pumpId
+  pumpDebounce.value[pumpId] = true
+  pumpProgress.value[pumpId] = 0
+  
+  // Запускаем таймер прогресса
+  const duration = pumpDuration.value[pumpId] * 1000 // в миллисекундах
+  const interval = 100 // обновляем каждые 100мс
+  let elapsed = 0
+  
+  pumpTimers.value[pumpId] = setInterval(() => {
+    elapsed += interval
+    const progress = Math.min((elapsed / duration) * 100, 100)
+    pumpProgress.value[pumpId] = progress
+    
+    if (progress >= 100) {
+      clearInterval(pumpTimers.value[pumpId])
+      delete pumpTimers.value[pumpId]
+    }
+  }, interval)
+  
   try {
     const response = await axios.post(`/api/nodes/${props.node.node_id}/pump/run`, {
       pump_id: pumpId,
@@ -304,7 +352,18 @@ const runPump = async (pumpId) => {
     const errorMsg = error.response?.data?.error || error.message || 'Ошибка запуска насоса'
     toast.error(errorMsg)
   } finally {
-    runningPump.value = null
+    // Очищаем таймер и сбрасываем состояние
+    if (pumpTimers.value[pumpId]) {
+      clearInterval(pumpTimers.value[pumpId])
+      delete pumpTimers.value[pumpId]
+    }
+    
+    // Задержка перед сбросом состояния для показа завершения
+    setTimeout(() => {
+      runningPump.value = null
+      pumpProgress.value[pumpId] = 0
+      pumpDebounce.value[pumpId] = false
+    }, 1000)
   }
 }
 
@@ -315,7 +374,15 @@ const calibratePump = async (pumpId) => {
     return
   }
 
+  // Проверяем debounce
+  if (calibrationDebounce.value[pumpId]) {
+    toast.warning('Подождите, калибровка уже выполняется...')
+    return
+  }
+
   calibratingPump.value = pumpId
+  calibrationDebounce.value[pumpId] = true
+  
   try {
     const response = await axios.post(`/api/nodes/${props.node.node_id}/pump/calibrate`, {
       pump_id: pumpId,
@@ -334,6 +401,10 @@ const calibratePump = async (pumpId) => {
     toast.error(errorMsg)
   } finally {
     calibratingPump.value = null
+    // Сбрасываем debounce через 3 секунды (калибровка занимает больше времени)
+    setTimeout(() => {
+      calibrationDebounce.value[pumpId] = false
+    }, 3000)
   }
 }
 
@@ -366,6 +437,13 @@ const formatDate = (timestamp) => {
 // При монтировании загрузить калибровки
 onMounted(() => {
   loadCalibrations()
+})
+
+// При размонтировании очищаем таймеры
+onUnmounted(() => {
+  Object.values(pumpTimers.value).forEach(timer => {
+    if (timer) clearInterval(timer)
+  })
 })
 </script>
 

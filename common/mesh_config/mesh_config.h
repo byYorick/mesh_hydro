@@ -74,7 +74,7 @@ extern "C" {
  * Обычно это IP вашего компьютера где запущен Docker
  * Узнать можно: ipconfig (Windows) или ifconfig (Linux/Mac)
  */
-#define MQTT_BROKER_HOST        "192.168.1.100"
+#define MQTT_BROKER_HOST        "192.168.0.167"
 
 /**
  * @brief Порт MQTT брокера
@@ -84,7 +84,7 @@ extern "C" {
 /**
  * @brief Полный URI MQTT брокера
  */
-#define MQTT_BROKER_URI         "mqtt://192.168.1.100:1883"
+#define MQTT_BROKER_URI         "mqtt://192.168.0.167:1883"
 
 /*******************************************************************************
  * TIMEOUTS И ИНТЕРВАЛЫ - ОБЩИЕ
@@ -92,8 +92,10 @@ extern "C" {
 
 /**
  * @brief Таймаут для определения офлайн узла (мс)
+ * 
+ * ⚠️ ВАЖНО: Должен совпадать с backend таймаутом (20 сек)
  */
-#define MESH_NODE_TIMEOUT_MS    10000          // 10 секунд
+#define MESH_NODE_TIMEOUT_MS    20000          // 20 секунд
 
 /**
  * @brief Интервал отправки telemetry (мс)

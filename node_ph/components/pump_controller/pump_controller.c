@@ -25,8 +25,9 @@ static const char *TAG = "pump_ctrl";
 #define MAX_RUN_TIME_MS   10000  // Макс 10 секунд непрерывной работы
 #define DEFAULT_ML_PER_SEC 2.0f  // Дефолтная производительность
 
-// GPIO пины для насосов (ESP32-C3)
-static const int PUMP_GPIO[PUMP_MAX] = {2, 3};
+// GPIO пины для насосов (ESP32 - реальная распайка)
+// GPIO 12 = pH UP, GPIO 13 = pH DOWN
+static const int PUMP_GPIO[PUMP_MAX] = {12, 13};
 
 // Структура насоса
 typedef struct {
@@ -98,7 +99,11 @@ esp_err_t pump_controller_init(void) {
 }
 
 esp_err_t pump_controller_run(pump_id_t pump, uint32_t duration_ms) {
+    ESP_LOGI(TAG, "=== PUMP CONTROLLER RUN ===");
+    ESP_LOGI(TAG, "Pump: %d, Duration: %lu ms", pump, (unsigned long)duration_ms);
+    
     if (pump >= PUMP_MAX) {
+        ESP_LOGE(TAG, "Invalid pump ID: %d (max: %d)", pump, PUMP_MAX-1);
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -108,7 +113,11 @@ esp_err_t pump_controller_run(pump_id_t pump, uint32_t duration_ms) {
         duration_ms = MAX_RUN_TIME_MS;
     }
     
-    return pump_start_internal(pump, duration_ms);
+    ESP_LOGI(TAG, "Calling pump_start_internal...");
+    esp_err_t ret = pump_start_internal(pump, duration_ms);
+    ESP_LOGI(TAG, "pump_start_internal returned: %s", esp_err_to_name(ret));
+    
+    return ret;
 }
 
 esp_err_t pump_controller_run_dose(pump_id_t pump, float dose_ml) {
@@ -212,7 +221,7 @@ static esp_err_t pump_start_internal(pump_id_t pump, uint32_t duration_ms) {
         return ESP_ERR_INVALID_STATE;
     }
     
-    ESP_LOGI(TAG, "Pump %d START (%lu ms)", pump, (unsigned long)duration_ms);
+    ESP_LOGI(TAG, "Pump %d START (%lu ms) GPIO=%d duty=100%%", pump, (unsigned long)duration_ms, PUMP_GPIO[pump]);
     
     // Включение PWM (100% duty)
     ESP_ERROR_CHECK(ledc_set_duty(PWM_MODE, (ledc_channel_t)pump, PWM_MAX_DUTY));
@@ -254,8 +263,8 @@ static esp_err_t pump_stop_internal(pump_id_t pump) {
     float ml = (actual_time / 1000.0f) * s_pumps[pump].ml_per_sec;
     s_pumps[pump].stats.total_ml += ml;
     
-    ESP_LOGI(TAG, "Pump %d STOP (%.2f ml, %llu ms)", 
-             pump, ml, (unsigned long long)actual_time);
+    ESP_LOGI(TAG, "Pump %d STOP (%.2f ml, %llu ms) GPIO=%d", 
+             pump, ml, (unsigned long long)actual_time, PUMP_GPIO[pump]);
     
     s_pumps[pump].is_running = false;
     
