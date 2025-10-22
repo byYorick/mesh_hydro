@@ -5,6 +5,7 @@ idf_component_register(
         ph_sensor
         pump_controller
         pid_controller
+        adaptive_pid
         mesh_manager
         mesh_protocol
         node_config

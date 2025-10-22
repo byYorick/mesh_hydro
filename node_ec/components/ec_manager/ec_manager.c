@@ -7,6 +7,7 @@
 #include "ec_sensor.h"
 #include "pump_controller.h"
 #include "pid_controller.h"
+#include "adaptive_pid.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 
@@ -31,8 +32,8 @@ static uint32_t s_boot_time = 0;
 static bool s_emergency_mode = false;
 static bool s_autonomous_mode = false;
 
-// PID контроллер (один для всех насосов EC)
-static pid_controller_t s_pid_ec;
+// Адаптивный PID контроллер (один для всех насосов EC)
+static adaptive_pid_t s_pid_ec;
 
 // Текущее значение
 static float s_current_ec = 2.0f;
@@ -60,12 +61,20 @@ esp_err_t ec_manager_init(ec_node_config_t *config) {
     s_emergency_mode = false;
     s_autonomous_mode = false;
     
-    // Инициализация PID контроллера для EC
-    pid_init(&s_pid_ec, s_config->pump_pid[PUMP_EC_A].kp, 
-             s_config->pump_pid[PUMP_EC_A].ki, 
-             s_config->pump_pid[PUMP_EC_A].kd);
-    pid_set_setpoint(&s_pid_ec, s_config->ec_target);
-    pid_set_output_limits(&s_pid_ec, 0.0f, 10.0f); // Макс 10 мл за раз (распределится на 3 насоса)
+    // Инициализация адаптивного PID контроллера для EC
+    adaptive_pid_init(&s_pid_ec, s_config->ec_target,
+                     s_config->pump_pid[PUMP_EC_A].kp, 
+                     s_config->pump_pid[PUMP_EC_A].ki, 
+                     s_config->pump_pid[PUMP_EC_A].kd);
+    
+    // Настройка зон для EC (dead=0.2, close=0.5, far=1.5)
+    adaptive_pid_set_zones(&s_pid_ec, 0.2f, 0.5f, 1.5f);
+    
+    // Safety: макс 10 мл за раз, минимум 60 сек между дозами
+    adaptive_pid_set_safety(&s_pid_ec, 10.0f, 60000);
+    
+    // Лимиты выхода
+    adaptive_pid_set_output_limits(&s_pid_ec, 0.0f, 10.0f);
     
     ESP_LOGI(TAG, "EC Manager initialized");
     ESP_LOGI(TAG, "Node ID: %s, EC target: %.2f", 
@@ -324,26 +333,23 @@ static void read_sensor(void) {
 
 // Управление EC (распределение по 3 насосам)
 static void control_ec(void) {
-    float error = s_current_ec - s_config->ec_target;
-    
-    // Мёртвая зона ±0.2
-    if (fabs(error) < 0.2f) {
-        return;
-    }
+    float output = 0.0f;
+    esp_err_t err;
     
     // Если EC < target - нужно повысить
     if (s_current_ec < s_config->ec_target) {
-        float output = pid_compute(&s_pid_ec, s_current_ec, 10.0f); // dt=10 сек
+        err = adaptive_pid_compute(&s_pid_ec, s_current_ec, 10.0f, &output);
         
-        if (output > 0.1f) {
-            // Распределение по 3 насосам:
-            // A = 50%, B = 40%, C = 10%
+        if (err == ESP_OK && output > 0.0f) {
+            // Распределение по 3 насосам: A = 50%, B = 40%, C = 10%
             float dose_a = output * 0.5f;
             float dose_b = output * 0.4f;
             float dose_c = output * 0.1f;
             
-            ESP_LOGI(TAG, "EC: %.2f ml (A:%.2f B:%.2f C:%.2f) current=%.2f target=%.2f", 
-                     output, dose_a, dose_b, dose_c, s_current_ec, s_config->ec_target);
+            pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ec);
+            ESP_LOGI(TAG, "EC: %.2f ml [%s zone] (A:%.2f B:%.2f C:%.2f) current=%.2f target=%.2f", 
+                     output, adaptive_pid_zone_to_str(zone), dose_a, dose_b, dose_c, 
+                     s_current_ec, s_config->ec_target);
             
             // Запуск всех 3 насосов последовательно
             pump_controller_run_dose(PUMP_EC_A, dose_a);
@@ -351,6 +357,11 @@ static void control_ec(void) {
             pump_controller_run_dose(PUMP_EC_B, dose_b);
             vTaskDelay(pdMS_TO_TICKS(100));
             pump_controller_run_dose(PUMP_EC_C, dose_c);
+            
+            // Отправка события при коррекции в FAR зоне
+            if (zone == ZONE_FAR) {
+                send_event(MESH_EVENT_WARNING, "EC far from target, aggressive correction", s_current_ec);
+            }
         }
     }
     // Если EC > target - только логирование (EC не понижается насосами)
@@ -446,7 +457,7 @@ void ec_manager_handle_command(const char *command, cJSON *params) {
             }
             
             s_config->ec_target = new_target;
-            pid_set_setpoint(&s_pid_ec, s_config->ec_target);
+            adaptive_pid_set_setpoint(&s_pid_ec, s_config->ec_target);
             
             // ВАЖНО: Сохранение в NVS!
             esp_err_t err = node_config_save(s_config, sizeof(ec_node_config_t), "ec_ns");
@@ -659,7 +670,7 @@ void ec_manager_handle_config_update(cJSON *config_json) {
         float new_target = (float)ec_target->valuedouble;
         if (new_target >= 0.5f && new_target <= 5.0f) {
             s_config->ec_target = new_target;
-            pid_set_setpoint(&s_pid_ec, s_config->ec_target);
+            adaptive_pid_set_setpoint(&s_pid_ec, s_config->ec_target);
             config_changed = true;
             ESP_LOGI(TAG, "EC target updated: %.2f", s_config->ec_target);
         }

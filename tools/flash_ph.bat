@@ -5,17 +5,27 @@ echo ═════════════════════════
 echo  ПРОШИВКА NODE pH (ESP32-C3)
 echo ════════════════════════════════════════════════════════
 echo.
-echo ⚠️  УКАЖИ COM ПОРТ В СТРОКЕ 14!
+echo 📌 Порт: COM8 (измени если нужно)
+echo 📦 Компонент: pH Manager + Adaptive PID
 echo.
-pause
-
-set "IDF_INIT=C:\Espressif\idf_cmd_init.bat esp-idf-29323a3f5a0574597d6dbaa0af20c775"
-set "COM_PORT=COM3"
 
 cd /d %~dp0\..\node_ph
 
-echo.
-echo 🔌 Прошивка на порт %COM_PORT%...
-echo.
-C:\Windows\system32\cmd.exe /k "%IDF_INIT% && idf.py -p %COM_PORT% flash monitor"
+echo ⏳ Сборка прошивки...
+C:\Espressif\idf_cmd_init.bat esp-idf-1dcc643656a1439837fdf6ab63363005
+call idf.py build
 
+if %errorlevel% neq 0 (
+    echo.
+    echo ❌ Ошибка сборки!
+    pause
+    exit /b 1
+)
+
+echo.
+echo ✅ Сборка завершена успешно!
+echo.
+echo ⏳ Прошивка на COM8...
+call idf.py -p COM8 flash monitor
+
+pause

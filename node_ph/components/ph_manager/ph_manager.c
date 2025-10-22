@@ -7,6 +7,7 @@
 #include "ph_sensor.h"
 #include "pump_controller.h"
 #include "pid_controller.h"
+#include "adaptive_pid.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 
@@ -31,9 +32,9 @@ static uint32_t s_boot_time = 0;
 static bool s_emergency_mode = false;
 static bool s_autonomous_mode = false;
 
-// PID контроллеры
-static pid_controller_t s_pid_ph_up;
-static pid_controller_t s_pid_ph_down;
+// Адаптивные PID контроллеры
+static adaptive_pid_t s_pid_ph_up;
+static adaptive_pid_t s_pid_ph_down;
 
 // Текущее значение
 static float s_current_ph = 7.0f;
@@ -61,18 +62,30 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     s_emergency_mode = false;
     s_autonomous_mode = false;
     
-    // Инициализация PID контроллеров
-    pid_init(&s_pid_ph_up, s_config->pump_pid[PUMP_PH_UP].kp, 
-             s_config->pump_pid[PUMP_PH_UP].ki, 
-             s_config->pump_pid[PUMP_PH_UP].kd);
-    pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
-    pid_set_output_limits(&s_pid_ph_up, 0.0f, 5.0f); // Макс 5 мл за раз
+    // Инициализация адаптивных PID контроллеров
+    adaptive_pid_init(&s_pid_ph_up, s_config->ph_target,
+                     s_config->pump_pid[PUMP_PH_UP].kp, 
+                     s_config->pump_pid[PUMP_PH_UP].ki, 
+                     s_config->pump_pid[PUMP_PH_UP].kd);
     
-    pid_init(&s_pid_ph_down, s_config->pump_pid[PUMP_PH_DOWN].kp,
-             s_config->pump_pid[PUMP_PH_DOWN].ki,
-             s_config->pump_pid[PUMP_PH_DOWN].kd);
-    pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
-    pid_set_output_limits(&s_pid_ph_down, 0.0f, 5.0f);
+    // Настройка зон для pH (dead=0.1, close=0.3, far=1.0)
+    adaptive_pid_set_zones(&s_pid_ph_up, 0.1f, 0.3f, 1.0f);
+    
+    // Safety: макс 5 мл за раз, минимум 60 сек между дозами
+    adaptive_pid_set_safety(&s_pid_ph_up, 5.0f, 60000);
+    
+    // Лимиты выхода
+    adaptive_pid_set_output_limits(&s_pid_ph_up, 0.0f, 5.0f);
+    
+    // pH DOWN контроллер
+    adaptive_pid_init(&s_pid_ph_down, s_config->ph_target,
+                     s_config->pump_pid[PUMP_PH_DOWN].kp,
+                     s_config->pump_pid[PUMP_PH_DOWN].ki,
+                     s_config->pump_pid[PUMP_PH_DOWN].kd);
+    
+    adaptive_pid_set_zones(&s_pid_ph_down, 0.1f, 0.3f, 1.0f);
+    adaptive_pid_set_safety(&s_pid_ph_down, 5.0f, 60000);
+    adaptive_pid_set_output_limits(&s_pid_ph_down, 0.0f, 5.0f);
     
     ESP_LOGI(TAG, "pH Manager initialized");
     ESP_LOGI(TAG, "Node ID: %s, pH target: %.2f", 
@@ -329,31 +342,39 @@ static void read_sensor(void) {
 
 // Управление pH
 static void control_ph(void) {
-    float error = s_current_ph - s_config->ph_target;
-    
-    // Мёртвая зона ±0.2
-    if (fabs(error) < 0.2f) {
-        return;
-    }
+    float output = 0.0f;
+    esp_err_t err;
     
     // Если pH < target - нужно повысить (pH UP)
     if (s_current_ph < s_config->ph_target) {
-        float output = pid_compute(&s_pid_ph_up, s_current_ph, 10.0f); // dt=10 сек
+        err = adaptive_pid_compute(&s_pid_ph_up, s_current_ph, 10.0f, &output);
         
-        if (output > 0.1f) {
-            ESP_LOGI(TAG, "pH UP: %.2f ml (current=%.2f, target=%.2f)", 
-                     output, s_current_ph, s_config->ph_target);
+        if (err == ESP_OK && output > 0.0f) {
+            pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_up);
+            ESP_LOGI(TAG, "pH UP: %.2f ml [%s zone] (current=%.2f, target=%.2f)", 
+                     output, adaptive_pid_zone_to_str(zone), s_current_ph, s_config->ph_target);
             pump_controller_run_dose(PUMP_PH_UP, output);
+            
+            // Отправка события при коррекции в FAR зоне
+            if (zone == ZONE_FAR) {
+                send_event(MESH_EVENT_WARNING, "pH far from target, aggressive correction", s_current_ph);
+            }
         }
     }
     // Если pH > target - нужно понизить (pH DOWN)
-    else {
-        float output = pid_compute(&s_pid_ph_down, s_current_ph, 10.0f);
+    else if (s_current_ph > s_config->ph_target) {
+        err = adaptive_pid_compute(&s_pid_ph_down, s_current_ph, 10.0f, &output);
         
-        if (output > 0.1f) {
-            ESP_LOGI(TAG, "pH DOWN: %.2f ml (current=%.2f, target=%.2f)", 
-                     output, s_current_ph, s_config->ph_target);
+        if (err == ESP_OK && output > 0.0f) {
+            pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_down);
+            ESP_LOGI(TAG, "pH DOWN: %.2f ml [%s zone] (current=%.2f, target=%.2f)", 
+                     output, adaptive_pid_zone_to_str(zone), s_current_ph, s_config->ph_target);
             pump_controller_run_dose(PUMP_PH_DOWN, output);
+            
+            // Отправка события при коррекции в FAR зоне
+            if (zone == ZONE_FAR) {
+                send_event(MESH_EVENT_WARNING, "pH far from target, aggressive correction", s_current_ph);
+            }
         }
     }
 }
@@ -444,8 +465,8 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
             }
             
             s_config->ph_target = new_target;
-            pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
-            pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
+            adaptive_pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
+            adaptive_pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
             
             // ВАЖНО: Сохранение в NVS!
             esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
@@ -657,8 +678,8 @@ void ph_manager_handle_config_update(cJSON *config_json) {
         float new_target = (float)ph_target->valuedouble;
         if (new_target >= 5.0f && new_target <= 9.0f) {
             s_config->ph_target = new_target;
-            pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
-            pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
+            adaptive_pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
+            adaptive_pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
             config_changed = true;
             ESP_LOGI(TAG, "pH target updated: %.2f", s_config->ph_target);
         }
