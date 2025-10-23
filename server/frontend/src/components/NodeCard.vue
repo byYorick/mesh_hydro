@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { computed, memoize } from 'vue'
+import { computed } from 'vue'
 import { formatDistanceToNow } from '@/utils/time'
 import CommandDialog from './CommandDialog.vue'
 
@@ -435,38 +435,49 @@ function getRssiColor(percent) {
   return 'error'
 }
 
-// Мемоизированная функция для обработки метрик
-const processNodeMetrics = memoize((nodeType, data) => {
-  if (!data) return []
-  
-  const metrics = []
-  
-  // pH/EC metrics
-  if (nodeType === 'ph_ec' || nodeType === 'ph') {
-    if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
-    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+// Простая мемоизация для обработки метрик
+const metricsCache = new Map()
+const processNodeMetrics = (nodeType, data) => {
+  const cacheKey = `${nodeType}-${JSON.stringify(data)}`
+  if (metricsCache.has(cacheKey)) {
+    return metricsCache.get(cacheKey)
   }
   
-  if (nodeType === 'ec') {
-    if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
-    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
-  }
+  const result = (() => {
+    if (!data) return []
+    
+    const metrics = []
+    
+    // pH/EC metrics
+    if (nodeType === 'ph_ec' || nodeType === 'ph') {
+      if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    if (nodeType === 'ec') {
+      if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    // Climate metrics
+    if (nodeType === 'climate') {
+      if (data.temperature != null) metrics.push({ key: 'temp', value: `${data.temperature.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+      if (data.humidity != null) metrics.push({ key: 'hum', value: `${data.humidity.toFixed(0)}%`, icon: 'mdi-water-percent' })
+      if (data.co2 != null) metrics.push({ key: 'co2', value: `${data.co2} ppm`, icon: 'mdi-molecule-co2' })
+    }
+    
+    // Water metrics
+    if (nodeType === 'water') {
+      if (data.level != null) metrics.push({ key: 'level', value: `${data.level.toFixed(0)}%`, icon: 'mdi-waves' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    return metrics
+  })()
   
-  // Climate metrics
-  if (nodeType === 'climate') {
-    if (data.temperature != null) metrics.push({ key: 'temp', value: `${data.temperature.toFixed(1)}°C`, icon: 'mdi-thermometer' })
-    if (data.humidity != null) metrics.push({ key: 'hum', value: `${data.humidity.toFixed(0)}%`, icon: 'mdi-water-percent' })
-    if (data.co2 != null) metrics.push({ key: 'co2', value: `${data.co2} ppm`, icon: 'mdi-molecule-co2' })
-  }
-  
-  // Water metrics
-  if (nodeType === 'water') {
-    if (data.level != null) metrics.push({ key: 'level', value: `${data.level.toFixed(0)}%`, icon: 'mdi-waves' })
-    if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
-  }
-  
-  return metrics
-})
+  metricsCache.set(cacheKey, result)
+  return result
+}
 
 // Visible metrics для mobile layout
 const visibleMetrics = computed(() => {

@@ -98,6 +98,11 @@ export const useTelemetryStore = defineStore('telemetry', {
 
     // Add telemetry in real-time (from WebSocket)
     addTelemetryRealtime(data) {
+      // Ensure telemetry is an array
+      if (!Array.isArray(this.telemetry)) {
+        this.telemetry = []
+      }
+      
       // Add to telemetry array
       this.telemetry.unshift(data)
       

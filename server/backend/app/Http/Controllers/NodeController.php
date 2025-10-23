@@ -401,15 +401,16 @@ class NodeController extends Controller
             "Pump #{$validated['pump_id']}: {$validated['volume_ml']} ml in {$validated['duration_sec']} sec"
         );
 
-        // Отправка команды на узел через MQTT
+        // Отправка конфига калибровки в NVS на узел
         try {
+            // Отправляем конфиг калибровки в NVS
             $mqtt->sendCommand(
                 $nodeId,
-                'calibrate_pump',
+                'set_config',
                 [
-                    'pump_id' => $validated['pump_id'],
-                    'duration_sec' => $validated['duration_sec'],
-                    'volume_ml' => $validated['volume_ml'],
+                    'pump_' . $validated['pump_id'] . '_ml_per_sec' => $mlPerSecond,
+                    'pump_' . $validated['pump_id'] . '_calibration_volume' => $validated['volume_ml'],
+                    'pump_' . $validated['pump_id'] . '_calibration_time' => $validated['duration_sec'],
                 ]
             );
 

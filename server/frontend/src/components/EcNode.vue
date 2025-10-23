@@ -140,25 +140,13 @@
                 </v-card-subtitle>
 
                 <v-card-text>
+                  <!-- Время калибровки и кнопка запуска -->
                   <v-row>
-                    <v-col cols="4">
-                      <v-text-field
-                        v-model.number="calibrationVolume[pump.id]"
-                        type="number"
-                        label="Объем"
-                        variant="outlined"
-                        density="compact"
-                        suffix="мл"
-                        :min="1"
-                        :max="500"
-                        hide-details
-                      ></v-text-field>
-                    </v-col>
-                    <v-col cols="4">
+                    <v-col cols="6">
                       <v-text-field
                         v-model.number="calibrationDuration[pump.id]"
                         type="number"
-                        label="Время"
+                        label="Время калибровки"
                         variant="outlined"
                         density="compact"
                         suffix="сек"
@@ -167,29 +155,88 @@
                         hide-details
                       ></v-text-field>
                     </v-col>
-                    <v-col cols="4">
+                    <v-col cols="6">
                       <v-btn
                         block
                         color="primary"
-                        prepend-icon="mdi-auto-fix"
-                        @click="calibratePump(pump.id)"
-                        :disabled="!node.online || loading"
+                        :prepend-icon="calibratingPump === pump.id ? 'mdi-loading' : 'mdi-play'"
+                        @click="startCalibration(pump.id)"
+                        :disabled="!node.online || loading || calibratingPump !== null || runningPump !== null"
                         :loading="calibratingPump === pump.id"
+                        :variant="calibratingPump === pump.id ? 'elevated' : 'flat'"
                       >
-                        Калибровать
+                        {{ calibratingPump === pump.id ? 'Калибровка...' : 'Запустить калибровку' }}
                       </v-btn>
                     </v-col>
                   </v-row>
 
+                  <!-- Прогресс калибровки -->
+                  <v-row v-if="calibratingPump === pump.id && pumpProgress[pump.id] > 0">
+                    <v-col cols="12">
+                      <v-progress-linear
+                        :model-value="pumpProgress[pump.id]"
+                        :color="getPumpColor(pump.id)"
+                        height="8"
+                        rounded
+                      ></v-progress-linear>
+                      <div class="text-center text-caption mt-2">
+                        Калибровка: {{ pumpProgress[pump.id].toFixed(1) }}%
+                      </div>
+                    </v-col>
+                  </v-row>
+
+                  <!-- Поле ввода объема после завершения калибровки -->
+                  <v-row v-if="showVolumeInput[pump.id]">
+                    <v-col cols="8">
+                      <v-text-field
+                        v-model.number="calibrationVolume[pump.id]"
+                        type="number"
+                        label="Введите объем в мл"
+                        variant="outlined"
+                        density="compact"
+                        suffix="мл"
+                        :min="0.1"
+                        :max="1000"
+                        step="0.1"
+                        placeholder="Например: 100"
+                        hide-details
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="4">
+                      <v-btn
+                        block
+                        color="success"
+                        prepend-icon="mdi-content-save"
+                        @click="saveCalibration(pump.id)"
+                        class="mt-1"
+                      >
+                        Сохранить
+                      </v-btn>
+                    </v-col>
+                  </v-row>
+
+                  <!-- Информация о последней калибровке -->
                   <v-alert
                     v-if="getPumpCalibration(pump.id)"
-                    type="success"
+                    :type="getPumpCalibration(pump.id).is_calibrated ? 'success' : 'warning'"
                     variant="tonal"
                     density="compact"
                     class="mt-3"
                   >
-                    <div class="text-caption">
-                      Последняя калибровка: {{ formatDate(getPumpCalibration(pump.id).last_calibrated) }}
+                    <div class="d-flex align-center">
+                      <v-icon class="me-2">
+                        {{ getPumpCalibration(pump.id).is_calibrated ? 'mdi-check-circle' : 'mdi-alert-circle' }}
+                      </v-icon>
+                      <div>
+                        <div class="font-weight-medium">
+                          {{ getPumpCalibration(pump.id).is_calibrated ? 'Калиброван' : 'Не калиброван' }}
+                        </div>
+                        <div class="text-caption">
+                          Производительность: {{ getPumpCalibration(pump.id).ml_per_second.toFixed(2) }} мл/с
+                          <br>
+                          Калиброван: {{ formatDate(getPumpCalibration(pump.id).calibrated_at) }}
+                        </div>
+                      </div>
                     </div>
                   </v-alert>
                 </v-card-text>
@@ -237,7 +284,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import { axios as api } from '@/services/api'
+import api from '@/services/api'
 
 const props = defineProps({
   node: {
@@ -266,6 +313,7 @@ const requestingConfig = ref(false)
 const pumpDebounce = ref({}) // Защита от дублирования запросов
 const pumpTimers = ref({}) // Таймеры для отслеживания работы насосов
 const pumpProgress = ref({}) // Прогресс работы насосов
+const showVolumeInput = ref({}) // Показывать поле ввода объема
 const lastConfigRequest = ref(null)
 
 // Вычисляемые значения
@@ -330,8 +378,12 @@ const getPumpButtonText = (pumpId) => {
 const loadCalibrations = async () => {
   try {
     const response = await api.getPumpCalibrations(props.node.node_id)
-    if (response.success) {
-      pumpCalibrations.value = response.calibrations
+    console.log('Load calibrations response:', response)
+    
+    if (response.success || response.status === 200) {
+      pumpCalibrations.value = response.calibrations || response
+    } else {
+      console.error('Failed to load calibrations:', response.error || response.message)
     }
   } catch (error) {
     console.error('Failed to load calibrations:', error)
@@ -443,15 +495,92 @@ const runPump = async (pumpId) => {
   }
 }
 
-// Калибровка насоса
-const calibratePump = async (pumpId) => {
-  if (!calibrationVolume.value[pumpId] || !calibrationDuration.value[pumpId]) {
-    toast.warning('Введите объем и время')
+// Запуск калибровки насоса (включение насоса на время)
+const startCalibration = async (pumpId) => {
+  // Валидация времени
+  const durationValidation = validateCalibrationDuration(calibrationDuration.value[pumpId])
+  if (durationValidation !== true) {
+    toast.warning(durationValidation)
+    return
+  }
+
+  // Проверяем debounce
+  if (calibrationDebounce.value[pumpId]) {
+    toast.warning('Подождите, калибровка уже выполняется...')
     return
   }
 
   calibratingPump.value = pumpId
+  calibrationDebounce.value[pumpId] = true
+  
   try {
+    console.log('Starting calibration pump with data:', {
+      nodeId: props.node.node_id,
+      pumpId,
+      duration: calibrationDuration.value[pumpId]
+    })
+    
+    // Запускаем насос на время калибровки
+    const response = await api.runPump(
+      props.node.node_id,
+      pumpId,
+      calibrationDuration.value[pumpId]
+    )
+
+    if (response.success) {
+      toast.success(`Насос ${pumpId} запущен для калибровки на ${calibrationDuration.value[pumpId]} сек`)
+      
+      // Запускаем таймер прогресса
+      const duration = calibrationDuration.value[pumpId] * 1000 // в миллисекундах
+      const interval = 100 // обновляем каждые 100мс
+      let elapsed = 0
+      
+      pumpTimers.value[pumpId] = setInterval(() => {
+        elapsed += interval
+        const progress = Math.min((elapsed / duration) * 100, 100)
+        pumpProgress.value[pumpId] = progress
+        
+        if (progress >= 100) {
+          clearInterval(pumpTimers.value[pumpId])
+          delete pumpTimers.value[pumpId]
+          
+          // Показываем поле ввода объема после завершения
+          setTimeout(() => {
+            showVolumeInput.value[pumpId] = true
+            calibratingPump.value = null
+            pumpProgress.value[pumpId] = 0
+          }, 500)
+        }
+      }, interval)
+    } else {
+      toast.error(response.error || 'Ошибка запуска насоса')
+      resetCalibrationState(pumpId)
+    }
+  } catch (error) {
+    const errorMsg = error.response?.data?.error || error.message || 'Ошибка запуска насоса'
+    toast.error(errorMsg)
+    resetCalibrationState(pumpId)
+  }
+}
+
+// Сохранение калибровки с введенным объемом
+const saveCalibration = async (pumpId) => {
+  // Валидация объема
+  const volumeValidation = validateCalibrationVolume(calibrationVolume.value[pumpId])
+  if (volumeValidation !== true) {
+    toast.warning(volumeValidation)
+    return
+  }
+
+  try {
+    console.log('Saving calibration with data:', {
+      nodeId: props.node.node_id,
+      pumpId,
+      duration: calibrationDuration.value[pumpId],
+      volume: calibrationVolume.value[pumpId]
+    })
+    
+    // Отправляем конфиг на узел и сохраняем в БД
     const response = await api.calibratePump(
       props.node.node_id,
       pumpId,
@@ -459,18 +588,30 @@ const calibratePump = async (pumpId) => {
       calibrationVolume.value[pumpId]
     )
 
-    if (response.success) {
-      toast.success(`Насос ${pumpId} откалиброван: ${response.ml_per_second.toFixed(2)} мл/с`)
+    console.log('Calibration response:', response)
+
+    if (response.success || response.status === 200) {
+      const mlPerSecond = response.ml_per_second || response.calibration?.ml_per_second || 0
+      toast.success(`Калибровка насоса ${pumpId} сохранена: ${mlPerSecond.toFixed(2)} мл/с`)
+      // Скрываем поле ввода
+      showVolumeInput.value[pumpId] = false
+      // Обновляем данные калибровки
       await loadCalibrations()
     } else {
-      toast.error(response.error || 'Ошибка калибровки')
+      toast.error(response.error || response.message || 'Ошибка сохранения калибровки')
     }
   } catch (error) {
-    const errorMsg = error.response?.data?.error || error.message || 'Ошибка калибровки'
+    const errorMsg = error.response?.data?.error || error.message || 'Ошибка сохранения калибровки'
     toast.error(errorMsg)
-  } finally {
-    calibratingPump.value = null
   }
+}
+
+// Сброс состояния калибровки
+const resetCalibrationState = (pumpId) => {
+  calibratingPump.value = null
+  showVolumeInput.value[pumpId] = false
+  pumpProgress.value[pumpId] = 0
+  calibrationDebounce.value[pumpId] = false
 }
 
 // Запрос конфигурации
@@ -496,7 +637,18 @@ const requestConfig = async () => {
 // Форматирование даты
 const formatDate = (timestamp) => {
   if (!timestamp) return 'N/A'
-  return new Date(timestamp * 1000).toLocaleString('ru-RU')
+  
+  // Если это строка ISO (например, "2025-10-23T11:09:41.000000Z")
+  if (typeof timestamp === 'string') {
+    return new Date(timestamp).toLocaleString('ru-RU')
+  }
+  
+  // Если это Unix timestamp (число)
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp * 1000).toLocaleString('ru-RU')
+  }
+  
+  return 'N/A'
 }
 
 // При монтировании загрузить калибровки

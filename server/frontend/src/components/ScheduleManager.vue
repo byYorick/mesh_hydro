@@ -212,7 +212,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import { axios as api } from '@/services/api'
+import api from '@/services/api'
 
 const props = defineProps({
   node: {

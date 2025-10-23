@@ -165,11 +165,13 @@ export default {
   },
 
   calibratePump(nodeId, pumpId, durationSec, volumeMl) {
-    return api.post(`/nodes/${nodeId}/pump/calibrate`, {
+    const data = {
       pump_id: pumpId,
       duration_sec: durationSec,
       volume_ml: volumeMl
-    })
+    }
+    console.log('API calibratePump request:', { nodeId, data })
+    return api.post(`/nodes/${nodeId}/pump/calibrate`, data)
   },
 
   getPumpCalibrations(nodeId) {

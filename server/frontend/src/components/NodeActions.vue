@@ -466,7 +466,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { axios as api } from '@/services/api'
+import api from '@/services/api'
 import ConfigEditor from './ConfigEditor.vue'
 
 const props = defineProps({

@@ -157,7 +157,7 @@ const selectedRange = ref('24h')
 
 // Calculate statistics
 const statistics = computed(() => {
-  if (!props.data || props.data.length === 0) return null
+  if (!props.data || !Array.isArray(props.data) || props.data.length === 0) return null
 
   const values = props.data
     .map(item => item.data?.[props.fields[0]] || item[props.fields[0]])
@@ -175,7 +175,7 @@ const statistics = computed(() => {
 
 // Chart data
 const chartData = computed(() => {
-  if (!props.data || props.data.length === 0) return null
+  if (!props.data || !Array.isArray(props.data) || props.data.length === 0) return null
 
   const datasets = props.fields.map((field, index) => ({
     label: field.toUpperCase(),

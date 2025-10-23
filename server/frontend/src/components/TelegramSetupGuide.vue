@@ -565,7 +565,7 @@ TELEGRAM_NOTIFY_INFO=false</pre>
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import { axios as api } from '@/services/api'
+import api from '@/services/api'
 
 const toast = useToast()
 
