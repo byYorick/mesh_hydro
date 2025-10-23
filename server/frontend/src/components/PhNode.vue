@@ -426,6 +426,12 @@ const validateCalibrationDuration = (value) => {
 
 // Запуск насоса
 const runPump = async (pumpId) => {
+  // Проверяем статус узла
+  if (!props.node.online && !props.node.is_online) {
+    toast.error('❌ Узел офлайн. Проверьте подключение.')
+    return
+  }
+
   // Валидация длительности
   const durationValidation = validatePumpDuration(pumpDuration.value[pumpId])
   if (durationValidation !== true) {
@@ -497,12 +503,14 @@ const runPump = async (pumpId) => {
       
     } else {
       const errorMsg = response.error || response.message || 'Ошибка запуска насоса'
-      toast.error(errorMsg)
+      console.error('❌ Ошибка запуска насоса:', response)
+      toast.error(`❌ ${errorMsg}`)
       resetPumpState(pumpId)
     }
   } catch (error) {
+    console.error('❌ Ошибка API:', error)
     const errorMsg = error.response?.data?.error || error.message || 'Ошибка запуска насоса'
-    toast.error(errorMsg)
+    toast.error(`❌ ${errorMsg}`)
     resetPumpState(pumpId)
   }
 }

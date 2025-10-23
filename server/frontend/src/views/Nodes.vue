@@ -130,9 +130,9 @@ const filteredNodes = computed(() => {
   if (debouncedSearch.value) {
     const query = debouncedSearch.value.toLowerCase()
     nodes = nodes.filter(node =>
-      node.node_id.toLowerCase().includes(query) ||
-      node.node_type.toLowerCase().includes(query) ||
-      node.zone?.toLowerCase().includes(query)
+      (node.node_id && node.node_id.toLowerCase().includes(query)) ||
+      (node.node_type && node.node_type.toLowerCase().includes(query)) ||
+      (node.zone && node.zone.toLowerCase().includes(query))
     )
   }
 

@@ -213,6 +213,9 @@ const knownFields = [
 
 const additionalMetadata = computed(() => {
   const additional = {}
+  if (!metadata.value || typeof metadata.value !== 'object') {
+    return additional
+  }
   Object.keys(metadata.value).forEach(key => {
     if (!knownFields.includes(key)) {
       additional[key] = metadata.value[key]
@@ -286,7 +289,7 @@ function formatCreatedVia(via) {
 }
 
 function formatMac(mac) {
-  if (!mac) return 'N/A'
+  if (!mac || typeof mac !== 'string') return 'N/A'
   
   // Если уже форматировано с двоеточиями (00:4b:12:37:d5:a4)
   if (mac.includes(':')) {
