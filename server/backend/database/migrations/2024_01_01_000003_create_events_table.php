@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -16,7 +17,7 @@ return new class extends Migration
             $table->string('node_id');
             $table->enum('level', ['info', 'warning', 'critical', 'emergency']);
             $table->text('message');
-            $table->json('data')->nullable();
+            $table->jsonb('data')->nullable();  // JSONB в PostgreSQL
             $table->timestamp('resolved_at')->nullable();
             $table->string('resolved_by')->nullable(); // user_id или 'auto'
             $table->timestamps();
@@ -28,6 +29,11 @@ return new class extends Migration
             $table->index('created_at');
             $table->index(['node_id', 'created_at']); // Составной индекс
         });
+
+        // GIN индекс для JSONB поля (только PostgreSQL)
+        if (config('database.default') === 'pgsql') {
+            DB::statement('CREATE INDEX events_data_gin ON events USING GIN (data)');
+        }
     }
 
     /**

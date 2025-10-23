@@ -105,6 +105,20 @@ class MqttListenerCommand extends Command
             $mqtt->handleDiscovery($topic, $message);
         });
 
+        // Подписка на config_response (ответы нод на запрос конфигурации)
+        $this->info('📡 Subscribing to: hydro/config_response/#');
+        $mqtt->subscribe('hydro/config_response/#', function ($topic, $message) use ($mqtt) {
+            $this->line("📋 [CONFIG_RESPONSE] {$topic}");
+            $mqtt->handleConfigResponse($topic, $message);
+        });
+
+        // Подписка на ошибки узлов
+        $this->info('📡 Subscribing to: hydro/error/#');
+        $mqtt->subscribe('hydro/error/#', function ($topic, $message) use ($mqtt) {
+            $this->line("❌ [ERROR] {$topic}");
+            $mqtt->handleError($topic, $message);
+        });
+
         $this->newLine();
         $this->info('🎧 MQTT Listener is running (AUTO-DISCOVERY enabled)...');
         $this->info('Press Ctrl+C to stop');

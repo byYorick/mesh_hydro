@@ -1,55 +1,75 @@
 <template>
   <div>
-    <v-row>
-      <v-col cols="12">
-        <h1 class="text-h3 mb-4">Dashboard</h1>
-      </v-col>
-    </v-row>
+    <!-- Pull to Refresh Indicator -->
+    <PullToRefreshIndicator
+      v-if="isMobile"
+      :is-pulling="isPulling"
+      :is-refreshing="isRefreshing"
+      :pull-distance="pullDistance"
+    />
+
+    <!-- Hero Section -->
+    <v-sheet
+      :class="['hero-section rounded-xl mb-6', { 'hero-mobile': isMobile }]"
+      :style="heroStyle"
+      elevation="0"
+    >
+      <v-row align="center" :class="{ 'pa-4': isMobile, 'pa-8': !isMobile }">
+        <v-col cols="12" md="8">
+          <h1 :class="isMobile ? 'text-h4' : 'text-h2'" class="font-weight-bold mb-2">
+            Mesh Hydro System
+          </h1>
+          <p :class="isMobile ? 'text-subtitle-1' : 'text-h6'" class="text-medium-emphasis">
+            {{ summary?.nodes?.online || 0 }} из {{ summary?.nodes?.total || 0 }} узлов онлайн
+          </p>
+        </v-col>
+        <v-col cols="12" md="4" class="text-center">
+          <v-icon
+            :icon="systemStatusIcon"
+            :color="systemStatusColor"
+            :size="isMobile ? 64 : 80"
+            class="pulse-animation"
+          ></v-icon>
+        </v-col>
+      </v-row>
+    </v-sheet>
 
     <!-- System Status Cards -->
     <v-row>
-      <v-col cols="12" sm="6" md="3">
-        <v-card color="primary" variant="tonal">
-          <v-card-text class="text-center">
-            <div class="text-h3 font-weight-bold">
-              {{ summary?.nodes?.online || 0 }}
-            </div>
-            <div class="text-subtitle-1">Узлов Online</div>
-          </v-card-text>
-        </v-card>
+      <v-col :cols="cardCols">
+        <StatCard
+          icon="mdi-access-point-network"
+          :value="summary?.nodes?.online || 0"
+          label="Узлов Online"
+          color="success"
+        />
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
-        <v-card color="error" variant="tonal">
-          <v-card-text class="text-center">
-            <div class="text-h3 font-weight-bold">
-              {{ summary?.nodes?.offline || 0 }}
-            </div>
-            <div class="text-subtitle-1">Узлов Offline</div>
-          </v-card-text>
-        </v-card>
+      <v-col :cols="cardCols">
+        <StatCard
+          icon="mdi-access-point-network-off"
+          :value="summary?.nodes?.offline || 0"
+          label="Узлов Offline"
+          color="error"
+        />
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
-        <v-card color="warning" variant="tonal">
-          <v-card-text class="text-center">
-            <div class="text-h3 font-weight-bold">
-              {{ summary?.events?.active || 0 }}
-            </div>
-            <div class="text-subtitle-1">Активных событий</div>
-          </v-card-text>
-        </v-card>
+      <v-col :cols="cardCols">
+        <StatCard
+          icon="mdi-alert-circle"
+          :value="summary?.events?.active || 0"
+          label="Активных событий"
+          color="warning"
+        />
       </v-col>
 
-      <v-col cols="12" sm="6" md="3">
-        <v-card color="error" variant="tonal">
-          <v-card-text class="text-center">
-            <div class="text-h3 font-weight-bold">
-              {{ summary?.events?.critical || 0 }}
-            </div>
-            <div class="text-subtitle-1">Критичных событий</div>
-          </v-card-text>
-        </v-card>
+      <v-col :cols="cardCols">
+        <StatCard
+          icon="mdi-fire"
+          :value="summary?.events?.critical || 0"
+          label="Критичных"
+          color="error"
+        />
       </v-col>
     </v-row>
 
@@ -74,31 +94,52 @@
       </v-col>
     </v-row>
 
-    <v-row>
+    <!-- Loading skeleton -->
+    <div v-if="nodesStore.loading" class="v-row">
+      <v-col
+        v-for="n in 6"
+        :key="`skeleton-${n}`"
+        :cols="cardCols"
+      >
+        <SkeletonCard />
+      </v-col>
+    </div>
 
+    <!-- Nodes Grid with staggered animation -->
+    <transition-group v-else name="stagger-fade" tag="div" class="v-row">
       <v-col
         v-for="node in nodesStore.nodes"
         :key="node.node_id"
-        cols="12"
-        sm="6"
-        md="4"
-        lg="3"
+        :cols="cardCols"
       >
         <NodeCard
           :node="node"
+          :mobile-layout="isMobile"
           @command="sendCommand(node.node_id, $event)"
         />
       </v-col>
 
-      <v-col v-if="nodesStore.nodes.length === 0" cols="12">
-        <v-card>
-          <v-card-text class="text-center pa-8">
-            <v-icon icon="mdi-access-point-network-off" size="64" color="grey"></v-icon>
+      <v-col v-if="nodesStore.nodes.length === 0" cols="12" key="empty-state">
+        <v-card elevation="0" class="glass-card">
+          <v-card-text class="text-center pa-12">
+            <v-icon icon="mdi-access-point-network-off" :size="isMobile ? 64 : 80" color="grey"></v-icon>
             <div class="mt-4 text-h6 text-disabled">Нет доступных узлов</div>
+            <div class="text-caption text-disabled mt-2">
+              Подключите ESP32 устройства для начала работы
+            </div>
+            <v-btn
+              color="primary"
+              class="mt-6"
+              prepend-icon="mdi-plus"
+              href="/doc/START_HERE.md"
+              target="_blank"
+            >
+              Как подключить узлы
+            </v-btn>
           </v-card-text>
         </v-card>
       </v-col>
-    </v-row>
+    </transition-group>
 
     <!-- Latest Events -->
     <v-row>
@@ -142,20 +183,70 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { useEventsStore } from '@/stores/events'
+import { useResponsive } from '@/composables/useResponsive'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import NodeCard from '@/components/NodeCard.vue'
 import EventLog from '@/components/EventLog.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
 const eventsStore = useEventsStore()
+const { isMobile, isTablet, cardCols } = useResponsive()
 
 const summary = ref(null)
+
+// Pull to refresh для mobile
+const { isPulling, pullDistance, isRefreshing } = usePullToRefresh(async () => {
+  summary.value = await appStore.fetchDashboardSummary()
+  await nodesStore.fetchNodes()
+  appStore.showSnackbar('Данные обновлены', 'success', 2000)
+})
+
+// Hero section styling
+const heroStyle = computed(() => {
+  const isDark = appStore.theme === 'dark'
+  const gradient = isDark
+    ? 'linear-gradient(135deg, rgba(66, 165, 245, 0.1), rgba(156, 39, 176, 0.1))'
+    : 'linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(156, 39, 176, 0.1))'
+  
+  return {
+    background: gradient,
+  }
+})
+
+// System status indicator
+const systemStatusColor = computed(() => {
+  if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
+    return 'grey'
+  }
+  
+  const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
+  
+  if (onlinePercent >= 80) return 'success'
+  if (onlinePercent >= 50) return 'warning'
+  return 'error'
+})
+
+const systemStatusIcon = computed(() => {
+  if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
+    return 'mdi-help-circle'
+  }
+  
+  const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
+  
+  if (onlinePercent >= 80) return 'mdi-check-circle'
+  if (onlinePercent >= 50) return 'mdi-alert-circle'
+  return 'mdi-close-circle'
+})
 
 onMounted(async () => {
   try {
@@ -168,9 +259,33 @@ onMounted(async () => {
 // Send command to node
 async function sendCommand(nodeId, { command, params }) {
   try {
-    await nodesStore.sendCommand(nodeId, command, params)
-    appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    // Специальная обработка для команды run_pump
+    if (command === 'run_pump') {
+      // Определяем pump_id на основе типа насоса
+      const pumpIdMap = {
+        'ph_up': 0,
+        'ph_down': 1,
+        'ec_up': 2,
+        'ec_down': 3,
+        'water': 4
+      }
+      
+      const pumpId = pumpIdMap[params.pump] || 0
+      
+      // Отправляем запрос на запуск насоса
+      await api.post(`/nodes/${nodeId}/pump/run`, {
+        pump_id: pumpId,
+        duration_sec: params.duration
+      })
+      
+      appStore.showSnackbar(`Насос ${params.pump} запущен на ${params.duration} сек`, 'success')
+    } else {
+      // Обычные команды через стандартный API
+      await nodesStore.sendCommand(nodeId, command, params)
+      appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    }
   } catch (error) {
+    console.error('Error sending command:', error)
     appStore.showSnackbar('Ошибка отправки команды', 'error')
   }
 }

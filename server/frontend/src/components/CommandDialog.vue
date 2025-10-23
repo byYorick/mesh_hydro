@@ -84,7 +84,7 @@
 
           <!-- No params needed -->
           <v-alert
-            v-if="['reboot', 'get_status', 'reset_errors'].includes(selectedCommand)"
+            v-if="selectedCommand && ['reboot', 'get_status', 'reset_errors'].includes(selectedCommand)"
             type="info"
             variant="tonal"
           >

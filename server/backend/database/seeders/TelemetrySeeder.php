@@ -15,17 +15,40 @@ class TelemetrySeeder extends Seeder
         // Generate telemetry for last 24 hours
         $startTime = now()->subHours(24);
         
-        // pH/EC telemetry (every 5 minutes)
+        // pH telemetry (every 5 minutes)
         for ($i = 0; $i < 288; $i++) {
             $time = $startTime->copy()->addMinutes($i * 5);
             
             Telemetry::create([
-                'node_id' => 'ph_ec_001',
-                'node_type' => 'ph_ec',
+                'node_id' => 'ph_001',
+                'node_type' => 'ph',
                 'data' => [
                     'ph' => round(6.0 + (sin($i / 20) * 0.5) + (rand(-10, 10) / 100), 2),
-                    'ec' => round(1.5 + (cos($i / 15) * 0.3) + (rand(-10, 10) / 100), 2),
-                    'temp' => round(22.0 + (sin($i / 30) * 3) + (rand(-5, 5) / 10), 1),
+                    'temp' => round(22.0 + (sin($i / 30) * 2) + (rand(-5, 5) / 10), 1),
+                    'autonomous' => true,
+                    'pump_up_ml' => rand(0, 50) / 10,
+                    'pump_down_ml' => rand(0, 50) / 10,
+                ],
+                'received_at' => $time,
+                'created_at' => $time,
+            ]);
+            $count++;
+        }
+
+        // EC telemetry (every 5 minutes)
+        for ($i = 0; $i < 288; $i++) {
+            $time = $startTime->copy()->addMinutes($i * 5);
+            
+            Telemetry::create([
+                'node_id' => 'ec_001',
+                'node_type' => 'ec',
+                'data' => [
+                    'ec' => round(2.0 + (cos($i / 15) * 0.4) + (rand(-10, 10) / 100), 2),
+                    'temp' => round(22.5 + (sin($i / 28) * 2.5) + (rand(-5, 5) / 10), 1),
+                    'autonomous' => true,
+                    'pump_ec_a_ml' => rand(0, 80) / 10,
+                    'pump_ec_b_ml' => rand(0, 60) / 10,
+                    'pump_ec_c_ml' => rand(0, 20) / 10,
                 ],
                 'received_at' => $time,
                 'created_at' => $time,

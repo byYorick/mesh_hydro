@@ -27,26 +27,48 @@
         />
       </v-col>
 
-      <!-- Actions Panel -->
-      <v-col cols="12" md="8">
-        <NodeActions
-          :node="node"
-          @command="sendCommand"
-          @config-update="updateConfig"
-        />
-      </v-col>
-    </v-row>
+    <!-- Actions Panel -->
+    <v-col cols="12" md="8">
+      <!-- pH Node Component -->
+      <PhNode v-if="node.node_type === 'ph'" :node="node" />
+      
+      <!-- EC Node Component -->
+      <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
+      
+      <!-- pH/EC Node Actions (includes manual pump control) -->
+      <NodeActions
+        v-else-if="node.node_type === 'ph_ec' || node.node_type === 'ph'"
+        :node="node"
+        @command="sendCommand"
+        @config-update="updateConfig"
+      />
+      
+      <!-- Generic Node Actions -->
+      <NodeActions
+        v-else
+        :node="node"
+        @command="sendCommand"
+        @config-update="updateConfig"
+      />
+    </v-col>
+  </v-row>
 
-    <!-- Memory and Metadata -->
+    <!-- Memory, Metadata and Health -->
     <v-row>
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="4">
         <NodeMemoryCard
           :node="node"
           :loading="loading"
           @refresh="loadTelemetry"
         />
       </v-col>
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="4">
+        <NodeHealthIndicator
+          :node="node"
+          :error-count="nodeErrors.length"
+        />
+      </v-col>
+      <v-col cols="12" md="4">
         <NodeMetadataCard :node="node" />
       </v-col>
     </v-row>
@@ -62,6 +84,17 @@
           :loading="loading"
           @range-changed="onRangeChanged"
           @refresh="loadTelemetry"
+        />
+      </v-col>
+    </v-row>
+
+    <!-- Errors Timeline -->
+    <v-row>
+      <v-col cols="12">
+        <ErrorTimeline
+          :errors="nodeErrors"
+          @view-details="viewErrorDetails"
+          @resolve="resolveError"
         />
       </v-col>
     </v-row>
@@ -99,6 +132,13 @@
         </v-card>
       </v-col>
     </v-row>
+
+    <!-- Error Details Dialog -->
+    <ErrorDetailsDialog
+      v-model="showErrorDialog"
+      :error="selectedError"
+      @error-resolved="handleErrorResolved"
+    />
   </div>
   
   <div v-else class="text-center pa-8">
@@ -112,12 +152,18 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNodesStore } from '@/stores/nodes'
 import { useTelemetryStore } from '@/stores/telemetry'
+import { useErrorsStore } from '@/stores/errors'
 import { useAppStore } from '@/stores/app'
 import AdvancedChart from '@/components/AdvancedChart.vue'
 import NodeActions from '@/components/NodeActions.vue'
 import NodeManagementCard from '@/components/NodeManagementCard.vue'
 import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
 import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
+import NodeHealthIndicator from '@/components/NodeHealthIndicator.vue'
+import ErrorTimeline from '@/components/ErrorTimeline.vue'
+import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
+import PhNode from '@/components/PhNode.vue'
+import EcNode from '@/components/EcNode.vue'
 import { formatDateTime } from '@/utils/time'
 import api from '@/services/api'
 
@@ -125,12 +171,16 @@ const route = useRoute()
 const router = useRouter()
 const nodesStore = useNodesStore()
 const telemetryStore = useTelemetryStore()
+const errorsStore = useErrorsStore()
 const appStore = useAppStore()
 
 const node = ref(null)
 const telemetryData = ref([])
+const nodeErrors = ref([])
 const selectedRange = ref('24h')
 const loading = ref(false)
+const selectedError = ref(null)
+const showErrorDialog = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
@@ -140,7 +190,10 @@ const eventHeaders = [
 ]
 
 const statusColor = computed(() => {
-  return node.value?.online ? 'success' : 'error'
+  if (!node.value) return 'grey'
+  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+  const isOnline = node.value.is_online !== undefined ? node.value.is_online : node.value.online
+  return isOnline ? 'success' : 'error'
 })
 
 const telemetryFields = computed(() => {
@@ -162,9 +215,52 @@ onMounted(async () => {
   const nodeId = route.params.nodeId
   node.value = await nodesStore.fetchNode(nodeId)
   await loadTelemetry()
+  await loadNodeErrors()
 })
 
+async function loadNodeErrors() {
+  if (!node.value?.node_id) {
+    console.warn('Node not loaded, skipping error loading')
+    return
+  }
+  
+  try {
+    const result = await errorsStore.fetchNodeErrors(node.value.node_id, {
+      hours: 168, // Last 7 days
+    })
+    nodeErrors.value = Array.isArray(result) ? result : []
+  } catch (error) {
+    console.error('Error loading node errors:', error)
+    nodeErrors.value = []
+  }
+}
+
+function viewErrorDetails(error) {
+  selectedError.value = error
+  showErrorDialog.value = true
+}
+
+async function resolveError(errorId) {
+  try {
+    await errorsStore.resolveError(errorId, 'manual')
+    appStore.showSnackbar('Ошибка решена', 'success')
+    await loadNodeErrors()
+  } catch (error) {
+    appStore.showSnackbar('Ошибка при резолвении', 'error')
+  }
+}
+
+async function handleErrorResolved() {
+  await loadNodeErrors()
+  showErrorDialog.value = false
+}
+
 async function loadTelemetry() {
+  if (!node.value?.node_id) {
+    console.warn('Node not loaded, skipping telemetry loading')
+    return
+  }
+  
   loading.value = true
   try {
     const hours = getHoursFromRange(selectedRange.value)
@@ -178,10 +274,39 @@ async function loadTelemetry() {
 }
 
 async function sendCommand({ command, params }) {
+  if (!node.value?.node_id) {
+    appStore.showSnackbar('Узел не загружен', 'error')
+    return
+  }
+  
   try {
-    await nodesStore.sendCommand(node.value.node_id, command, params)
-    appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    // Специальная обработка для команды run_pump
+    if (command === 'run_pump') {
+      // Определяем pump_id на основе типа насоса
+      const pumpIdMap = {
+        'ph_up': 0,
+        'ph_down': 1,
+        'ec_up': 2,
+        'ec_down': 3,
+        'water': 4
+      }
+      
+      const pumpId = pumpIdMap[params.pump] || 0
+      
+      // Отправляем запрос на запуск насоса
+      await api.post(`/nodes/${node.value.node_id}/pump/run`, {
+        pump_id: pumpId,
+        duration_sec: params.duration
+      })
+      
+      appStore.showSnackbar(`Насос ${params.pump} запущен на ${params.duration} сек`, 'success')
+    } else {
+      // Обычные команды через стандартный API
+      await nodesStore.sendCommand(node.value.node_id, command, params)
+      appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
+    }
   } catch (error) {
+    console.error('Error sending command:', error)
     appStore.showSnackbar('Ошибка отправки команды', 'error')
   }
 }

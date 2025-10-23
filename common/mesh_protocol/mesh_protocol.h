@@ -61,12 +61,13 @@ bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg);
  * @brief Создание JSON строки телеметрии
  * 
  * @param node_id ID узла
+ * @param node_type Тип узла (climate, ph, ec, display и т.д.)
  * @param data cJSON объект с данными
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_telemetry(const char *node_id, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_telemetry(const char *node_id, const char *node_type, cJSON *data, char *out_json, size_t max_len);
 
 /**
  * @brief Создание JSON строки команды
@@ -108,13 +109,14 @@ bool mesh_protocol_create_event(const char *node_id, mesh_event_level_t level, c
  * @brief Создание JSON строки heartbeat
  * 
  * @param node_id ID узла
+ * @param node_type Тип узла (climate, ph, ec, display и т.д.)
  * @param uptime Время работы (секунды)
  * @param heap_free Свободная память (байты)
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_heartbeat(const char *node_id, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
+bool mesh_protocol_create_heartbeat(const char *node_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
 
 /**
  * @brief Создание JSON строки запроса

@@ -35,6 +35,8 @@ static void heartbeat_task(void *arg);
 static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lux);
 static void send_discovery(void);
 static void send_heartbeat(void);
+static void send_event(mesh_event_level_t level, const char *message, float temp, float humidity, uint16_t co2);
+static void check_sensor_thresholds(float temp, float humidity, uint16_t co2);
 static esp_err_t read_all_sensors(float *temp, float *humidity, uint16_t *co2, uint16_t *lux);
 static int8_t get_rssi_to_parent(void);
 
@@ -150,15 +152,8 @@ static void climate_main_task(void *arg) {
             // Отправка телеметрии на ROOT
             send_telemetry(temp, humidity, co2, lux);
 
-            // Валидация данных (только для валидных значений)
-            if (temp > -100.0f) {  // Валидная температура
-                if (temp < -10.0f || temp > 50.0f) {
-                    ESP_LOGW(TAG, "Temperature out of range: %.1f°C", temp);
-                }
-            }
-            if (co2 > 0 && co2 > 5000) {
-                ESP_LOGW(TAG, "CO2 very high: %d ppm", co2);
-            }
+            // Проверка пороговых значений и отправка events
+            check_sensor_thresholds(temp, humidity, co2);
         }
         // Убрана проверка "else" которая пропускала телеметрию - теперь всегда отправляется!
 
@@ -311,26 +306,36 @@ static void send_heartbeat(void) {
     uint32_t heap_free = esp_get_free_heap_size();
     int8_t rssi = get_rssi_to_parent();
 
-    // Создание heartbeat JSON с MAC адресом
-    char heartbeat_msg[384];
-    snprintf(heartbeat_msg, sizeof(heartbeat_msg),
-            "{\"type\":\"heartbeat\","
-            "\"node_id\":\"%s\","
-            "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
-            "\"uptime\":%lu,"
-            "\"heap_free\":%lu,"
-            "\"rssi_to_parent\":%d}",
-            s_config->base.node_id,
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-            (unsigned long)uptime,
-            (unsigned long)heap_free,
-            rssi);
-
-    esp_err_t err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
+    // Создание heartbeat JSON с node_type, MAC и RSSI
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "type", "heartbeat");
+    cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
+    cJSON_AddStringToObject(root, "node_type", "climate");
+    
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    cJSON_AddStringToObject(root, "mac_address", mac_str);
+    
+    cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+    cJSON_AddNumberToObject(root, "uptime", uptime);
+    cJSON_AddNumberToObject(root, "heap_free", heap_free);
+    cJSON_AddNumberToObject(root, "rssi_to_parent", rssi);
+    
+    char *heartbeat_msg = cJSON_PrintUnformatted(root);
+    esp_err_t err = ESP_FAIL;
+    if (heartbeat_msg) {
+        err = mesh_manager_send_to_root((uint8_t *)heartbeat_msg, strlen(heartbeat_msg));
+    }
+    cJSON_Delete(root);
     
     if (err == ESP_OK) {
         ESP_LOGD(TAG, "💓 Heartbeat sent (uptime=%lus, heap=%luB, RSSI=%d)", 
                  (unsigned long)uptime, (unsigned long)heap_free, rssi);
+    }
+    
+    if (heartbeat_msg) {
+        free(heartbeat_msg);
     }
 }
 
@@ -354,7 +359,7 @@ static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lu
     cJSON_AddNumberToObject(data, "rssi_to_parent", rssi);
 
     char json_buf[512];
-    if (mesh_protocol_create_telemetry(s_config->base.node_id, data,
+    if (mesh_protocol_create_telemetry(s_config->base.node_id, "climate", data,
                                         json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         
@@ -393,5 +398,88 @@ void climate_controller_handle_config_update(cJSON *config_json) {
     node_config_save(s_config, sizeof(climate_node_config_t), "climate_ns");
     
     ESP_LOGI(TAG, "Config updated and saved");
+}
+
+// Отправка event сообщения
+static void send_event(mesh_event_level_t level, const char *message, float temp, float humidity, uint16_t co2) {
+    if (!mesh_manager_is_connected()) {
+        return;
+    }
+    
+    cJSON *data = cJSON_CreateObject();
+    if (temp > -100.0f) {
+        cJSON_AddNumberToObject(data, "temperature", temp);
+    }
+    if (humidity >= 0.0f) {
+        cJSON_AddNumberToObject(data, "humidity", humidity);
+    }
+    if (co2 > 0) {
+        cJSON_AddNumberToObject(data, "co2", co2);
+    }
+    
+    char json_buf[512];
+    if (mesh_protocol_create_event(s_config->base.node_id, level, message, data,
+                                    json_buf, sizeof(json_buf))) {
+        esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
+        
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Event sent: %s - %s", mesh_protocol_event_level_to_str(level), message);
+        }
+    }
+    
+    cJSON_Delete(data);
+}
+
+// Проверка пороговых значений
+static void check_sensor_thresholds(float temp, float humidity, uint16_t co2) {
+    static bool temp_warning_sent = false;
+    static bool co2_warning_sent = false;
+    static bool humidity_warning_sent = false;
+    
+    // Критичная температура
+    if (temp > -100.0f) {  // Валидное значение
+        if (temp < 5.0f || temp > 45.0f) {
+            if (!temp_warning_sent) {
+                send_event(MESH_EVENT_CRITICAL, "Temperature critical", temp, humidity, co2);
+                temp_warning_sent = true;
+            }
+        } else if (temp < 10.0f || temp > 40.0f) {
+            if (!temp_warning_sent) {
+                send_event(MESH_EVENT_WARNING, "Temperature out of optimal range", temp, humidity, co2);
+                temp_warning_sent = true;
+            }
+        } else {
+            temp_warning_sent = false;  // Сброс флага при нормализации
+        }
+    }
+    
+    // Критичный CO2
+    if (co2 > 0) {
+        if (co2 > 3000) {
+            if (!co2_warning_sent) {
+                send_event(MESH_EVENT_CRITICAL, "CO2 critical level", temp, humidity, co2);
+                co2_warning_sent = true;
+            }
+        } else if (co2 > 2000) {
+            if (!co2_warning_sent) {
+                send_event(MESH_EVENT_WARNING, "CO2 high level", temp, humidity, co2);
+                co2_warning_sent = true;
+            }
+        } else {
+            co2_warning_sent = false;
+        }
+    }
+    
+    // Критичная влажность
+    if (humidity >= 0.0f) {
+        if (humidity < 20.0f || humidity > 90.0f) {
+            if (!humidity_warning_sent) {
+                send_event(MESH_EVENT_WARNING, "Humidity out of range", temp, humidity, co2);
+                humidity_warning_sent = true;
+            }
+        } else {
+            humidity_warning_sent = false;
+        }
+    }
 }
 

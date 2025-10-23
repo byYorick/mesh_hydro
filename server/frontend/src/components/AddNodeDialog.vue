@@ -601,7 +601,7 @@ function validateJson(value) {
 }
 
 function addZone() {
-  if (newZone.value && !zones.value.includes(newZone.value)) {
+  if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
     zones.value.push(newZone.value)
     newNode.value.zone = newZone.value
   }

@@ -1,49 +1,49 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Telegram Bot Configuration
     |--------------------------------------------------------------------------
     |
-    | Настройки для Telegram бота
-    | Получить токен: https://t.me/BotFather
+    | Настройки для Telegram бота для уведомлений о событиях системы
     |
     */
 
-    'enabled' => env('TELEGRAM_ENABLED', true),
-    
+    'enabled' => env('TELEGRAM_ENABLED', false),
+
     'bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
-    
+
     'chat_id' => env('TELEGRAM_CHAT_ID', ''),
-    
+
     /*
     |--------------------------------------------------------------------------
-    | Notification Settings
+    | Уровни уведомлений
     |--------------------------------------------------------------------------
     |
-    | Настройки уведомлений
+    | Какие уровни событий отправлять в Telegram
     |
     */
-    
-    'notifications' => [
-        // Отправлять уведомления для этих уровней событий
-        'levels' => [
-            'info' => false,
-            'warning' => true,
-            'critical' => true,
-            'emergency' => true,
-        ],
-        
-        // Тихие уведомления (без звука)
-        'silent' => [
-            'info' => true,
-            'warning' => false,
-            'critical' => false,
-            'emergency' => false,
-        ],
+
+    'notify_levels' => [
+        'emergency' => true,
+        'critical' => true,
+        'warning' => env('TELEGRAM_NOTIFY_WARNINGS', true),
+        'info' => env('TELEGRAM_NOTIFY_INFO', false),
     ],
 
-];
+    /*
+    |--------------------------------------------------------------------------
+    | Throttling
+    |--------------------------------------------------------------------------
+    |
+    | Ограничение частоты отправки сообщений (защита от спама)
+    |
+    */
 
+    'throttle' => [
+        'enabled' => true,
+        'max_per_minute' => 10,
+        'max_per_hour' => 50,
+    ],
+];

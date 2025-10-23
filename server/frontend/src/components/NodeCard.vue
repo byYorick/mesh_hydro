@@ -2,13 +2,29 @@
   <v-card
     :color="statusColor"
     variant="tonal"
-    class="node-card"
+    :class="['node-card', { 'node-card-online': isOnline }]"
   >
-    <v-card-title class="d-flex align-center">
-      <v-icon :icon="nodeIcon" class="mr-2"></v-icon>
-      <span>{{ node.node_id }}</span>
+    <v-card-title class="d-flex align-center" :class="{ 'py-2': mobileLayout }">
+      <v-icon :icon="nodeIcon" :class="mobileLayout ? 'mr-2' : 'mr-2'" :size="mobileLayout ? 32 : 24"></v-icon>
       
-      <v-spacer></v-spacer>
+      <div :class="{ 'flex-grow-1': mobileLayout }">
+        <div :class="mobileLayout ? 'text-subtitle-1' : ''">{{ node.node_id }}</div>
+        <div v-if="mobileLayout" class="text-caption text-medium-emphasis">{{ nodeTypeText }}</div>
+      </div>
+      
+      <v-spacer v-if="!mobileLayout"></v-spacer>
+      
+      <!-- Error Badge -->
+      <v-badge
+        v-if="errorCount > 0"
+        :content="errorCount"
+        :color="errorCount > 5 ? 'error' : 'warning'"
+        offset-x="-5"
+        offset-y="5"
+        class="mr-2"
+      >
+        <v-icon icon="mdi-alert-circle" :color="errorCount > 5 ? 'error' : 'warning'"></v-icon>
+      </v-badge>
       
       <v-chip
         :color="statusColor"
@@ -16,17 +32,31 @@
         variant="flat"
       >
         <v-icon :icon="statusIcon" start></v-icon>
-        {{ statusText }}
+        {{ mobileLayout ? '' : statusText }}
       </v-chip>
     </v-card-title>
 
-    <v-card-subtitle>
+    <v-card-subtitle v-if="!mobileLayout">
       {{ nodeTypeText }} • {{ node.zone || 'Без зоны' }}
     </v-card-subtitle>
 
-    <v-card-text>
-      <!-- Node-specific data -->
-      <div v-if="node.node_type === 'ph_ec' && lastData">
+    <v-card-text :class="{ 'pa-2': mobileLayout }">
+      <!-- Mobile: Horizontal scroll для метрик -->
+      <div v-if="mobileLayout && lastData" class="metrics-scroll mb-2">
+        <v-chip
+          v-for="metric in visibleMetrics"
+          :key="metric.key"
+          class="metric-chip"
+          size="small"
+          variant="outlined"
+        >
+          <v-icon :icon="metric.icon" start size="small"></v-icon>
+          {{ metric.value }}
+        </v-chip>
+      </div>
+
+      <!-- Desktop: Node-specific data -->
+      <div v-else-if="(node.node_type === 'ph_ec' || node.node_type === 'ph') && lastData">
         <v-row dense>
           <v-col cols="6">
             <div class="text-h4 font-weight-bold">
@@ -36,9 +66,26 @@
           </v-col>
           <v-col cols="6">
             <div class="text-h4 font-weight-bold">
+              {{ lastData.temp?.toFixed(1) || '-' }}°C
+            </div>
+            <div class="text-caption">Температура</div>
+          </v-col>
+        </v-row>
+      </div>
+
+      <div v-else-if="node.node_type === 'ec' && lastData">
+        <v-row dense>
+          <v-col cols="6">
+            <div class="text-h4 font-weight-bold">
               {{ lastData.ec?.toFixed(2) || '-' }}
             </div>
             <div class="text-caption">EC (mS/cm)</div>
+          </v-col>
+          <v-col cols="6">
+            <div class="text-h4 font-weight-bold">
+              {{ lastData.temp?.toFixed(1) || '-' }}°C
+            </div>
+            <div class="text-caption">Температура</div>
           </v-col>
         </v-row>
       </div>
@@ -134,7 +181,7 @@
       <!-- Quick actions based on node type -->
       <template v-if="isOnline">
         <!-- pH/EC Quick Actions -->
-        <v-menu v-if="node.node_type === 'ph_ec'">
+        <v-menu v-if="node.node_type === 'ph_ec' || node.node_type === 'ph'">
           <template v-slot:activator="{ props }">
             <v-btn
               size="small"
@@ -222,6 +269,14 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  mobileLayout: {
+    type: Boolean,
+    default: false,
+  },
+  errorCount: {
+    type: Number,
+    default: 0,
+  },
 })
 
 const emit = defineEmits(['command'])
@@ -237,21 +292,34 @@ function handleCommand({ command, params }) {
   emit('command', { command, params })
 }
 
-// Node online status
+// Node online status - используем данные с backend
 const isOnline = computed(() => {
-  return props.node.online || props.node.is_online || false
+  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+  return props.node.is_online !== undefined ? props.node.is_online : props.node.online
 })
 
-// Status color
+// Status color - используем данные с backend
 const statusColor = computed(() => {
+  // Приоритет: сначала status_color (вычисленное поле), потом вычисляем сами
+  if (props.node.status_color) {
+    const colorMap = {
+      'green': 'success',
+      'orange': 'warning', 
+      'red': 'error',
+      'grey': 'grey'
+    }
+    return colorMap[props.node.status_color] || 'grey'
+  }
+  
+  // Fallback: вычисляем сами
   if (!props.node.last_seen_at) return 'grey'
   
   const lastSeen = new Date(props.node.last_seen_at)
   const seconds = (Date.now() - lastSeen.getTime()) / 1000
   
-  if (seconds < 30) return 'success'
-  if (seconds < 60) return 'warning'
-  return 'error'
+  if (seconds < 20) return 'success'   // Онлайн: < 20 секунд
+  if (seconds < 40) return 'warning'   // Предупреждение: 20-40 секунд
+  return 'error'                       // Офлайн: > 40 секунд
 })
 
 // Status icon
@@ -268,6 +336,8 @@ const statusText = computed(() => {
 const nodeIcon = computed(() => {
   const icons = {
     'ph_ec': 'mdi-flask',
+    'ph': 'mdi-flask-outline',
+    'ec': 'mdi-flash',
     'climate': 'mdi-thermometer',
     'relay': 'mdi-electric-switch',
     'water': 'mdi-water',
@@ -281,6 +351,8 @@ const nodeIcon = computed(() => {
 const nodeTypeText = computed(() => {
   const types = {
     'ph_ec': 'pH/EC Сенсор',
+    'ph': 'pH Контроллер',
+    'ec': 'EC Контроллер',
     'climate': 'Климат Сенсор',
     'relay': 'Реле',
     'water': 'Уровень Воды',
@@ -362,6 +434,55 @@ function getRssiColor(percent) {
   if (percent > 30) return 'warning'
   return 'error'
 }
+
+// Простая мемоизация для обработки метрик
+const metricsCache = new Map()
+const processNodeMetrics = (nodeType, data) => {
+  const cacheKey = `${nodeType}-${JSON.stringify(data)}`
+  if (metricsCache.has(cacheKey)) {
+    return metricsCache.get(cacheKey)
+  }
+  
+  const result = (() => {
+    if (!data) return []
+    
+    const metrics = []
+    
+    // pH/EC metrics
+    if (nodeType === 'ph_ec' || nodeType === 'ph') {
+      if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    if (nodeType === 'ec') {
+      if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    // Climate metrics
+    if (nodeType === 'climate') {
+      if (data.temperature != null) metrics.push({ key: 'temp', value: `${data.temperature.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+      if (data.humidity != null) metrics.push({ key: 'hum', value: `${data.humidity.toFixed(0)}%`, icon: 'mdi-water-percent' })
+      if (data.co2 != null) metrics.push({ key: 'co2', value: `${data.co2} ppm`, icon: 'mdi-molecule-co2' })
+    }
+    
+    // Water metrics
+    if (nodeType === 'water') {
+      if (data.level != null) metrics.push({ key: 'level', value: `${data.level.toFixed(0)}%`, icon: 'mdi-waves' })
+      if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
+    }
+    
+    return metrics
+  })()
+  
+  metricsCache.set(cacheKey, result)
+  return result
+}
+
+// Visible metrics для mobile layout
+const visibleMetrics = computed(() => {
+  return processNodeMetrics(props.node.node_type, lastData.value)
+})
 </script>
 
 <style scoped>

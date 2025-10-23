@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 #define MAX_NODES 20
-#define NODE_TIMEOUT_MS 30000  // 30 секунд
+#define NODE_TIMEOUT_MS 20000  // 20 секунд (синхронизировано с backend)
 
 /**
  * @brief Информация об узле

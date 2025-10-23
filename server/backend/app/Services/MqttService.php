@@ -8,6 +8,8 @@ use App\Models\Node;
 use App\Models\Telemetry;
 use App\Models\Event;
 use App\Models\Command;
+use App\Models\NodeError;
+use App\Services\NotificationThrottleService;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
@@ -15,12 +17,14 @@ class MqttService
 {
     private MqttClient $mqtt;
     private string $clientId;
+    private NotificationThrottleService $throttleService;
 
-    public function __construct()
+    public function __construct(NotificationThrottleService $throttleService)
     {
         $host = config('mqtt.host', 'localhost');
         $port = config('mqtt.port', 1883);
         $this->clientId = config('mqtt.client_id', 'hydro-server-') . uniqid();
+        $this->throttleService = $throttleService;
         
         $this->mqtt = new MqttClient($host, $port, $this->clientId);
     }
@@ -88,6 +92,11 @@ class MqttService
     public function publish(string $topic, string $message, int $qos = 0, bool $retain = false): void
     {
         try {
+            // Автоматическое подключение если не подключен
+            if (!$this->mqtt->isConnected()) {
+                $this->connect();
+            }
+            
             $this->mqtt->publish($topic, $message, $qos, $retain);
             
             Log::debug("MQTT published", [
@@ -151,7 +160,7 @@ class MqttService
             }
 
             // Валидация node_type
-            $validTypes = ['ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
+            $validTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
             $nodeType = isset($data['type']) && in_array($data['type'], $validTypes) 
                 ? $data['type'] 
                 : 'unknown';
@@ -186,7 +195,6 @@ class MqttService
             
             // Создание или обновление узла
             $updateData = [
-                'online' => true,
                 'last_seen_at' => now(),
             ];
             
@@ -208,6 +216,14 @@ class MqttService
                 ['node_id' => $data['node_id']],
                 $updateData
             );
+
+            // Обновляем online статус на основе isOnline()
+            $wasOnline = $node->online;
+            $isOnline = $node->isOnline();
+            
+            if ($wasOnline !== $isOnline) {
+                $node->update(['online' => $isOnline]);
+            }
 
             // Broadcast status change если изменился или новый узел
             if ($wasOnline !== true) {
@@ -254,7 +270,7 @@ class MqttService
             $event = Event::create([
                 'node_id' => $data['node_id'],
                 'level' => $data['level'] ?? Event::LEVEL_INFO,
-                'message' => $data['message'] ?? 'Unknown event',
+                'message' => $this->translateEventMessage($data['message'] ?? 'Unknown event'),
                 'data' => $data['data'] ?? [],
             ]);
 
@@ -416,27 +432,43 @@ class MqttService
                     'node_id' => $nodeId
                 ]);
                 
+                // ВСЕГДА обновляем last_seen_at при discovery (независимо от данных)
+                $metadata = $existingNode->metadata ?? [];
+                $metadata['last_discovery'] = now()->toIso8601String();
+                
                 // Обновляем метаданные если пришли новые данные
-                if (isset($data['firmware']) || isset($data['hardware']) || isset($data['mac_address']) || isset($data['mac'])) {
-                    $metadata = $existingNode->metadata ?? [];
-                    $metadata['firmware'] = $data['firmware'] ?? $metadata['firmware'] ?? null;
-                    $metadata['hardware'] = $data['hardware'] ?? $metadata['hardware'] ?? null;
-                    $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'] ?? $metadata['mac_address'] ?? null;
-                    $metadata['ip_address'] = $data['ip'] ?? $metadata['ip_address'] ?? null;
-                    $metadata['last_discovery'] = now()->toIso8601String();
-                    
-                    $updateData = [
-                        'metadata' => $metadata,
-                        'online' => true,
-                        'last_seen_at' => now(),
-                    ];
-                    
-                    // Обновляем также поле mac_address в таблице nodes
-                    if (isset($data['mac_address']) || isset($data['mac'])) {
-                        $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
-                    }
-                    
-                    $existingNode->update($updateData);
+                if (isset($data['firmware'])) {
+                    $metadata['firmware'] = $data['firmware'];
+                }
+                if (isset($data['hardware'])) {
+                    $metadata['hardware'] = $data['hardware'];
+                }
+                if (isset($data['mac_address']) || isset($data['mac'])) {
+                    $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'];
+                }
+                if (isset($data['ip'])) {
+                    $metadata['ip_address'] = $data['ip'];
+                }
+                
+                $updateData = [
+                    'metadata' => $metadata,
+                    'last_seen_at' => now(),  // ✅ ВСЕГДА обновляем!
+                ];
+                
+                // Обновляем также поле mac_address в таблице nodes
+                if (isset($data['mac_address']) || isset($data['mac'])) {
+                    $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
+                }
+                
+                $existingNode->update($updateData);
+                
+                // Обновляем online статус на основе isOnline()
+                $wasOnline = $existingNode->online;
+                $isOnline = $existingNode->isOnline();
+                
+                if ($wasOnline !== $isOnline) {
+                    $existingNode->update(['online' => $isOnline]);
+                    event(new \App\Events\NodeStatusChanged($existingNode, $wasOnline, $isOnline));
                 }
                 
                 return;
@@ -520,8 +552,14 @@ class MqttService
         if (str_starts_with($nodeId, 'climate_')) {
             return 'climate';
         }
+        if (str_starts_with($nodeId, 'ph_')) {
+            return 'ph';  // НОВЫЙ: отдельная нода pH
+        }
+        if (str_starts_with($nodeId, 'ec_')) {
+            return 'ec';  // НОВЫЙ: отдельная нода EC
+        }
         if (str_starts_with($nodeId, 'ph_ec_')) {
-            return 'ph_ec';
+            return 'ph_ec';  // СТАРЫЙ: объединенная нода
         }
         if (str_starts_with($nodeId, 'relay_')) {
             return 'relay';
@@ -541,8 +579,14 @@ class MqttService
         // Определяем по наличию сенсоров в данных
         if (isset($data['sensors'])) {
             $sensors = $data['sensors'];
-            if (in_array('ph', $sensors) || in_array('ec', $sensors)) {
-                return 'ph_ec';
+            if (in_array('ph', $sensors) && !in_array('ec', $sensors)) {
+                return 'ph';  // Только pH датчик
+            }
+            if (in_array('ec', $sensors) && !in_array('ph', $sensors)) {
+                return 'ec';  // Только EC датчик
+            }
+            if (in_array('ph', $sensors) && in_array('ec', $sensors)) {
+                return 'ph_ec';  // Оба датчика
             }
             if (in_array('temperature', $sensors) || in_array('humidity', $sensors)) {
                 return 'climate';
@@ -640,21 +684,176 @@ class MqttService
     private function sendNotifications(Event $event): void
     {
         try {
+            $eventType = $this->mapEventLevelToType($event->level);
+            $message = "Event: {$event->message} (Node: {$event->node_id})";
+            
+            // Проверяем throttling
+            if (!$this->throttleService->canSendNotification($eventType, $event->node_id, $message)) {
+                Log::debug("Notification throttled", [
+                    'event_id' => $event->id,
+                    'node_id' => $event->node_id,
+                    'level' => $event->level,
+                    'type' => $eventType
+                ]);
+                return;
+            }
+
             // Telegram уведомление
             if (config('telegram.enabled', true)) {
                 app(TelegramService::class)->sendAlert($event);
             }
 
-            // SMS уведомление
-            if (config('sms.enabled', false)) {
+            // SMS уведомление (только для критичных)
+            if (config('sms.enabled', false) && $event->isCritical()) {
                 app(SmsService::class)->sendAlert($event);
             }
+            
+            // Регистрируем отправку для throttling
+            $this->throttleService->markNotificationSent($eventType, $event->node_id, $message);
+            
         } catch (Exception $e) {
             Log::error("Notification sending error", [
                 'event_id' => $event->id,
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Маппинг уровня события в тип для throttling
+     */
+    private function mapEventLevelToType(string $level): string
+    {
+        return match($level) {
+            'critical', 'emergency' => 'critical',
+            'warning', 'error' => 'warning',
+            default => 'info'
+        };
+    }
+
+    /**
+     * Обработка ошибок узлов
+     * Топик: hydro/error/{node_id}
+     */
+    public function handleError(string $topic, string $payload): void
+    {
+        try {
+            $data = json_decode($payload, true);
+            
+            if (!$data || !isset($data['node_id'])) {
+                Log::warning("Invalid error data", [
+                    'topic' => $topic,
+                    'payload' => $payload
+                ]);
+                return;
+            }
+
+            // Сохранение ошибки в БД
+            $error = NodeError::create([
+                'node_id' => $data['node_id'],
+                'error_code' => $data['error_code'] ?? 'UNKNOWN_ERROR',
+                'error_type' => $data['error_type'] ?? NodeError::TYPE_SOFTWARE,
+                'severity' => $data['severity'] ?? NodeError::SEVERITY_MEDIUM,
+                'message' => $data['message'] ?? 'Unknown error occurred',
+                'stack_trace' => $data['stack_trace'] ?? null,
+                'diagnostics' => $data['diagnostics'] ?? [],
+                'occurred_at' => isset($data['timestamp']) 
+                    ? \Carbon\Carbon::createFromTimestamp($data['timestamp'])
+                    : now(),
+            ]);
+
+            Log::error("Node error occurred", [
+                'node_id' => $error->node_id,
+                'error_code' => $error->error_code,
+                'severity' => $error->severity,
+                'message' => $error->message,
+            ]);
+
+            // Создание события для критичных ошибок
+            if ($error->isCritical()) {
+                Event::create([
+                    'node_id' => $error->node_id,
+                    'level' => Event::LEVEL_CRITICAL,
+                    'message' => "Critical error: {$error->message}",
+                    'data' => [
+                        'error_code' => $error->error_code,
+                        'error_type' => $error->error_type,
+                        'diagnostics' => $error->diagnostics,
+                    ],
+                ]);
+
+                // Отправка уведомлений для критичных ошибок
+                $this->sendNotifications($error);
+            }
+
+            // Broadcast error to frontend
+            event(new \App\Events\ErrorOccurred($error));
+
+        } catch (Exception $e) {
+            Log::error("Error handling error (meta!)", [
+                'topic' => $topic,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Отправка уведомлений о критичной ошибке
+     */
+    private function sendErrorNotifications(NodeError $error): void
+    {
+        try {
+            $errorType = $this->mapErrorSeverityToType($error->severity);
+            $message = "Error: {$error->message} (Node: {$error->node_id}, Code: {$error->error_code})";
+            
+            // Проверяем throttling
+            if (!$this->throttleService->canSendNotification($errorType, $error->node_id, $message)) {
+                Log::debug("Error notification throttled", [
+                    'error_id' => $error->id,
+                    'node_id' => $error->node_id,
+                    'severity' => $error->severity,
+                    'type' => $errorType
+                ]);
+                return;
+            }
+
+            // Telegram уведомление
+            if (config('telegram.enabled', false)) {
+                try {
+                    app(TelegramService::class)->sendErrorAlert($error);
+                } catch (\Exception $e) {
+                    Log::error("Failed to send Telegram alert", [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // SMS уведомление (только для critical)
+            if (config('sms.enabled', false) && $error->isCritical()) {
+                app(SmsService::class)->sendErrorAlert($error);
+            }
+            
+            // Регистрируем отправку для throttling
+            $this->throttleService->markNotificationSent($errorType, $error->node_id, $message);
+            
+        } catch (Exception $e) {
+            Log::error("Notification sending error", [
+                'error_id' => $error->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Маппинг серьезности ошибки в тип для throttling
+     */
+    private function mapErrorSeverityToType(string $severity): string
+    {
+        return match($severity) {
+            'critical' => 'critical',
+            'high', 'medium' => 'warning',
+            default => 'info'
+        };
     }
 
     /**
@@ -667,6 +866,127 @@ class MqttService
         } catch (Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Обработка ответа с конфигурацией от узла
+     */
+    public function handleConfigResponse(string $topic, string $payload): void
+    {
+        try {
+            Log::info("📋 handleConfigResponse called", [
+                'topic' => $topic,
+                'payload_length' => strlen($payload)
+            ]);
+            
+            $data = json_decode($payload, true);
+            
+            if (!$data || !isset($data['node_id'], $data['config'])) {
+                Log::warning("Invalid config_response data", [
+                    'topic' => $topic,
+                    'payload' => $payload,
+                    'json_error' => json_last_error_msg()
+                ]);
+                return;
+            }
+
+            $nodeId = $data['node_id'];
+            $config = $data['config'];
+            
+            // Проверка что config - это массив
+            if (!is_array($config)) {
+                Log::warning("Config is not an array", [
+                    'node_id' => $nodeId,
+                    'config_type' => gettype($config)
+                ]);
+                return;
+            }
+            
+            Log::info("📋 Config response received", [
+                'node_id' => $nodeId,
+                'config_keys' => array_keys($config)
+            ]);
+            
+            // Сохранение конфигурации в кэш (1 час)
+            Cache::put("node_config:{$nodeId}", $config, 3600);
+            
+            // Обновление узла в БД
+            $node = Node::where('node_id', $nodeId)->first();
+            if ($node) {
+                $node->update([
+                    'config' => $config,
+                    'last_seen_at' => now()
+                ]);
+                
+                Log::info("📋 Node config updated in DB", ['node_id' => $nodeId]);
+            }
+            
+            // Сохранение калибровки насосов в БД
+            if (isset($config['pumps_calibration']) && is_array($config['pumps_calibration'])) {
+                foreach ($config['pumps_calibration'] as $pumpCal) {
+                    if (isset($pumpCal['pump_id'])) {
+                        \App\Models\PumpCalibration::updateOrCreate(
+                            [
+                                'node_id' => $nodeId,
+                                'pump_id' => $pumpCal['pump_id']
+                            ],
+                            [
+                                'ml_per_second' => $pumpCal['ml_per_second'] ?? 1.0,
+                                'calibration_volume_ml' => $pumpCal['calibration_volume_ml'] ?? null,
+                                'calibration_time_ms' => $pumpCal['calibration_time_ms'] ?? null,
+                                'is_calibrated' => $pumpCal['is_calibrated'] ?? false,
+                                'calibrated_at' => isset($pumpCal['last_calibrated']) && $pumpCal['last_calibrated'] > 0
+                                    ? \Carbon\Carbon::createFromTimestamp($pumpCal['last_calibrated'])
+                                    : null,
+                            ]
+                        );
+                    }
+                }
+                
+                Log::info("📋 Pump calibrations saved", [
+                    'node_id' => $nodeId,
+                    'pumps_count' => count($config['pumps_calibration'])
+                ]);
+            }
+            
+            // Отправка события через WebSocket
+            broadcast(new \App\Events\NodeConfigUpdated($nodeId, $config));
+            
+            Log::info("📋 Config response processed successfully", ['node_id' => $nodeId]);
+            
+        } catch (Exception $e) {
+            Log::error("Error handling config_response", [
+                'topic' => $topic,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Перевод сообщений событий на русский язык
+     */
+    private function translateEventMessage(string $message): string
+    {
+        $translations = [
+            'pH far from target, aggressive correction' => 'pH далеко от цели, агрессивная коррекция',
+            'pH correction in progress' => 'Коррекция pH в процессе',
+            'pH target reached' => 'Цель pH достигнута',
+            'EC far from target, aggressive correction' => 'EC далеко от цели, агрессивная коррекция',
+            'EC correction in progress' => 'Коррекция EC в процессе',
+            'EC target reached' => 'Цель EC достигнута',
+            'Pump started' => 'Насос запущен',
+            'Pump stopped' => 'Насос остановлен',
+            'Calibration completed' => 'Калибровка завершена',
+            'Node offline' => 'Узел офлайн',
+            'Node online' => 'Узел онлайн',
+            'Critical error' => 'Критическая ошибка',
+            'Warning' => 'Предупреждение',
+            'Info' => 'Информация',
+            'Debug' => 'Отладка',
+        ];
+
+        return $translations[$message] ?? $message;
     }
 }
 

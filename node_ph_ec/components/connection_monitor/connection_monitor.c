@@ -12,8 +12,9 @@
 static const char *TAG = "conn_monitor";
 
 // Пороги переключения состояний (мс)
-#define DEGRADED_THRESHOLD_MS   10000   // 10 сек без контакта
-#define AUTONOMOUS_THRESHOLD_MS 30000   // 30 сек без контакта
+// Синхронизировано с общими таймаутами системы
+#define DEGRADED_THRESHOLD_MS   10000   // 10 сек без контакта (предупреждение)
+#define AUTONOMOUS_THRESHOLD_MS 20000   // 20 сек без контакта (офлайн)
 
 static connection_state_t s_current_state = CONN_STATE_ONLINE;
 static uint64_t s_last_root_contact_ms = 0;

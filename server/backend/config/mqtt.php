@@ -7,7 +7,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'host' => env('MQTT_HOST', '192.168.1.100'),
+    'host' => env('MQTT_HOST', 'localhost'),
     'port' => env('MQTT_PORT', 1883),
     'client_id' => env('MQTT_CLIENT_ID', 'hydro_backend_' . uniqid()),
     'username' => env('MQTT_USERNAME', null),

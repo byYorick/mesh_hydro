@@ -23,7 +23,7 @@ export const useEventsStore = defineStore('events', {
     // Get critical events
     criticalEvents: (state) => {
       return state.events.filter(e => 
-        ['critical', 'emergency'].includes(e.level) && !e.resolved_at
+        e.level && ['critical', 'emergency'].includes(e.level) && !e.resolved_at
       )
     },
 
@@ -40,7 +40,7 @@ export const useEventsStore = defineStore('events', {
     // Count active critical events
     criticalCount: (state) => {
       return state.events.filter(e => 
-        ['critical', 'emergency'].includes(e.level) && !e.resolved_at
+        e.level && ['critical', 'emergency'].includes(e.level) && !e.resolved_at
       ).length
     },
   },

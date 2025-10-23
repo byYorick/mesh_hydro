@@ -38,8 +38,12 @@ class NodeController extends Controller
         // Загрузка последней телеметрии с appends
         $nodes = $query->with(['lastTelemetry'])->get();
 
-        // Добавление вычисляемых полей через appends
-        $nodes->makeVisible(['is_online', 'status_color', 'icon']);
+        // Добавление вычисляемых полей для каждого узла
+        $nodes->each(function ($node) {
+            $node->is_online = $node->isOnline();
+            $node->status_color = $node->status_color;
+            $node->icon = $node->icon;
+        });
 
         return response()->json($nodes);
     }
@@ -116,7 +120,21 @@ class NodeController extends Controller
 
         $validated = $request->validate([
             'config' => 'required|array',
+            'comment' => 'nullable|string|max:500',
         ]);
+
+        // Сохранение старой конфигурации для истории
+        $oldConfig = $node->config ?? [];
+
+        // Логирование изменений в истории
+        \App\Models\ConfigHistory::logChange(
+            $nodeId,
+            $oldConfig,
+            $validated['config'],
+            'update_config',
+            $request->user()?->email ?? 'api',
+            $validated['comment'] ?? null
+        );
 
         // Сохранение в БД
         $node->update(['config' => $validated['config']]);
@@ -258,6 +276,248 @@ class NodeController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Node and all related data deleted',
+        ]);
+    }
+
+    /**
+     * Ручной запуск насоса
+     */
+    public function runPump(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    {
+        // Простое отладочное сообщение
+        error_log("=== RUNPUMP CALLED ===");
+        error_log("Node ID: " . $nodeId);
+        error_log("Request data: " . json_encode($request->all()));
+        error_log("Request method: " . $request->method());
+        error_log("Request headers: " . json_encode($request->headers->all()));
+        
+        $node = Node::where('node_id', $nodeId)->firstOrFail();
+
+        // Отладочная информация
+        Log::info("runPump request data", [
+            'node_id' => $nodeId,
+            'request_data' => $request->all(),
+            'content_type' => $request->header('Content-Type'),
+        ]);
+
+        $validated = $request->validate([
+            'pump_id' => 'required|integer|min:0|max:5',
+            'duration_sec' => 'required|numeric|min:0.1|max:30',
+        ]);
+
+        // Проверка что узел онлайн
+        if (!$node->isOnline()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Node is offline',
+            ], 400);
+        }
+
+        // Отправка команды через MQTT
+        try {
+            $mqtt->sendCommand(
+                $nodeId,
+                'run_pump_manual',
+                [
+                    'pump_id' => $validated['pump_id'],
+                    'duration_sec' => $validated['duration_sec'],
+                ]
+            );
+
+            Log::info("Pump run command sent", [
+                'node_id' => $nodeId,
+                'pump_id' => $validated['pump_id'],
+                'duration_sec' => $validated['duration_sec'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Pump {$validated['pump_id']} started for {$validated['duration_sec']} seconds",
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to send pump run command", [
+                'node_id' => $nodeId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to send command: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Калибровка насоса
+     */
+    public function calibratePump(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    {
+        $node = Node::where('node_id', $nodeId)->firstOrFail();
+
+        $validated = $request->validate([
+            'pump_id' => 'required|integer|min:0|max:5',
+            'duration_sec' => 'required|numeric|min:0.1|max:60',
+            'volume_ml' => 'required|numeric|min:0.1|max:1000',
+        ]);
+
+        // Проверка что узел онлайн
+        if (!$node->isOnline()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Node is offline',
+            ], 400);
+        }
+
+        // Расчет производительности
+        $mlPerSecond = $validated['volume_ml'] / $validated['duration_sec'];
+
+        // Получить старую калибровку для истории
+        $oldCalibration = \App\Models\PumpCalibration::where('node_id', $nodeId)
+            ->where('pump_id', $validated['pump_id'])
+            ->first();
+
+        // Сохранение калибровки в БД
+        $calibration = \App\Models\PumpCalibration::updateOrCreate(
+            [
+                'node_id' => $nodeId,
+                'pump_id' => $validated['pump_id'],
+            ],
+            [
+                'ml_per_second' => $mlPerSecond,
+                'calibration_volume_ml' => $validated['volume_ml'],
+                'calibration_time_ms' => (int)($validated['duration_sec'] * 1000),
+                'is_calibrated' => true,
+                'calibrated_at' => now(),
+            ]
+        );
+
+        // Логирование в истории
+        \App\Models\ConfigHistory::logChange(
+            $nodeId,
+            $oldCalibration ? ['pump_' . $validated['pump_id'] . '_ml_per_sec' => $oldCalibration->ml_per_second] : [],
+            ['pump_' . $validated['pump_id'] . '_ml_per_sec' => $mlPerSecond],
+            'calibrate_pump',
+            $request->user()?->email ?? 'api',
+            "Pump #{$validated['pump_id']}: {$validated['volume_ml']} ml in {$validated['duration_sec']} sec"
+        );
+
+        // Отправка конфига калибровки в NVS на узел
+        try {
+            // Отправляем конфиг калибровки в NVS
+            $mqtt->sendCommand(
+                $nodeId,
+                'set_config',
+                [
+                    'pump_' . $validated['pump_id'] . '_ml_per_sec' => $mlPerSecond,
+                    'pump_' . $validated['pump_id'] . '_calibration_volume' => $validated['volume_ml'],
+                    'pump_' . $validated['pump_id'] . '_calibration_time' => $validated['duration_sec'],
+                ]
+            );
+
+            Log::info("Pump calibration saved and sent", [
+                'node_id' => $nodeId,
+                'pump_id' => $validated['pump_id'],
+                'ml_per_second' => $mlPerSecond,
+            ]);
+
+            // Отправка Telegram уведомления
+            if (config('telegram.enabled', false)) {
+                try {
+                    app(\App\Services\TelegramService::class)->sendCalibrationAlert(
+                        $nodeId,
+                        $validated['pump_id'],
+                        $mlPerSecond
+                    );
+                } catch (\Exception $e) {
+                    Log::warning("Failed to send Telegram notification", ['error' => $e->getMessage()]);
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Pump {$validated['pump_id']} calibrated: {$mlPerSecond} ml/s",
+                'calibration' => $calibration,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to send calibration command", [
+                'node_id' => $nodeId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Calibration saved to DB but failed to send to node: ' . $e->getMessage(),
+                'calibration' => $calibration,
+            ], 500);
+        }
+    }
+
+    /**
+     * Запрос конфигурации от узла
+     */
+    public function requestConfig(string $nodeId, MqttService $mqtt): JsonResponse
+    {
+        $node = Node::where('node_id', $nodeId)->firstOrFail();
+
+        // Проверка что узел онлайн
+        if (!$node->isOnline()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Node is offline',
+            ], 400);
+        }
+
+        // Отправка команды get_config
+        try {
+            $mqtt->sendCommand($nodeId, 'get_config', []);
+
+            Log::info("Config request sent to node", ['node_id' => $nodeId]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Config request sent to node. Check WebSocket for response.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to request config", [
+                'node_id' => $nodeId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to send request: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Получение калибровки насосов
+     */
+    public function getPumpCalibrations(string $nodeId): JsonResponse
+    {
+        $calibrations = \App\Models\PumpCalibration::where('node_id', $nodeId)
+            ->orderBy('pump_id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'calibrations' => $calibrations,
+        ]);
+    }
+
+    /**
+     * Получение истории изменений конфигурации
+     */
+    public function getConfigHistory(string $nodeId): JsonResponse
+    {
+        $history = \App\Models\ConfigHistory::where('node_id', $nodeId)
+            ->orderBy('changed_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'history' => $history,
         ]);
     }
 }

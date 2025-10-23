@@ -72,7 +72,7 @@ class Node extends Model
 
     /**
      * Проверка: узел онлайн?
-     * Считается онлайн если last_seen_at < 30 секунд назад
+     * Считается онлайн если last_seen_at < 20 секунд назад
      */
     public function isOnline(): bool
     {
@@ -80,7 +80,7 @@ class Node extends Model
             return false;
         }
         
-        $timeout = config('hydro.node_offline_timeout', 30); // секунд
+        $timeout = config('hydro.node_offline_timeout', 20); // секунд
         return $this->last_seen_at->diffInSeconds(now()) < $timeout;
     }
 
@@ -122,9 +122,9 @@ class Node extends Model
 
         $seconds = $this->last_seen_at->diffInSeconds(now());
         
-        if ($seconds < 30) return 'green';
-        if ($seconds < 60) return 'orange';
-        return 'red';
+        if ($seconds < 20) return 'green';  // Онлайн: < 20 секунд
+        if ($seconds < 40) return 'orange'; // Предупреждение: 20-40 секунд
+        return 'red';                        // Офлайн: > 40 секунд
     }
 
     /**
@@ -132,7 +132,7 @@ class Node extends Model
      */
     public function scopeOnline($query)
     {
-        $timeout = config('hydro.node_offline_timeout', 30);
+        $timeout = config('hydro.node_offline_timeout', 20);
         return $query->where('last_seen_at', '>', now()->subSeconds($timeout));
     }
 
@@ -141,7 +141,7 @@ class Node extends Model
      */
     public function scopeOffline($query)
     {
-        $timeout = config('hydro.node_offline_timeout', 30);
+        $timeout = config('hydro.node_offline_timeout', 20);
         return $query->where(function($q) use ($timeout) {
             $q->whereNull('last_seen_at')
               ->orWhere('last_seen_at', '<=', now()->subSeconds($timeout));

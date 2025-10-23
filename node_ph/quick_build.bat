@@ -1,0 +1,3 @@
+@echo off
+echo Quick build with JSON debug...
+C:\Windows\system32\cmd.exe /k "C:\Espressif\idf_cmd_init.bat" esp-idf-1dcc643656a1439837fdf6ab63363005 && idf.py build && idf.py flash monitor

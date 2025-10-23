@@ -3,7 +3,7 @@ import api from './api'
 export default {
   // Update node basic fields
   async updateNode(nodeId, data) {
-    return api.axios.put(`/nodes/${nodeId}`, data)
+    return api.put(`/nodes/${nodeId}`, data)
   },
 
   // Get available zones from existing nodes

@@ -21,6 +21,79 @@ export const useSettingsStore = defineStore('settings', {
       emergencyNoAutoResolve: true,
     },
 
+    // PID Settings
+    pid: {
+      ph: {
+        // Основные PID параметры
+        kp: parseFloat(localStorage.getItem('pid_ph_kp') || '0.3'),
+        ki: parseFloat(localStorage.getItem('pid_ph_ki') || '0.01'),
+        kd: parseFloat(localStorage.getItem('pid_ph_kd') || '0.0'),
+        setpoint: parseFloat(localStorage.getItem('pid_ph_setpoint') || '5.8'),
+        deadband: parseFloat(localStorage.getItem('pid_ph_deadband') || '0.05'),
+        
+        // Тайминги
+        doseMinInterval: parseInt(localStorage.getItem('pid_ph_doseMinInterval') || '90'),
+        mixDelay: parseInt(localStorage.getItem('pid_ph_mixDelay') || '45'),
+        
+        // Anti-windup
+        integralMax: parseFloat(localStorage.getItem('pid_ph_integralMax') || '10.0'),
+        integralMin: parseFloat(localStorage.getItem('pid_ph_integralMin') || '-10.0'),
+        
+        // Ограничения выхода
+        outputMax: parseFloat(localStorage.getItem('pid_ph_outputMax') || '5.0'),
+        outputMin: parseFloat(localStorage.getItem('pid_ph_outputMin') || '-5.0'),
+        
+        // Фильтрация
+        filterAlpha: parseFloat(localStorage.getItem('pid_ph_filterAlpha') || '0.25'),
+        
+        // Управление
+        enabled: localStorage.getItem('pid_ph_enabled') !== 'false',
+      },
+      ec: {
+        // Основные PID параметры
+        kp: parseFloat(localStorage.getItem('pid_ec_kp') || '0.2'),
+        ki: parseFloat(localStorage.getItem('pid_ec_ki') || '0.01'),
+        kd: parseFloat(localStorage.getItem('pid_ec_kd') || '0.0'),
+        setpoint: parseFloat(localStorage.getItem('pid_ec_setpoint') || '1.6'),
+        deadband: parseFloat(localStorage.getItem('pid_ec_deadband') || '0.08'),
+        
+        // Тайминги
+        doseMinInterval: parseInt(localStorage.getItem('pid_ec_doseMinInterval') || '180'),
+        mixDelay: parseInt(localStorage.getItem('pid_ec_mixDelay') || '60'),
+        componentABDelay: parseInt(localStorage.getItem('pid_ec_componentABDelay') || '30'),
+        
+        // Anti-windup
+        integralMax: parseFloat(localStorage.getItem('pid_ec_integralMax') || '8.0'),
+        integralMin: parseFloat(localStorage.getItem('pid_ec_integralMin') || '-8.0'),
+        
+        // Ограничения выхода
+        outputMax: parseFloat(localStorage.getItem('pid_ec_outputMax') || '10.0'),
+        outputMin: parseFloat(localStorage.getItem('pid_ec_outputMin') || '0.0'),
+        
+        // Фильтрация
+        filterAlpha: parseFloat(localStorage.getItem('pid_ec_filterAlpha') || '0.4'),
+        
+        // Управление
+        enabled: localStorage.getItem('pid_ec_enabled') !== 'false',
+      },
+    },
+
+    // Safety Settings
+    safety: {
+      dosing: {
+        maxDailyPhDown: parseInt(localStorage.getItem('safe_maxDailyPhDown') || '500'),
+        maxDailyPhUp: parseInt(localStorage.getItem('safe_maxDailyPhUp') || '300'),
+        maxDailyNutrients: parseInt(localStorage.getItem('safe_maxDailyNutrients') || '2000'),
+        minWaterLevel: parseInt(localStorage.getItem('safe_minWaterLevel') || '20'),
+        tempLockout: localStorage.getItem('safe_tempLockout') !== 'false',
+      },
+      sensors: {
+        phCalibrationDueDays: parseInt(localStorage.getItem('safe_phCalibrationDueDays') || '14'),
+        ecCalibrationDueDays: parseInt(localStorage.getItem('safe_ecCalibrationDueDays') || '30'),
+        tempCompensation: localStorage.getItem('safe_tempCompensation') !== 'false',
+      },
+    },
+
     // Notifications Settings
     notifications: {
       enabled: true,
@@ -122,6 +195,18 @@ export const useSettingsStore = defineStore('settings', {
     resetToDefaults() {
       localStorage.clear()
       window.location.reload()
+    },
+
+    // PID setters
+    setPid(group, key, value) {
+      this.pid[group][key] = value
+      localStorage.setItem(`pid_${group}_${key}`, value)
+    },
+
+    // Safety setters
+    setSafety(group, key, value) {
+      this.safety[group][key] = value
+      localStorage.setItem(`safe_${key}`, value)
     },
 
     // Export settings

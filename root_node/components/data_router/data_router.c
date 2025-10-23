@@ -163,6 +163,26 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             }
             break;
 
+        case MESH_MSG_RESPONSE:
+            ESP_LOGI(TAG, "📋 Response from %s → MQTT", msg.node_id);
+            
+            // Это может быть config_response от pH/EC ноды
+            // Публикуем в MQTT для backend
+            if (mqtt_client_manager_is_connected()) {
+                char topic[64];
+                snprintf(topic, sizeof(topic), "hydro/config_response/%s", msg.node_id);
+                
+                esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "   ✓ Config response published to %s", topic);
+                } else {
+                    ESP_LOGW(TAG, "   ✗ Failed to publish config response: %s", esp_err_to_name(err));
+                }
+            } else {
+                ESP_LOGW(TAG, "MQTT offline, config response dropped");
+            }
+            break;
+
         default:
             ESP_LOGW(TAG, "Unknown message type: %d", msg.type);
             break;

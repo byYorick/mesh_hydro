@@ -20,7 +20,7 @@ return [
     */
     
     // Таймаут офлайн узла (секунды)
-    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 30),
+    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 20),
     
     // Поддерживаемые типы узлов
     'node_types' => [
