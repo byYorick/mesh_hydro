@@ -217,7 +217,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import axios from 'axios'
+import { axios as api } from '@/services/api'
 
 const toast = useToast()
 
@@ -242,7 +242,7 @@ const loadingLogs = ref(false)
 const loadStatus = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/docker/status')
+    const response = await api.get('/docker/status')
     if (response.data.success) {
       dockerStatus.value = response.data.docker
       containers.value = response.data.docker.containers || []
@@ -296,7 +296,7 @@ const executeConfirmedAction = async () => {
 const restartAll = async () => {
   restartingAll.value = true
   try {
-    const response = await axios.post('/api/docker/restart/all')
+    const response = await api.post('/docker/restart/all')
     if (response.data.success) {
       toast.success('Все контейнеры перезапускаются...')
       
@@ -321,7 +321,7 @@ const restartAll = async () => {
 const startAll = async () => {
   startingAll.value = true
   try {
-    const response = await axios.post('/api/docker/start/all')
+    const response = await api.post('/docker/start/all')
     if (response.data.success) {
       toast.success('Контейнеры запускаются...')
       setTimeout(loadStatus, 3000)
@@ -339,7 +339,7 @@ const startAll = async () => {
 const stopAll = async () => {
   stoppingAll.value = true
   try {
-    const response = await axios.post('/api/docker/stop/all')
+    const response = await api.post('/docker/stop/all')
     if (response.data.success) {
       toast.warning('Все контейнеры остановлены')
       setTimeout(loadStatus, 2000)
@@ -361,7 +361,7 @@ const restartContainer = async (container) => {
 
   restartingContainer.value = container.service
   try {
-    const response = await axios.post('/api/docker/restart/container', {
+    const response = await api.post('/docker/restart/container', {
       container: container.service
     })
     
@@ -391,7 +391,7 @@ const loadLogs = async () => {
 
   loadingLogs.value = true
   try {
-    const response = await axios.get('/api/docker/logs', {
+    const response = await api.get('/docker/logs', {
       params: {
         container: selectedContainer.value.service,
         lines: 200

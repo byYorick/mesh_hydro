@@ -84,6 +84,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { formatDateTime, formatDistanceToNow } from '@/utils/time'
+import { useVirtualList } from '@/composables/useVirtualList'
 
 const props = defineProps({
   events: {

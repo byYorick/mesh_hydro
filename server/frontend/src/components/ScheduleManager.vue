@@ -212,7 +212,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import axios from 'axios'
+import { axios as api } from '@/services/api'
 
 const props = defineProps({
   node: {
@@ -239,13 +239,13 @@ const scheduleForm = ref({
 // Загрузка расписаний
 const loadSchedules = async () => {
   try {
-    const response = await axios.get(`/api/schedules/node/${props.node.node_id}`)
+    const response = await api.get(`/schedules/node/${props.node.node_id}`)
     if (response.data.success) {
       schedules.value = response.data.schedules
     }
 
     // Загрузка активного расписания
-    const activeResponse = await axios.get(`/api/schedules/node/${props.node.node_id}/active`)
+    const activeResponse = await api.get(`/schedules/node/${props.node.node_id}/active`)
     if (activeResponse.data.success) {
       activeSchedule.value = activeResponse.data.active_schedule
     }
@@ -283,14 +283,14 @@ const saveSchedule = async () => {
   loading.value = true
   try {
     if (editingSchedule.value) {
-      await axios.put(
-        `/api/schedules/node/${props.node.node_id}/${editingSchedule.value.id}`,
+      await api.put(
+        `/schedules/node/${props.node.node_id}/${editingSchedule.value.id}`,
         scheduleForm.value
       )
       toast.success('Расписание обновлено')
     } else {
-      await axios.post(
-        `/api/schedules/node/${props.node.node_id}`,
+      await api.post(
+        `/schedules/node/${props.node.node_id}`,
         scheduleForm.value
       )
       toast.success('Расписание создано')
@@ -309,8 +309,8 @@ const saveSchedule = async () => {
 // Переключить расписание
 const toggleSchedule = async (schedule) => {
   try {
-    await axios.put(
-      `/api/schedules/node/${props.node.node_id}/${schedule.id}`,
+    await api.put(
+      `/schedules/node/${props.node.node_id}/${schedule.id}`,
       { enabled: schedule.enabled }
     )
     toast.success(schedule.enabled ? 'Расписание включено' : 'Расписание выключено')
@@ -325,7 +325,7 @@ const deleteSchedule = async (schedule) => {
   if (!confirm(`Удалить расписание "${schedule.name}"?`)) return
 
   try {
-    await axios.delete(`/api/schedules/node/${props.node.node_id}/${schedule.id}`)
+    await api.delete(`/schedules/node/${props.node.node_id}/${schedule.id}`)
     toast.success('Расписание удалено')
     await loadSchedules()
   } catch (error) {

@@ -86,11 +86,23 @@
         @click="appStore.toggleTheme()"
       ></v-btn>
 
+      <!-- Offline Indicator -->
+      <v-chip
+        v-if="isOfflineMode"
+        color="warning"
+        size="small"
+        prepend-icon="mdi-wifi-off"
+        class="mr-2"
+      >
+        Офлайн
+      </v-chip>
+
       <!-- Refresh Button -->
       <v-btn
         icon="mdi-refresh"
         @click="refreshData"
         :loading="appStore.loading"
+        :disabled="isOfflineMode"
       ></v-btn>
 
       <!-- Settings -->
@@ -205,6 +217,7 @@ import { useErrorsStore } from '@/stores/errors'
 import { useSettingsStore } from '@/stores/settings'
 import { useTelemetryStore } from '@/stores/telemetry'
 import { useResponsive } from '@/composables/useResponsive'
+import { useOfflineMode } from '@/composables/useOfflineMode'
 import NodeDiscoveryIndicator from '@/components/NodeDiscoveryIndicator.vue'
 import { getConnectionStatus } from '@/services/echo'
 
@@ -217,6 +230,7 @@ const errorsStore = useErrorsStore()
 const settingsStore = useSettingsStore()
 const telemetryStore = useTelemetryStore()
 const { isMobile } = useResponsive()
+const { isOnline, isOfflineMode } = useOfflineMode()
 
 const echo = inject('echo')
 const rail = ref(false)

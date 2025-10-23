@@ -29,7 +29,7 @@ export const useTelemetryStore = defineStore('telemetry', {
       
       try {
         const response = await api.getTelemetry(params)
-        this.telemetry = response.data || response
+        this.telemetry = response
         return this.telemetry
       } catch (error) {
         this.error = error.message

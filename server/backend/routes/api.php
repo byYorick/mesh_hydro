@@ -46,7 +46,7 @@ Route::middleware('throttle:api')->group(function () {
         Route::get('/{nodeId}/statistics', [NodeController::class, 'statistics']);
         
         // Write operations с ограниченным rate limit
-        Route::middleware('throttle:30,1')->group(function () {
+        Route::middleware('throttle:60,1')->group(function () {
             Route::post('/', [NodeController::class, 'store']);
             Route::put('/{nodeId}', [NodeController::class, 'update']);
             Route::delete('/{nodeId}', [NodeController::class, 'destroy']);

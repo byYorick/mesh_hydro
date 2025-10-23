@@ -56,8 +56,22 @@
       </v-col>
     </v-row>
 
+    <!-- Loading skeleton -->
+    <div v-if="nodesStore.loading" class="v-row">
+      <v-col
+        v-for="n in 8"
+        :key="`skeleton-${n}`"
+        cols="12"
+        sm="6"
+        md="4"
+        lg="3"
+      >
+        <SkeletonCard />
+      </v-col>
+    </div>
+
     <!-- Nodes Grid -->
-    <v-row>
+    <v-row v-else>
       <v-col
         v-for="node in filteredNodes"
         :key="node.node_id"
@@ -90,8 +104,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
+import { useDebounce } from '@/composables/useDebounce'
 import NodeCard from '@/components/NodeCard.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
+import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()
@@ -101,15 +117,18 @@ const search = ref('')
 const filterType = ref(null)
 const filterStatus = ref(null)
 
+// Debounced search для улучшения производительности
+const debouncedSearch = useDebounce(search, 300)
+
 const nodeTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root']
 
 // Filtered nodes
 const filteredNodes = computed(() => {
   let nodes = [...nodesStore.nodes]
 
-  // Search filter
-  if (search.value) {
-    const query = search.value.toLowerCase()
+  // Search filter с debounce
+  if (debouncedSearch.value) {
+    const query = debouncedSearch.value.toLowerCase()
     nodes = nodes.filter(node =>
       node.node_id.toLowerCase().includes(query) ||
       node.node_type.toLowerCase().includes(query) ||

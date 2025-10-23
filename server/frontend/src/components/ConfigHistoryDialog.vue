@@ -94,7 +94,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useToast } from 'vue-toastification'
-import axios from 'axios'
+import { axios as api } from '@/services/api'
 
 const props = defineProps({
   node: {
@@ -121,7 +121,7 @@ watch(dialog, async (newVal) => {
 const loadHistory = async () => {
   loading.value = true
   try {
-    const response = await axios.get(`/api/nodes/${props.node.node_id}/config/history`)
+    const response = await api.get(`/nodes/${props.node.node_id}/config/history`)
     if (response.data.success) {
       history.value = response.data.history
     }

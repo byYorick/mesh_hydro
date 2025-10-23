@@ -1,46 +1,126 @@
 <template>
-  <v-card>
-    <v-card-title>
-      <v-skeleton-loader type="heading" width="60%"></v-skeleton-loader>
+  <v-card class="skeleton-card" elevation="2">
+    <v-card-title class="d-flex align-center">
+      <v-skeleton-loader
+        type="avatar"
+        width="40"
+        height="40"
+        class="mr-3"
+      ></v-skeleton-loader>
+      <div class="flex-grow-1">
+        <v-skeleton-loader
+          type="text"
+          width="60%"
+          class="mb-1"
+        ></v-skeleton-loader>
+        <v-skeleton-loader
+          type="text"
+          width="40%"
+          height="16"
+        ></v-skeleton-loader>
+      </div>
+      <v-skeleton-loader
+        type="chip"
+        width="80"
+        height="24"
+      ></v-skeleton-loader>
     </v-card-title>
 
-    <v-card-subtitle>
-      <v-skeleton-loader type="text" width="40%"></v-skeleton-loader>
-    </v-card-subtitle>
-
     <v-card-text>
-      <v-skeleton-loader type="paragraph"></v-skeleton-loader>
-      
-      <v-row dense class="mt-4">
+      <v-row>
         <v-col cols="6">
-          <v-skeleton-loader type="chip"></v-skeleton-loader>
+          <v-skeleton-loader
+            type="text"
+            width="80%"
+            class="mb-2"
+          ></v-skeleton-loader>
+          <v-skeleton-loader
+            type="text"
+            width="60%"
+            height="20"
+          ></v-skeleton-loader>
         </v-col>
         <v-col cols="6">
-          <v-skeleton-loader type="chip"></v-skeleton-loader>
+          <v-skeleton-loader
+            type="text"
+            width="80%"
+            class="mb-2"
+          ></v-skeleton-loader>
+          <v-skeleton-loader
+            type="text"
+            width="60%"
+            height="20"
+          ></v-skeleton-loader>
         </v-col>
       </v-row>
+
+      <v-divider class="my-3"></v-divider>
+
+      <div class="mb-2">
+        <v-skeleton-loader
+          type="text"
+          width="30%"
+          class="mb-1"
+        ></v-skeleton-loader>
+        <v-skeleton-loader
+          type="rect"
+          height="6"
+          class="rounded"
+        ></v-skeleton-loader>
+      </div>
+
+      <div class="mb-2">
+        <v-skeleton-loader
+          type="text"
+          width="25%"
+          class="mb-1"
+        ></v-skeleton-loader>
+        <v-skeleton-loader
+          type="rect"
+          height="6"
+          class="rounded"
+        ></v-skeleton-loader>
+      </div>
+
+      <v-skeleton-loader
+        type="text"
+        width="50%"
+        height="14"
+        class="mt-2"
+      ></v-skeleton-loader>
     </v-card-text>
 
     <v-card-actions>
-      <v-skeleton-loader type="button"></v-skeleton-loader>
+      <v-skeleton-loader
+        type="button"
+        width="80"
+        height="32"
+      ></v-skeleton-loader>
       <v-spacer></v-spacer>
-      <v-skeleton-loader type="button"></v-skeleton-loader>
+      <v-skeleton-loader
+        type="button"
+        width="100"
+        height="32"
+      ></v-skeleton-loader>
     </v-card-actions>
   </v-card>
 </template>
 
 <script setup>
-defineProps({
-  loading: {
-    type: Boolean,
-    default: true,
-  },
-})
+// Skeleton card для загрузки узлов
 </script>
 
 <style scoped>
-.v-skeleton-loader {
-  background: transparent !important;
+.skeleton-card {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 </style>
-

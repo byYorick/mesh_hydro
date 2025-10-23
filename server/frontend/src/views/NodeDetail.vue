@@ -190,7 +190,10 @@ const eventHeaders = [
 ]
 
 const statusColor = computed(() => {
-  return node.value?.online ? 'success' : 'error'
+  if (!node.value) return 'grey'
+  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+  const isOnline = node.value.is_online !== undefined ? node.value.is_online : node.value.online
+  return isOnline ? 'success' : 'error'
 })
 
 const telemetryFields = computed(() => {
@@ -216,6 +219,11 @@ onMounted(async () => {
 })
 
 async function loadNodeErrors() {
+  if (!node.value?.node_id) {
+    console.warn('Node not loaded, skipping error loading')
+    return
+  }
+  
   try {
     const result = await errorsStore.fetchNodeErrors(node.value.node_id, {
       hours: 168, // Last 7 days
@@ -248,6 +256,11 @@ async function handleErrorResolved() {
 }
 
 async function loadTelemetry() {
+  if (!node.value?.node_id) {
+    console.warn('Node not loaded, skipping telemetry loading')
+    return
+  }
+  
   loading.value = true
   try {
     const hours = getHoursFromRange(selectedRange.value)
@@ -261,6 +274,11 @@ async function loadTelemetry() {
 }
 
 async function sendCommand({ command, params }) {
+  if (!node.value?.node_id) {
+    appStore.showSnackbar('Узел не загружен', 'error')
+    return
+  }
+  
   try {
     // Специальная обработка для команды run_pump
     if (command === 'run_pump') {

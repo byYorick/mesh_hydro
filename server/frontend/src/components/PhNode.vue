@@ -52,6 +52,19 @@
                         class="mr-2"></v-icon>
                 <strong>{{ pump.name }}</strong>
                 <v-spacer></v-spacer>
+                
+                <!-- Статус работы насоса -->
+                <v-chip 
+                  v-if="runningPump === pump.id" 
+                  color="info" 
+                  size="small"
+                  class="mr-2"
+                >
+                  <v-icon icon="mdi-pulse" start size="x-small"></v-icon>
+                  Работает
+                </v-chip>
+                
+                <!-- Калибровка -->
                 <v-chip v-if="getPumpCalibration(pump.id)" color="success" size="small">
                   <v-icon icon="mdi-check-circle" start size="x-small"></v-icon>
                   {{ getPumpCalibration(pump.id).ml_per_second.toFixed(2) }} мл/с
@@ -81,14 +94,14 @@
                   <v-col cols="6">
                     <v-btn
                       block
-                      :color="pump.id === 0 ? 'success' : 'error'"
-                      :prepend-icon="runningPump === pump.id ? 'mdi-stop' : 'mdi-play'"
-                      @click="runPump(pump.id)"
-                      :disabled="!node.online || loading || runningPump !== null"
+                      :color="getPumpButtonColor(pump.id)"
+                      :prepend-icon="getPumpButtonIcon(pump.id)"
+                      @click="runningPump === pump.id ? stopPump(pump.id) : runPump(pump.id)"
+                      :disabled="!node.online || loading || (runningPump !== null && runningPump !== pump.id)"
                       :loading="runningPump === pump.id"
                       :variant="runningPump === pump.id ? 'elevated' : 'flat'"
                     >
-                      {{ runningPump === pump.id ? 'Работает...' : 'Запустить' }}
+                      {{ getPumpButtonText(pump.id) }}
                     </v-btn>
                   </v-col>
                 </v-row>
@@ -238,7 +251,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import axios from 'axios'
+import { axios as api } from '@/services/api'
 
 const props = defineProps({
   node: {
@@ -288,12 +301,37 @@ const getPumpCalibration = (pumpId) => {
   return pumpCalibrations.value.find(cal => cal.pump_id === pumpId)
 }
 
+// Функции для определения состояния кнопки насоса
+const getPumpButtonColor = (pumpId) => {
+  if (runningPump.value === pumpId) {
+    return pumpId === 0 ? 'success' : 'error'
+  }
+  return pumpId === 0 ? 'success' : 'error'
+}
+
+const getPumpButtonIcon = (pumpId) => {
+  if (runningPump.value === pumpId) {
+    return 'mdi-stop'
+  }
+  return 'mdi-play'
+}
+
+const getPumpButtonText = (pumpId) => {
+  if (runningPump.value === pumpId) {
+    return 'Работает...'
+  }
+  if (runningPump.value !== null && runningPump.value !== pumpId) {
+    return 'Другой насос работает'
+  }
+  return 'Запустить'
+}
+
 // Загрузка калибровок
 const loadCalibrations = async () => {
   try {
-    const response = await axios.get(`/api/nodes/${props.node.node_id}/pump/calibrations`)
-    if (response.data.success) {
-      pumpCalibrations.value = response.data.calibrations
+    const response = await api.getPumpCalibrations(props.node.node_id)
+    if (response.success) {
+      pumpCalibrations.value = response.calibrations
     }
   } catch (error) {
     console.error('Failed to load calibrations:', error)
@@ -304,10 +342,43 @@ const loadCalibrations = async () => {
 const pumpDebounce = ref({})
 const calibrationDebounce = ref({})
 
+// Валидация форм
+const validatePumpDuration = (value) => {
+  if (!value || value <= 0) {
+    return 'Длительность должна быть больше 0'
+  }
+  if (value > 30) {
+    return 'Максимальная длительность: 30 секунд'
+  }
+  return true
+}
+
+const validateCalibrationVolume = (value) => {
+  if (!value || value <= 0) {
+    return 'Объем должен быть больше 0'
+  }
+  if (value > 500) {
+    return 'Максимальный объем: 500 мл'
+  }
+  return true
+}
+
+const validateCalibrationDuration = (value) => {
+  if (!value || value <= 0) {
+    return 'Время должно быть больше 0'
+  }
+  if (value > 120) {
+    return 'Максимальное время: 120 секунд'
+  }
+  return true
+}
+
 // Запуск насоса
 const runPump = async (pumpId) => {
-  if (!pumpDuration.value[pumpId] || pumpDuration.value[pumpId] <= 0) {
-    toast.warning('Введите длительность')
+  // Валидация длительности
+  const durationValidation = validatePumpDuration(pumpDuration.value[pumpId])
+  if (durationValidation !== true) {
+    toast.warning(durationValidation)
     return
   }
 
@@ -317,60 +388,118 @@ const runPump = async (pumpId) => {
     return
   }
 
+  // Проверяем, не запущен ли уже другой насос
+  if (runningPump.value !== null && runningPump.value !== pumpId) {
+    toast.warning('Другой насос уже работает')
+    return
+  }
+
   runningPump.value = pumpId
   pumpDebounce.value[pumpId] = true
   pumpProgress.value[pumpId] = 0
   
-  // Запускаем таймер прогресса
-  const duration = pumpDuration.value[pumpId] * 1000 // в миллисекундах
-  const interval = 100 // обновляем каждые 100мс
-  let elapsed = 0
-  
-  pumpTimers.value[pumpId] = setInterval(() => {
-    elapsed += interval
-    const progress = Math.min((elapsed / duration) * 100, 100)
-    pumpProgress.value[pumpId] = progress
-    
-    if (progress >= 100) {
-      clearInterval(pumpTimers.value[pumpId])
-      delete pumpTimers.value[pumpId]
-    }
-  }, interval)
+  // Очищаем предыдущий таймер если есть
+  if (pumpTimers.value[pumpId]) {
+    clearInterval(pumpTimers.value[pumpId])
+    delete pumpTimers.value[pumpId]
+  }
   
   try {
-    const response = await axios.post(`/api/nodes/${props.node.node_id}/pump/run`, {
-      pump_id: pumpId,
-      duration_sec: pumpDuration.value[pumpId]
-    })
+    console.log(`🚀 Запуск насоса ${pumpId} на ${pumpDuration.value[pumpId]} сек`)
+    
+    const response = await api.runPump(
+      props.node.node_id,
+      pumpId,
+      pumpDuration.value[pumpId]
+    )
 
-    if (response.data.success) {
+    console.log('📡 API ответ:', response)
+
+    // Проверяем успешность ответа (response уже извлечен из .data в interceptor)
+    const isSuccess = response.success || response.status === 200
+    
+    if (isSuccess) {
       toast.success(`Насос ${pumpId} запущен на ${pumpDuration.value[pumpId]} сек`)
+      
+      // Запускаем таймер прогресса только после успешного API вызова
+      const duration = pumpDuration.value[pumpId] * 1000 // в миллисекундах
+      const interval = 100 // обновляем каждые 100мс
+      let elapsed = 0
+      
+      pumpTimers.value[pumpId] = setInterval(() => {
+        elapsed += interval
+        const progress = Math.min((elapsed / duration) * 100, 100)
+        pumpProgress.value[pumpId] = progress
+        
+        if (progress >= 100) {
+          clearInterval(pumpTimers.value[pumpId])
+          delete pumpTimers.value[pumpId]
+          
+          // Сбрасываем состояние после завершения
+          setTimeout(() => {
+            runningPump.value = null
+            pumpProgress.value[pumpId] = 0
+            pumpDebounce.value[pumpId] = false
+          }, 500) // Небольшая задержка для плавности
+        }
+      }, interval)
+      
     } else {
-      toast.error(response.data.error || 'Ошибка запуска насоса')
+      const errorMsg = response.error || response.message || 'Ошибка запуска насоса'
+      toast.error(errorMsg)
+      resetPumpState(pumpId)
     }
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.message || 'Ошибка запуска насоса'
     toast.error(errorMsg)
-  } finally {
-    // Очищаем таймер и сбрасываем состояние
-    if (pumpTimers.value[pumpId]) {
-      clearInterval(pumpTimers.value[pumpId])
-      delete pumpTimers.value[pumpId]
-    }
+    resetPumpState(pumpId)
+  }
+}
+
+// Функция для сброса состояния насоса
+const resetPumpState = (pumpId) => {
+  // Очищаем таймер прогресса
+  if (pumpTimers.value[pumpId]) {
+    clearInterval(pumpTimers.value[pumpId])
+    delete pumpTimers.value[pumpId]
+  }
+  
+  // Сбрасываем состояние
+  runningPump.value = null
+  pumpProgress.value[pumpId] = 0
+  pumpDebounce.value[pumpId] = false
+}
+
+// Функция для принудительной остановки насоса
+const stopPump = async (pumpId) => {
+  if (runningPump.value !== pumpId) return
+  
+  try {
+    // Отправляем команду остановки на сервер
+    await api.stopPump(props.node.node_id, pumpId)
     
-    // Задержка перед сбросом состояния для показа завершения
-    setTimeout(() => {
-      runningPump.value = null
-      pumpProgress.value[pumpId] = 0
-      pumpDebounce.value[pumpId] = false
-    }, 1000)
+    toast.info(`Насос ${pumpId} остановлен`)
+  } catch (error) {
+    console.warn('Не удалось отправить команду остановки:', error)
+  } finally {
+    // В любом случае сбрасываем состояние
+    resetPumpState(pumpId)
   }
 }
 
 // Калибровка насоса
 const calibratePump = async (pumpId) => {
-  if (!calibrationVolume.value[pumpId] || !calibrationDuration.value[pumpId]) {
-    toast.warning('Введите объем и время')
+  // Валидация объема
+  const volumeValidation = validateCalibrationVolume(calibrationVolume.value[pumpId])
+  if (volumeValidation !== true) {
+    toast.warning(volumeValidation)
+    return
+  }
+  
+  // Валидация времени
+  const durationValidation = validateCalibrationDuration(calibrationDuration.value[pumpId])
+  if (durationValidation !== true) {
+    toast.warning(durationValidation)
     return
   }
 
@@ -384,17 +513,18 @@ const calibratePump = async (pumpId) => {
   calibrationDebounce.value[pumpId] = true
   
   try {
-    const response = await axios.post(`/api/nodes/${props.node.node_id}/pump/calibrate`, {
-      pump_id: pumpId,
-      volume_ml: calibrationVolume.value[pumpId],
-      duration_sec: calibrationDuration.value[pumpId]
-    })
+    const response = await api.calibratePump(
+      props.node.node_id,
+      pumpId,
+      calibrationDuration.value[pumpId],
+      calibrationVolume.value[pumpId]
+    )
 
-    if (response.data.success) {
-      toast.success(`Насос ${pumpId} откалиброван: ${response.data.ml_per_second.toFixed(2)} мл/с`)
+    if (response.success) {
+      toast.success(`Насос ${pumpId} откалиброван: ${response.ml_per_second.toFixed(2)} мл/с`)
       await loadCalibrations()
     } else {
-      toast.error(response.data.error || 'Ошибка калибровки')
+      toast.error(response.error || 'Ошибка калибровки')
     }
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.message || 'Ошибка калибровки'
@@ -412,13 +542,13 @@ const calibratePump = async (pumpId) => {
 const requestConfig = async () => {
   requestingConfig.value = true
   try {
-    const response = await axios.post(`/api/nodes/${props.node.node_id}/config/request`)
+    const response = await api.requestConfig(props.node.node_id)
 
-    if (response.data.success) {
+    if (response.success) {
       toast.success('Запрос конфигурации отправлен. Ожидайте ответа через WebSocket...')
       lastConfigRequest.value = new Date().toLocaleTimeString('ru-RU')
     } else {
-      toast.error(response.data.error || 'Ошибка запроса конфигурации')
+      toast.error(response.error || 'Ошибка запроса конфигурации')
     }
   } catch (error) {
     const errorMsg = error.response?.data?.error || error.message || 'Ошибка запроса'
@@ -442,8 +572,15 @@ onMounted(() => {
 // При размонтировании очищаем таймеры
 onUnmounted(() => {
   Object.values(pumpTimers.value).forEach(timer => {
-    if (timer) clearInterval(timer)
+    if (timer) {
+      if (typeof timer === 'number') {
+        clearTimeout(timer)
+      } else {
+        clearInterval(timer)
+      }
+    }
   })
+  pumpTimers.value = {}
 })
 </script>
 

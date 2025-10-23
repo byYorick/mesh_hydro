@@ -54,7 +54,7 @@ export const useErrorsStore = defineStore('errors', {
       
       try {
         const response = await api.getErrors(params)
-        this.errors = response.data || response
+        this.errors = response || []
         return this.errors
       } catch (error) {
         this.error = error.message
@@ -71,7 +71,7 @@ export const useErrorsStore = defineStore('errors', {
       
       try {
         const response = await api.getNodeErrors(nodeId, params)
-        return response.data || response || []
+        return response || []
       } catch (error) {
         this.error = error.message
         console.error('Error fetching node errors:', error)
@@ -84,7 +84,7 @@ export const useErrorsStore = defineStore('errors', {
     async fetchErrorStatistics(hours = 24) {
       try {
         const response = await api.getErrorStatistics(hours)
-        this.statistics = response.data || response
+        this.statistics = response
         return this.statistics
       } catch (error) {
         console.error('Error fetching error statistics:', error)
@@ -95,7 +95,7 @@ export const useErrorsStore = defineStore('errors', {
     async fetchError(id) {
       try {
         const response = await api.getError(id)
-        this.selectedError = response.data || response
+        this.selectedError = response
         return this.selectedError
       } catch (error) {
         console.error('Error fetching error details:', error)

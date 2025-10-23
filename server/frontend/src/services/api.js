@@ -24,7 +24,7 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor with retry logic
+// Response interceptor with improved retry logic
 api.interceptors.response.use(
   (response) => {
     return response.data
@@ -43,18 +43,27 @@ api.interceptors.response.use(
       return handleError(error)
     }
     
-    // Retry для network errors или 5xx
-    if (!error.response || error.response.status >= 500) {
+    // Retry только для определенных 5xx ошибок
+    const retryableStatuses = [500, 502, 503, 504]
+    const isRetryableError = !error.response || 
+      (error.response.status >= 500 && retryableStatuses.includes(error.response.status))
+    
+    if (isRetryableError) {
       config.retry.count += 1
       
       if (config.retry.count < config.retry.limit) {
         console.log(`🔄 Retrying request (${config.retry.count}/${config.retry.limit})...`)
         
-        // Exponential backoff
-        const delay = config.retry.delay * Math.pow(2, config.retry.count - 1)
+        // Exponential backoff with jitter
+        const baseDelay = config.retry.delay * Math.pow(2, config.retry.count - 1)
+        const jitter = Math.random() * 1000 // Добавляем случайность
+        const delay = Math.min(baseDelay + jitter, 10000) // Максимум 10 секунд
+        
         await new Promise(resolve => setTimeout(resolve, delay))
         
         return api.request(config)
+      } else {
+        console.error(`❌ Max retries exceeded for ${config.url}`)
       }
     }
     
@@ -141,6 +150,40 @@ export default {
     return api.delete(`/nodes/${nodeId}`)
   },
 
+  // Pump operations
+  runPump(nodeId, pumpId, durationSec) {
+    return api.post(`/nodes/${nodeId}/pump/run`, {
+      pump_id: pumpId,
+      duration_sec: durationSec
+    })
+  },
+
+  stopPump(nodeId, pumpId) {
+    return api.post(`/nodes/${nodeId}/pump/stop`, {
+      pump_id: pumpId
+    })
+  },
+
+  calibratePump(nodeId, pumpId, durationSec, volumeMl) {
+    return api.post(`/nodes/${nodeId}/pump/calibrate`, {
+      pump_id: pumpId,
+      duration_sec: durationSec,
+      volume_ml: volumeMl
+    })
+  },
+
+  getPumpCalibrations(nodeId) {
+    return api.get(`/nodes/${nodeId}/pump/calibrations`)
+  },
+
+  requestConfig(nodeId) {
+    return api.get(`/nodes/${nodeId}/config/request`)
+  },
+
+  getConfigHistory(nodeId) {
+    return api.get(`/nodes/${nodeId}/config/history`)
+  },
+
   // Telemetry
   getTelemetry(params = {}) {
     return api.get('/telemetry', { params })
@@ -225,6 +268,94 @@ export default {
 
   deleteError(errorId) {
     return api.delete(`/errors/${errorId}`)
+  },
+
+  // Settings
+  getSettings() {
+    return api.get('/settings')
+  },
+
+  getTelegramSettings() {
+    return api.get('/settings/telegram')
+  },
+
+  getTelegramChatId() {
+    return api.get('/settings/telegram/chat-id')
+  },
+
+  saveTelegramSettings(settings) {
+    return api.post('/settings/telegram', settings)
+  },
+
+  testTelegram() {
+    return api.post('/settings/telegram/test')
+  },
+
+  // Docker management
+  getDockerStatus() {
+    return api.get('/docker/status')
+  },
+
+  getDockerLogs() {
+    return api.get('/docker/logs')
+  },
+
+  restartAllContainers() {
+    return api.post('/docker/restart/all')
+  },
+
+  restartContainer(containerName) {
+    return api.post('/docker/restart/container', { container: containerName })
+  },
+
+  startAllContainers() {
+    return api.post('/docker/start/all')
+  },
+
+  stopAllContainers() {
+    return api.post('/docker/stop/all')
+  },
+
+  // PID Presets
+  getPidPresets() {
+    return api.get('/pid-presets')
+  },
+
+  getPidPreset(id) {
+    return api.get(`/pid-presets/${id}`)
+  },
+
+  createPidPreset(data) {
+    return api.post('/pid-presets', data)
+  },
+
+  updatePidPreset(id, data) {
+    return api.put(`/pid-presets/${id}`, data)
+  },
+
+  deletePidPreset(id) {
+    return api.delete(`/pid-presets/${id}`)
+  },
+
+  // Schedules
+  getNodeSchedules(nodeId) {
+    return api.get(`/schedules/node/${nodeId}`)
+  },
+
+  getActiveSchedules(nodeId) {
+    return api.get(`/schedules/node/${nodeId}/active`)
+  },
+
+  createSchedule(nodeId, data) {
+    return api.post(`/schedules/node/${nodeId}`, data)
+  },
+
+  updateSchedule(nodeId, scheduleId, data) {
+    return api.put(`/schedules/node/${nodeId}/${scheduleId}`, data)
+  },
+
+  deleteSchedule(nodeId, scheduleId) {
+    return api.delete(`/schedules/node/${nodeId}/${scheduleId}`)
   },
 }
 

@@ -195,7 +195,6 @@ class MqttService
             
             // Создание или обновление узла
             $updateData = [
-                'online' => true,
                 'last_seen_at' => now(),
             ];
             
@@ -217,6 +216,14 @@ class MqttService
                 ['node_id' => $data['node_id']],
                 $updateData
             );
+
+            // Обновляем online статус на основе isOnline()
+            $wasOnline = $node->online;
+            $isOnline = $node->isOnline();
+            
+            if ($wasOnline !== $isOnline) {
+                $node->update(['online' => $isOnline]);
+            }
 
             // Broadcast status change если изменился или новый узел
             if ($wasOnline !== true) {
@@ -445,7 +452,6 @@ class MqttService
                 
                 $updateData = [
                     'metadata' => $metadata,
-                    'online' => true,
                     'last_seen_at' => now(),  // ✅ ВСЕГДА обновляем!
                 ];
                 
@@ -455,6 +461,15 @@ class MqttService
                 }
                 
                 $existingNode->update($updateData);
+                
+                // Обновляем online статус на основе isOnline()
+                $wasOnline = $existingNode->online;
+                $isOnline = $existingNode->isOnline();
+                
+                if ($wasOnline !== $isOnline) {
+                    $existingNode->update(['online' => $isOnline]);
+                    event(new \App\Events\NodeStatusChanged($existingNode, $wasOnline, $isOnline));
+                }
                 
                 return;
             }

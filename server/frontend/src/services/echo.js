@@ -8,6 +8,9 @@ let echoInstance = null
 let fallbackInterval = null
 let isWebSocketConnected = false
 let fallbackMode = false
+let reconnectAttempts = 0
+let maxReconnectAttempts = 5
+let reconnectTimeout = null
 
 export function initializeEcho() {
   if (echoInstance) {
@@ -78,6 +81,11 @@ export function initializeEcho() {
         console.warn('⚠️ WebSocket disconnected:', reason)
         isWebSocketConnected = false
         startFallbackPolling()
+        
+        // Автоматическое переподключение
+        if (reconnectAttempts < maxReconnectAttempts) {
+          scheduleReconnect()
+        }
       })
 
       echoInstance.connector.socket.on('reconnect', (attemptNumber) => {
@@ -126,6 +134,68 @@ export function disconnectEcho() {
   stopFallbackPolling()
   isWebSocketConnected = false
   fallbackMode = false
+  
+  // Очищаем таймер переподключения
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout)
+    reconnectTimeout = null
+  }
+  reconnectAttempts = 0
+}
+
+/**
+ * Планирование переподключения
+ */
+function scheduleReconnect() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout)
+  }
+  
+  reconnectAttempts++
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000) // Exponential backoff, max 30s
+  
+  console.log(`🔄 Scheduling reconnect attempt ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`)
+  
+  reconnectTimeout = setTimeout(() => {
+    reconnectWebSocket()
+  }, delay)
+}
+
+/**
+ * Переподключение WebSocket
+ */
+function reconnectWebSocket() {
+  if (isWebSocketConnected) {
+    console.log('✅ WebSocket already connected, skipping reconnect')
+    return
+  }
+  
+  console.log(`🔄 Attempting to reconnect WebSocket (attempt ${reconnectAttempts}/${maxReconnectAttempts})`)
+  
+  try {
+    // Отключаем текущий экземпляр
+    if (echoInstance) {
+      echoInstance.disconnect()
+      echoInstance = null
+    }
+    
+    // Создаем новый экземпляр
+    echoInstance = initializeEcho()
+    
+    if (echoInstance) {
+      console.log('✅ WebSocket reconnected successfully')
+      reconnectAttempts = 0
+      isWebSocketConnected = true
+      fallbackMode = false
+      stopFallbackPolling()
+    } else {
+      console.warn('⚠️ WebSocket reconnect failed, continuing with fallback')
+      startFallbackPolling()
+    }
+  } catch (error) {
+    console.error('❌ WebSocket reconnect error:', error)
+    startFallbackPolling()
+  }
 }
 
 /**

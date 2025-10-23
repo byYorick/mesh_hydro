@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, memoize } from 'vue'
 import { formatDistanceToNow } from '@/utils/time'
 import CommandDialog from './CommandDialog.vue'
 
@@ -292,19 +292,26 @@ function handleCommand({ command, params }) {
   emit('command', { command, params })
 }
 
-// Node online status - проверяем по last_seen_at (как в backend)
+// Node online status - используем данные с backend
 const isOnline = computed(() => {
-  if (!props.node.last_seen_at) return false
-  
-  const lastSeen = new Date(props.node.last_seen_at)
-  const seconds = (Date.now() - lastSeen.getTime()) / 1000
-  
-  // Считаем онлайн если last_seen_at < 20 секунд назад (синхронизировано с backend)
-  return seconds < 20
+  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+  return props.node.is_online !== undefined ? props.node.is_online : props.node.online
 })
 
-// Status color
+// Status color - используем данные с backend
 const statusColor = computed(() => {
+  // Приоритет: сначала status_color (вычисленное поле), потом вычисляем сами
+  if (props.node.status_color) {
+    const colorMap = {
+      'green': 'success',
+      'orange': 'warning', 
+      'red': 'error',
+      'grey': 'grey'
+    }
+    return colorMap[props.node.status_color] || 'grey'
+  }
+  
+  // Fallback: вычисляем сами
   if (!props.node.last_seen_at) return 'grey'
   
   const lastSeen = new Date(props.node.last_seen_at)
@@ -428,38 +435,42 @@ function getRssiColor(percent) {
   return 'error'
 }
 
-// Visible metrics для mobile layout
-const visibleMetrics = computed(() => {
-  if (!lastData.value) return []
+// Мемоизированная функция для обработки метрик
+const processNodeMetrics = memoize((nodeType, data) => {
+  if (!data) return []
   
   const metrics = []
-  const data = lastData.value
   
   // pH/EC metrics
-  if (props.node.node_type === 'ph_ec' || props.node.node_type === 'ph') {
+  if (nodeType === 'ph_ec' || nodeType === 'ph') {
     if (data.ph != null) metrics.push({ key: 'ph', value: `pH ${data.ph.toFixed(2)}`, icon: 'mdi-flask' })
     if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
   }
   
-  if (props.node.node_type === 'ec') {
+  if (nodeType === 'ec') {
     if (data.ec != null) metrics.push({ key: 'ec', value: `EC ${data.ec.toFixed(2)}`, icon: 'mdi-flash' })
     if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
   }
   
   // Climate metrics
-  if (props.node.node_type === 'climate') {
+  if (nodeType === 'climate') {
     if (data.temperature != null) metrics.push({ key: 'temp', value: `${data.temperature.toFixed(1)}°C`, icon: 'mdi-thermometer' })
     if (data.humidity != null) metrics.push({ key: 'hum', value: `${data.humidity.toFixed(0)}%`, icon: 'mdi-water-percent' })
     if (data.co2 != null) metrics.push({ key: 'co2', value: `${data.co2} ppm`, icon: 'mdi-molecule-co2' })
   }
   
   // Water metrics
-  if (props.node.node_type === 'water') {
+  if (nodeType === 'water') {
     if (data.level != null) metrics.push({ key: 'level', value: `${data.level.toFixed(0)}%`, icon: 'mdi-waves' })
     if (data.temp != null) metrics.push({ key: 'temp', value: `${data.temp.toFixed(1)}°C`, icon: 'mdi-thermometer' })
   }
   
   return metrics
+})
+
+// Visible metrics для mobile layout
+const visibleMetrics = computed(() => {
+  return processNodeMetrics(props.node.node_type, lastData.value)
 })
 </script>
 

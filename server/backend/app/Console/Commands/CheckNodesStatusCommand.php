@@ -44,6 +44,14 @@ class CheckNodesStatusCommand extends Command
                 
                 // Broadcast изменение статуса через WebSocket
                 event(new \App\Events\NodeStatusChanged($node, $wasOnline, $isOnline));
+                
+                // Логируем изменение статуса
+                Log::info("Node status changed", [
+                    'node_id' => $node->node_id,
+                    'was_online' => $wasOnline,
+                    'is_online' => $isOnline,
+                    'last_seen_at' => $node->last_seen_at,
+                ]);
             }
 
             if ($isOnline) {

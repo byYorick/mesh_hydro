@@ -38,8 +38,12 @@ class NodeController extends Controller
         // Загрузка последней телеметрии с appends
         $nodes = $query->with(['lastTelemetry'])->get();
 
-        // Добавление вычисляемых полей через appends
-        $nodes->makeVisible(['is_online', 'status_color', 'icon']);
+        // Добавление вычисляемых полей для каждого узла
+        $nodes->each(function ($node) {
+            $node->is_online = $node->isOnline();
+            $node->status_color = $node->status_color;
+            $node->icon = $node->icon;
+        });
 
         return response()->json($nodes);
     }

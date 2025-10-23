@@ -565,7 +565,7 @@ TELEGRAM_NOTIFY_INFO=false</pre>
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'vue-toastification'
-import axios from 'axios'
+import { axios as api } from '@/services/api'
 
 const toast = useToast()
 
@@ -593,7 +593,7 @@ const isConfigured = computed(() => {
 const loadSettings = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/settings/telegram')
+    const response = await api.get('/settings/telegram')
     if (response.data.success) {
       const settings = response.data.telegram
       enabled.value = settings.enabled || false
@@ -637,7 +637,7 @@ const saveSettings = async () => {
       data.chat_id = chatId.value
     }
 
-    const response = await axios.post('/api/settings/telegram', data)
+    const response = await api.post('/settings/telegram', data)
     
     if (response.data.success) {
       toast.success('✅ Настройки сохранены в БД!')
@@ -668,7 +668,7 @@ const getChatIdAuto = async () => {
 
   loadingChats.value = true
   try {
-    const response = await axios.get('/api/settings/telegram/chat-id')
+    const response = await api.get('/settings/telegram/chat-id')
     if (response.data.success && response.data.chats.length > 0) {
       availableChats.value = response.data.chats
       toast.success(`Найдено ${response.data.count} чат(ов)`)
@@ -696,7 +696,7 @@ const sendTestMessage = async () => {
 
   testing.value = true
   try {
-    const response = await axios.post('/api/settings/telegram/test')
+    const response = await api.post('/settings/telegram/test')
     
     if (response.data.success) {
       toast.success('🎉 Тестовое сообщение отправлено! Проверьте Telegram.')

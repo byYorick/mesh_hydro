@@ -17,12 +17,19 @@ export const useNodesStore = defineStore('nodes', {
 
     // Get online nodes
     onlineNodes: (state) => {
-      return state.nodes.filter(node => node.online || node.is_online)
+      return state.nodes.filter(node => {
+        // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+        return node.is_online !== undefined ? node.is_online : node.online
+      })
     },
 
     // Get offline nodes
     offlineNodes: (state) => {
-      return state.nodes.filter(node => !node.online && !node.is_online)
+      return state.nodes.filter(node => {
+        // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
+        const isOnline = node.is_online !== undefined ? node.is_online : node.online
+        return !isOnline
+      })
     },
 
     // Get node by ID
@@ -58,6 +65,10 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     async fetchNode(nodeId) {
+      if (!nodeId) {
+        throw new Error('Node ID is required')
+      }
+      
       this.loading = true
       this.error = null
       
@@ -81,6 +92,10 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     async sendCommand(nodeId, command, params = {}) {
+      if (!nodeId) {
+        throw new Error('Node ID is required')
+      }
+      
       try {
         const result = await api.sendCommand(nodeId, command, params)
         return result
@@ -91,6 +106,10 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     async updateConfig(nodeId, config) {
+      if (!nodeId) {
+        throw new Error('Node ID is required')
+      }
+      
       try {
         const result = await api.updateNodeConfig(nodeId, config)
         
@@ -105,6 +124,10 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     async deleteNode(nodeId) {
+      if (!nodeId) {
+        throw new Error('Node ID is required')
+      }
+      
       try {
         await api.deleteNode(nodeId)
         
@@ -122,6 +145,11 @@ export const useNodesStore = defineStore('nodes', {
 
     // Update node in real-time (from WebSocket or fallback polling)
     updateNodeRealtime(nodeData) {
+      if (!nodeData || !nodeData.node_id) {
+        console.warn('Invalid node data for real-time update:', nodeData)
+        return
+      }
+      
       const index = this.nodes.findIndex(n => n.node_id === nodeData.node_id)
       
       if (index !== -1) {
@@ -141,6 +169,26 @@ export const useNodesStore = defineStore('nodes', {
           ...this.selectedNode,
           ...nodeData,
         }
+      }
+    },
+
+    // Update node status (for WebSocket events)
+    updateNodeStatus(nodeId, isOnline) {
+      if (!nodeId) {
+        console.warn('Node ID is required for status update')
+        return
+      }
+      
+      const node = this.nodes.find(n => n.node_id === nodeId)
+      if (node) {
+        node.online = isOnline
+        node.is_online = isOnline
+        // Обновляем last_seen_at если узел онлайн
+        if (isOnline) {
+          node.last_seen_at = new Date().toISOString()
+        }
+      } else {
+        console.warn(`Node ${nodeId} not found for status update`)
       }
     },
   },

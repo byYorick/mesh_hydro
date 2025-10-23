@@ -94,8 +94,19 @@
       </v-col>
     </v-row>
 
+    <!-- Loading skeleton -->
+    <div v-if="nodesStore.loading" class="v-row">
+      <v-col
+        v-for="n in 6"
+        :key="`skeleton-${n}`"
+        :cols="cardCols"
+      >
+        <SkeletonCard />
+      </v-col>
+    </div>
+
     <!-- Nodes Grid with staggered animation -->
-    <transition-group name="stagger-fade" tag="div" class="v-row">
+    <transition-group v-else name="stagger-fade" tag="div" class="v-row">
       <v-col
         v-for="node in nodesStore.nodes"
         :key="node.node_id"
@@ -183,6 +194,7 @@ import EventLog from '@/components/EventLog.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
+import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()
@@ -213,9 +225,11 @@ const heroStyle = computed(() => {
 
 // System status indicator
 const systemStatusColor = computed(() => {
-  const onlinePercent = summary.value?.nodes?.total 
-    ? (summary.value.nodes.online / summary.value.nodes.total) * 100 
-    : 0
+  if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
+    return 'grey'
+  }
+  
+  const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
   
   if (onlinePercent >= 80) return 'success'
   if (onlinePercent >= 50) return 'warning'
@@ -223,9 +237,11 @@ const systemStatusColor = computed(() => {
 })
 
 const systemStatusIcon = computed(() => {
-  const onlinePercent = summary.value?.nodes?.total 
-    ? (summary.value.nodes.online / summary.value.nodes.total) * 100 
-    : 0
+  if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
+    return 'mdi-help-circle'
+  }
+  
+  const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
   
   if (onlinePercent >= 80) return 'mdi-check-circle'
   if (onlinePercent >= 50) return 'mdi-alert-circle'
