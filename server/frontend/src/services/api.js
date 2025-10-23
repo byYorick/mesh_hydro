@@ -359,6 +359,63 @@ export default {
   deleteSchedule(nodeId, scheduleId) {
     return api.delete(`/schedules/node/${nodeId}/${scheduleId}`)
   },
+
+  // System Control Commands
+  setPhTarget(nodeId, phTarget) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'set_ph_target',
+      params: { ph_target: phTarget }
+    })
+  },
+
+  setEcTarget(nodeId, ecTarget) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'set_ec_target',
+      params: { ec_target: ecTarget }
+    })
+  },
+
+  setAutonomousMode(nodeId, enable) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'set_autonomous_mode',
+      params: { enable: enable }
+    })
+  },
+
+  setSafetySettings(nodeId, settings) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'set_safety_settings',
+      params: settings
+    })
+  },
+
+  forceMockMode(nodeId, enable) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'force_mock_mode',
+      params: { enable: enable }
+    })
+  },
+
+  emergencyStop(nodeId) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'emergency_stop',
+      params: {}
+    })
+  },
+
+  resetEmergency(nodeId) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'reset_emergency',
+      params: {}
+    })
+  },
+
+  getSensorStatus(nodeId) {
+    return api.post(`/nodes/${nodeId}/command`, {
+      command: 'get_sensor_status',
+      params: {}
+    })
+  },
 }
 
 // Export axios instance for direct use if needed

@@ -647,6 +647,84 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
         
         cJSON_Delete(root);
     }
+    else if (strcmp(command, "set_ph_target") == 0) {
+        cJSON *ph_target = cJSON_GetObjectItem(params, "ph_target");
+        if (cJSON_IsNumber(ph_target)) {
+            float new_target = (float)ph_target->valuedouble;
+            if (new_target >= 5.0f && new_target <= 8.0f) {
+                s_config->ph_target = new_target;
+                // Обновляем PID контроллеры
+                adaptive_pid_set_target(&s_pid_ph_up, new_target);
+                adaptive_pid_set_target(&s_pid_ph_down, new_target);
+                
+                // Сохраняем в NVS
+                esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "pH target set to %.2f and saved to NVS", new_target);
+                } else {
+                    ESP_LOGE(TAG, "Failed to save pH target to NVS: %s", esp_err_to_name(err));
+                }
+            } else {
+                ESP_LOGW(TAG, "Invalid pH target: %.2f (must be 5.0-8.0)", new_target);
+            }
+        }
+    }
+    else if (strcmp(command, "set_ec_target") == 0) {
+        cJSON *ec_target = cJSON_GetObjectItem(params, "ec_target");
+        if (cJSON_IsNumber(ec_target)) {
+            float new_target = (float)ec_target->valuedouble;
+            if (new_target >= 0.5f && new_target <= 3.0f) {
+                // Для pH узла EC target не используется, но сохраняем для совместимости
+                ESP_LOGI(TAG, "EC target set to %.2f (not used in pH node)", new_target);
+            } else {
+                ESP_LOGW(TAG, "Invalid EC target: %.2f (must be 0.5-3.0)", new_target);
+            }
+        }
+    }
+    else if (strcmp(command, "set_autonomous_mode") == 0) {
+        cJSON *enable = cJSON_GetObjectItem(params, "enable");
+        if (cJSON_IsBool(enable)) {
+            bool autonomous = cJSON_IsTrue(enable);
+            s_config->autonomous_enabled = autonomous;
+            s_autonomous_mode = autonomous;
+            
+            // Сохраняем в NVS
+            esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+            if (err == ESP_OK) {
+                ESP_LOGI(TAG, "Autonomous mode %s", autonomous ? "enabled" : "disabled");
+            } else {
+                ESP_LOGE(TAG, "Failed to save autonomous mode to NVS");
+            }
+        }
+    }
+    else if (strcmp(command, "set_safety_settings") == 0) {
+        cJSON *max_pump_time = cJSON_GetObjectItem(params, "max_pump_time_ms");
+        cJSON *cooldown = cJSON_GetObjectItem(params, "cooldown_ms");
+        
+        if (cJSON_IsNumber(max_pump_time)) {
+            s_config->max_pump_time_ms = (uint32_t)max_pump_time->valuedouble;
+        }
+        if (cJSON_IsNumber(cooldown)) {
+            s_config->cooldown_ms = (uint32_t)cooldown->valuedouble;
+        }
+        
+        // Сохраняем в NVS
+        esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Safety settings updated: max_pump=%lu ms, cooldown=%lu ms", 
+                     s_config->max_pump_time_ms, s_config->cooldown_ms);
+        } else {
+            ESP_LOGE(TAG, "Failed to save safety settings to NVS");
+        }
+    }
+    else if (strcmp(command, "emergency_stop") == 0) {
+        ph_manager_set_emergency(true);
+        ESP_LOGW(TAG, "EMERGENCY STOP activated via command");
+    }
+    else if (strcmp(command, "reset_emergency") == 0) {
+        ph_manager_set_emergency(false);
+        ESP_LOGI(TAG, "Emergency mode reset via command");
+    }
     else if (strcmp(command, "get_config") == 0) {
         // Проверка подключения к mesh
         if (!mesh_manager_is_connected()) {

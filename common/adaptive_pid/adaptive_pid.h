@@ -173,6 +173,15 @@ esp_err_t adaptive_pid_set_output_limits(adaptive_pid_t *pid, float min, float m
 esp_err_t adaptive_pid_set_setpoint(adaptive_pid_t *pid, float setpoint);
 
 /**
+ * @brief Установка целевого значения (alias для set_setpoint)
+ * 
+ * @param pid Указатель на структуру PID
+ * @param target Целевое значение
+ * @return ESP_OK при успехе
+ */
+esp_err_t adaptive_pid_set_target(adaptive_pid_t *pid, float target);
+
+/**
  * @brief Расчёт PID (основная функция)
  * 
  * @param pid Указатель на структуру PID

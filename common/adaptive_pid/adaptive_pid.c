@@ -448,3 +448,19 @@ static void adapt_coefficients(adaptive_pid_t *pid, float error, float output) {
     }
 }
 
+esp_err_t adaptive_pid_set_target(adaptive_pid_t *pid, float target) {
+    if (pid == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (target < 0.0f || target > 14.0f) {
+        ESP_LOGW(TAG, "Invalid target value: %.2f (must be 0.0-14.0)", target);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    pid->target = target;
+    ESP_LOGI(TAG, "PID target set to %.2f", target);
+    
+    return ESP_OK;
+}
+

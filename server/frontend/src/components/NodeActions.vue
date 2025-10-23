@@ -165,26 +165,175 @@
             </v-col>
           </template>
 
+          <!-- System Control -->
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="info"
+              prepend-icon="mdi-cog"
+              @click="openSystemControl"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              Система
+            </v-btn>
+          </v-col>
+
+          <!-- Mock Control -->
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              :color="isMockMode ? 'success' : 'grey'"
+              prepend-icon="mdi-flask-outline"
+              @click="toggleMockMode"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              {{ isMockMode ? 'Mock ВКЛ' : 'Mock ВЫКЛ' }}
+            </v-btn>
+          </v-col>
+
+          <!-- Emergency Control -->
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              :color="isEmergencyMode ? 'error' : 'warning'"
+              prepend-icon="mdi-alert-octagon"
+              @click="toggleEmergencyMode"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              {{ isEmergencyMode ? 'Авария ВКЛ' : 'Авария ВЫКЛ' }}
+            </v-btn>
+          </v-col>
+
+          <!-- Quick Control Buttons -->
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="primary"
+              prepend-icon="mdi-target"
+              @click="quickSetPhTarget"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              pH: 6.5
+            </v-btn>
+          </v-col>
+
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="success"
+              prepend-icon="mdi-play"
+              @click="startAutonomousMode"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              Автоном
+            </v-btn>
+          </v-col>
+
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="info"
+              prepend-icon="mdi-stop"
+              @click="stopAutonomousMode"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              Сервер
+            </v-btn>
+          </v-col>
+
+          <!-- Pump Quick Actions -->
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="orange"
+              prepend-icon="mdi-arrow-up"
+              @click="quickPumpUp"
+              :disabled="!isOnline || isPumpRunning"
+              size="small"
+              class="text-none"
+            >
+              pH UP 5с
+            </v-btn>
+          </v-col>
+
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="blue"
+              prepend-icon="mdi-arrow-down"
+              @click="quickPumpDown"
+              :disabled="!isOnline || isPumpRunning"
+              size="small"
+              class="text-none"
+            >
+              pH DOWN 5с
+            </v-btn>
+          </v-col>
+
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="purple"
+              prepend-icon="mdi-tune"
+              @click="quickCalibrate"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              Калибровка
+            </v-btn>
+          </v-col>
+
+          <v-col cols="12" sm="6" md="3">
+            <v-btn
+              block
+              color="teal"
+              prepend-icon="mdi-chart-line"
+              @click="getSensorStatus"
+              :disabled="!isOnline"
+              size="small"
+              class="text-none"
+            >
+              Датчики
+            </v-btn>
+          </v-col>
+
           <!-- Common Actions -->
-          <v-col cols="12" sm="6" md="4">
+          <v-col cols="12" sm="6" md="3">
             <v-btn
               block
               color="grey"
               prepend-icon="mdi-information"
               @click="sendCommand('get_status')"
               :disabled="!isOnline"
+              size="small"
+              class="text-none"
             >
-              Получить статус
+              Статус
             </v-btn>
           </v-col>
 
-          <v-col cols="12" sm="6" md="4">
+          <v-col cols="12" sm="6" md="3">
             <v-btn
               block
               color="warning"
               prepend-icon="mdi-restart"
               @click="confirmReboot"
               :disabled="!isOnline"
+              size="small"
+              class="text-none"
             >
               Перезагрузка
             </v-btn>
@@ -287,6 +436,130 @@
           <v-spacer></v-spacer>
           <v-btn @click="rebootDialog = false">Отмена</v-btn>
           <v-btn color="warning" @click="executeReboot">Перезагрузить</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- System Control Dialog -->
+    <v-dialog v-model="systemControlDialog" max-width="600">
+      <v-card>
+        <v-card-title class="bg-primary text-white">
+          <v-icon icon="mdi-cog" class="mr-2"></v-icon>
+          Управление системой {{ node?.node_id }}
+        </v-card-title>
+        
+        <v-card-text>
+          <!-- System Mode Toggle -->
+          <v-card variant="tonal" color="primary" class="mb-4">
+            <v-card-title class="text-subtitle-2">
+              <v-icon icon="mdi-account-switch" size="small" class="mr-2"></v-icon>
+              Режим работы системы
+            </v-card-title>
+            <v-card-text>
+              <v-radio-group v-model="systemMode" inline>
+                <v-radio
+                  label="Автономный (внутренняя система узла)"
+                  value="autonomous"
+                  color="success"
+                ></v-radio>
+                <v-radio
+                  label="Серверный (управление через сервер)"
+                  value="server"
+                  color="info"
+                ></v-radio>
+              </v-radio-group>
+              
+              <v-alert type="info" variant="tonal" density="compact" class="mt-2">
+                <div class="text-caption">
+                  <strong>Автономный:</strong> Узел работает независимо, используя внутренние алгоритмы PID<br>
+                  <strong>Серверный:</strong> Узел получает команды от сервера для точного управления
+                </div>
+              </v-alert>
+            </v-card-text>
+          </v-card>
+
+          <!-- PID Settings -->
+          <v-card variant="tonal" color="secondary" class="mb-4">
+            <v-card-title class="text-subtitle-2">
+              <v-icon icon="mdi-tune-variant" size="small" class="mr-2"></v-icon>
+              Настройки PID
+            </v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model.number="pidSettings.ph_target"
+                    label="pH Цель"
+                    type="number"
+                    step="0.1"
+                    min="5.0"
+                    max="8.0"
+                    variant="outlined"
+                    density="compact"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model.number="pidSettings.ec_target"
+                    label="EC Цель (мСм/см)"
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    max="3.0"
+                    variant="outlined"
+                    density="compact"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+
+          <!-- Safety Settings -->
+          <v-card variant="tonal" color="warning" class="mb-4">
+            <v-card-title class="text-subtitle-2">
+              <v-icon icon="mdi-shield-check" size="small" class="mr-2"></v-icon>
+              Настройки безопасности
+            </v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model.number="safetySettings.max_pump_time"
+                    label="Макс. время насоса (сек)"
+                    type="number"
+                    min="1"
+                    max="300"
+                    variant="outlined"
+                    density="compact"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="6">
+                  <v-text-field
+                    v-model.number="safetySettings.cooldown"
+                    label="Интервал между дозами (сек)"
+                    type="number"
+                    min="1"
+                    max="60"
+                    variant="outlined"
+                    density="compact"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+        </v-card-text>
+        
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="systemControlDialog = false">Отмена</v-btn>
+          <v-btn
+            color="primary"
+            prepend-icon="mdi-send"
+            @click="applySystemSettings"
+            :loading="applyingSettings"
+          >
+            Применить настройки
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -503,6 +776,25 @@ const sendingPreset = ref(false)
 const defaultPresets = ref([])
 const customPresets = ref([])
 const selectedPreset = ref(null)
+
+// System Control
+const systemControlDialog = ref(false)
+const systemMode = ref('autonomous')
+const isMockMode = ref(false)
+const isEmergencyMode = ref(false)
+const applyingSettings = ref(false)
+
+// PID Settings
+const pidSettings = ref({
+  ph_target: 6.5,
+  ec_target: 1.2
+})
+
+// Safety Settings
+const safetySettings = ref({
+  max_pump_time: 30,
+  cooldown: 5
+})
 
 const isOnline = computed(() => {
   // Проверяем по last_seen_at (как в NodeCard)
@@ -726,6 +1018,181 @@ function sendPresetToNode() {
 function goToSettings() {
   pidPresetsDialog.value = false
   router.push({ name: 'Settings', hash: '#pid' })
+}
+
+// System Control Functions
+function openSystemControl() {
+  // Загружаем текущие настройки узла
+  loadNodeSettings()
+  systemControlDialog.value = true
+}
+
+async function loadNodeSettings() {
+  try {
+    // Получаем текущую конфигурацию узла
+    const response = await api.get(`/nodes/${props.node.node_id}`)
+    const nodeData = response.data
+    
+    if (nodeData.config) {
+      // Загружаем настройки из конфигурации
+      systemMode.value = nodeData.config.autonomous_enabled ? 'autonomous' : 'server'
+      pidSettings.value.ph_target = nodeData.config.ph_target || 6.5
+      pidSettings.value.ec_target = nodeData.config.ec_target || 1.2
+      safetySettings.value.max_pump_time = nodeData.config.max_pump_time_ms ? nodeData.config.max_pump_time_ms / 1000 : 30
+      safetySettings.value.cooldown = nodeData.config.cooldown_ms ? nodeData.config.cooldown_ms / 1000 : 5
+    }
+    
+    // Проверяем статус mock режима
+    const statusResponse = await api.post(`/nodes/${props.node.node_id}/command`, {
+      command: 'get_sensor_status',
+      params: {}
+    })
+    
+    if (statusResponse.data.success) {
+      isMockMode.value = statusResponse.data.data?.mock_mode || false
+      isEmergencyMode.value = statusResponse.data.data?.emergency || false
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки настроек узла:', error)
+  }
+}
+
+async function applySystemSettings() {
+  try {
+    applyingSettings.value = true
+    
+    // Отправляем команду изменения режима
+    if (systemMode.value === 'autonomous') {
+      await sendCommand('set_autonomous_mode', { enable: true })
+    } else {
+      await sendCommand('set_autonomous_mode', { enable: false })
+    }
+    
+    // Отправляем настройки PID
+    await sendCommand('set_ph_target', { ph_target: pidSettings.value.ph_target })
+    await sendCommand('set_ec_target', { ec_target: pidSettings.value.ec_target })
+    
+    // Отправляем настройки безопасности
+    await sendCommand('set_safety_settings', {
+      max_pump_time_ms: safetySettings.value.max_pump_time * 1000,
+      cooldown_ms: safetySettings.value.cooldown * 1000
+    })
+    
+    console.log('✅ Настройки системы применены')
+    systemControlDialog.value = false
+    
+  } catch (error) {
+    console.error('❌ Ошибка применения настроек:', error)
+  } finally {
+    applyingSettings.value = false
+  }
+}
+
+// Mock Mode Control
+async function toggleMockMode() {
+  try {
+    const newMockMode = !isMockMode.value
+    await sendCommand('force_mock_mode', { enable: newMockMode })
+    isMockMode.value = newMockMode
+    console.log(`✅ Mock режим ${newMockMode ? 'включен' : 'выключен'}`)
+  } catch (error) {
+    console.error('❌ Ошибка переключения mock режима:', error)
+  }
+}
+
+// Emergency Mode Control
+async function toggleEmergencyMode() {
+  try {
+    const newEmergencyMode = !isEmergencyMode.value
+    if (newEmergencyMode) {
+      await sendCommand('emergency_stop', {})
+    } else {
+      await sendCommand('reset_emergency', {})
+    }
+    isEmergencyMode.value = newEmergencyMode
+    console.log(`✅ Аварийный режим ${newEmergencyMode ? 'включен' : 'выключен'}`)
+  } catch (error) {
+    console.error('❌ Ошибка переключения аварийного режима:', error)
+  }
+}
+
+// Quick Control Functions
+async function quickSetPhTarget() {
+  try {
+    // Устанавливаем стандартную pH цель 6.5
+    await sendCommand('set_ph_target', { ph_target: 6.5 })
+    console.log('✅ pH цель установлена на 6.5')
+  } catch (error) {
+    console.error('❌ Ошибка установки pH цели:', error)
+  }
+}
+
+async function startAutonomousMode() {
+  try {
+    await sendCommand('set_autonomous_mode', { enable: true })
+    systemMode.value = 'autonomous'
+    console.log('✅ Автономный режим включен')
+  } catch (error) {
+    console.error('❌ Ошибка включения автономного режима:', error)
+  }
+}
+
+async function stopAutonomousMode() {
+  try {
+    await sendCommand('set_autonomous_mode', { enable: false })
+    systemMode.value = 'server'
+    console.log('✅ Серверный режим включен')
+  } catch (error) {
+    console.error('❌ Ошибка включения серверного режима:', error)
+  }
+}
+
+// Pump Quick Actions
+async function quickPumpUp() {
+  try {
+    selectedPump.value = 'ph_up'
+    pumpDuration.value = 5
+    isCalibrationMode.value = false
+    await executePump()
+    console.log('✅ pH UP насос запущен на 5 секунд')
+  } catch (error) {
+    console.error('❌ Ошибка запуска pH UP насоса:', error)
+  }
+}
+
+async function quickPumpDown() {
+  try {
+    selectedPump.value = 'ph_down'
+    pumpDuration.value = 5
+    isCalibrationMode.value = false
+    await executePump()
+    console.log('✅ pH DOWN насос запущен на 5 секунд')
+  } catch (error) {
+    console.error('❌ Ошибка запуска pH DOWN насоса:', error)
+  }
+}
+
+async function quickCalibrate() {
+  try {
+    // Открываем диалог калибровки pH UP
+    selectedPump.value = 'ph_up'
+    pumpDuration.value = 5
+    calibrationVolume.value = 10
+    isCalibrationMode.value = true
+    pumpDialog.value = true
+    console.log('✅ Диалог калибровки открыт')
+  } catch (error) {
+    console.error('❌ Ошибка открытия калибровки:', error)
+  }
+}
+
+async function getSensorStatus() {
+  try {
+    await sendCommand('get_sensor_status', {})
+    console.log('✅ Запрос статуса датчиков отправлен')
+  } catch (error) {
+    console.error('❌ Ошибка получения статуса датчиков:', error)
+  }
 }
 </script>
 
