@@ -10,12 +10,14 @@
       <!-- Debug info -->
       <v-alert type="info" variant="tonal" density="compact" class="ma-2">
         <div class="text-caption">
-          <strong>Debug:</strong><br>
+          <strong>Debug NodeActions:</strong><br>
           isOnline: {{ isOnline }}<br>
           isPumpRunning: {{ isPumpRunning }}<br>
           last_seen_at: {{ node.last_seen_at }}<br>
           online: {{ node.online }}<br>
-          is_online: {{ node.is_online }}
+          is_online: {{ node.is_online }}<br>
+          node_id: {{ node.node_id }}<br>
+          node_type: {{ node.node_type }}
         </div>
       </v-alert>
 
@@ -172,7 +174,6 @@
               color="info"
               prepend-icon="mdi-cog"
               @click="openSystemControl"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -187,7 +188,6 @@
               :color="isMockMode ? 'success' : 'grey'"
               prepend-icon="mdi-flask-outline"
               @click="toggleMockMode"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -202,7 +202,6 @@
               :color="isEmergencyMode ? 'error' : 'warning'"
               prepend-icon="mdi-alert-octagon"
               @click="toggleEmergencyMode"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -217,7 +216,6 @@
               color="primary"
               prepend-icon="mdi-target"
               @click="quickSetPhTarget"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -231,7 +229,6 @@
               color="success"
               prepend-icon="mdi-play"
               @click="startAutonomousMode"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -245,7 +242,6 @@
               color="info"
               prepend-icon="mdi-stop"
               @click="stopAutonomousMode"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -260,7 +256,7 @@
               color="orange"
               prepend-icon="mdi-arrow-up"
               @click="quickPumpUp"
-              :disabled="!isOnline || isPumpRunning"
+              :disabled="isPumpRunning"
               size="small"
               class="text-none"
             >
@@ -274,7 +270,7 @@
               color="blue"
               prepend-icon="mdi-arrow-down"
               @click="quickPumpDown"
-              :disabled="!isOnline || isPumpRunning"
+              :disabled="isPumpRunning"
               size="small"
               class="text-none"
             >
@@ -288,7 +284,6 @@
               color="purple"
               prepend-icon="mdi-tune"
               @click="quickCalibrate"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -302,7 +297,6 @@
               color="teal"
               prepend-icon="mdi-chart-line"
               @click="getSensorStatus"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -317,7 +311,6 @@
               color="grey"
               prepend-icon="mdi-information"
               @click="sendCommand('get_status')"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -331,7 +324,6 @@
               color="warning"
               prepend-icon="mdi-restart"
               @click="confirmReboot"
-              :disabled="!isOnline"
               size="small"
               class="text-none"
             >
@@ -797,30 +789,39 @@ const safetySettings = ref({
 })
 
 const isOnline = computed(() => {
-  // Проверяем по last_seen_at (как в NodeCard)
+  console.log('🔍 NodeActions isOnline check:', {
+    node: props.node,
+    is_online: props.node?.is_online,
+    online: props.node?.online,
+    last_seen_at: props.node?.last_seen_at
+  })
+  
+  // Приоритет: backend поля is_online и online
+  if (props.node?.is_online !== undefined) {
+    console.log('✅ Using is_online:', props.node.is_online)
+    return props.node.is_online
+  }
+  if (props.node?.online !== undefined) {
+    console.log('✅ Using online:', props.node.online)
+    return props.node.online
+  }
+  
+  // Fallback: проверяем по last_seen_at
   if (props.node?.last_seen_at) {
     const lastSeen = new Date(props.node.last_seen_at)
     const seconds = (Date.now() - lastSeen.getTime()) / 1000
-    const online = seconds < 20
-    console.log('🔍 Проверка isOnline:', {
+    const online = seconds < 60 // Увеличиваем таймаут до 60 секунд
+    console.log('🔍 Проверка isOnline по last_seen_at:', {
       last_seen_at: props.node.last_seen_at,
-      lastSeen: lastSeen,
       seconds: seconds,
-      online: online,
-      node: props.node
+      online: online
     })
     return online
   }
   
-  // Fallback на старые поля
-  const fallbackOnline = props.node?.online || props.node?.is_online
-  console.log('🔍 Fallback isOnline:', {
-    online: props.node?.online,
-    is_online: props.node?.is_online,
-    fallbackOnline: fallbackOnline,
-    node: props.node
-  })
-  return fallbackOnline
+  // По умолчанию считаем офлайн
+  console.log('❌ Node offline - no data')
+  return false
 })
 
 function sendCommand(command, params = {}) {
