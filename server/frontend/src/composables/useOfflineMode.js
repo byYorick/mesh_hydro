@@ -92,6 +92,9 @@ export function useOfflineMode() {
 
   // Проверка возможности выполнения действия в офлайн
   const canExecuteOffline = (actionType) => {
+    if (!actionType || typeof actionType !== 'string') {
+      return false
+    }
     const offlineCapableActions = [
       'view_nodes',
       'view_events',

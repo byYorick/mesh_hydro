@@ -146,7 +146,7 @@ export const useAppStore = defineStore('app', {
       }
       
       // Критичные ошибки
-      if (error.message && error.message.includes('critical')) {
+      if (error.message && typeof error.message === 'string' && error.message.includes('critical')) {
         return 'critical'
       }
       

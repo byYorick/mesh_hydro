@@ -39,14 +39,14 @@ api.interceptors.response.use(
     
     // Не retry для определенных статусов
     const noRetryStatuses = [400, 401, 403, 404, 422]
-    if (error.response && noRetryStatuses.includes(error.response.status)) {
+    if (error.response && error.response.status && noRetryStatuses.includes(error.response.status)) {
       return handleError(error)
     }
     
     // Retry только для определенных 5xx ошибок
     const retryableStatuses = [500, 502, 503, 504]
     const isRetryableError = !error.response || 
-      (error.response.status >= 500 && retryableStatuses.includes(error.response.status))
+      (error.response.status >= 500 && error.response.status && retryableStatuses.includes(error.response.status))
     
     if (isRetryableError) {
       config.retry.count += 1

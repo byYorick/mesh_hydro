@@ -270,7 +270,7 @@ class MqttService
             $event = Event::create([
                 'node_id' => $data['node_id'],
                 'level' => $data['level'] ?? Event::LEVEL_INFO,
-                'message' => $data['message'] ?? 'Unknown event',
+                'message' => $this->translateEventMessage($data['message'] ?? 'Unknown event'),
                 'data' => $data['data'] ?? [],
             ]);
 
@@ -961,6 +961,32 @@ class MqttService
                 'trace' => $e->getTraceAsString()
             ]);
         }
+    }
+
+    /**
+     * Перевод сообщений событий на русский язык
+     */
+    private function translateEventMessage(string $message): string
+    {
+        $translations = [
+            'pH far from target, aggressive correction' => 'pH далеко от цели, агрессивная коррекция',
+            'pH correction in progress' => 'Коррекция pH в процессе',
+            'pH target reached' => 'Цель pH достигнута',
+            'EC far from target, aggressive correction' => 'EC далеко от цели, агрессивная коррекция',
+            'EC correction in progress' => 'Коррекция EC в процессе',
+            'EC target reached' => 'Цель EC достигнута',
+            'Pump started' => 'Насос запущен',
+            'Pump stopped' => 'Насос остановлен',
+            'Calibration completed' => 'Калибровка завершена',
+            'Node offline' => 'Узел офлайн',
+            'Node online' => 'Узел онлайн',
+            'Critical error' => 'Критическая ошибка',
+            'Warning' => 'Предупреждение',
+            'Info' => 'Информация',
+            'Debug' => 'Отладка',
+        ];
+
+        return $translations[$message] ?? $message;
     }
 }
 

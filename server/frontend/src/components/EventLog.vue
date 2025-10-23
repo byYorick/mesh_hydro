@@ -109,7 +109,7 @@ const filteredEvents = computed(() => {
     filtered = filtered.filter(e => !e.resolved_at)
   } else if (filter.value === 'critical') {
     filtered = filtered.filter(e => 
-      ['critical', 'emergency'].includes(e.level) && !e.resolved_at
+      e.level && ['critical', 'emergency'].includes(e.level) && !e.resolved_at
     )
   }
 

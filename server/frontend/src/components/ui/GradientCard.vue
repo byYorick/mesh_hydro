@@ -14,7 +14,7 @@ const props = defineProps({
   gradient: {
     type: String,
     default: 'primary',
-    validator: (value) => ['primary', 'success', 'warning', 'error', 'info'].includes(value),
+    validator: (value) => value && typeof value === 'string' && ['primary', 'success', 'warning', 'error', 'info'].includes(value),
   },
 })
 

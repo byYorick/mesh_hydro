@@ -139,6 +139,21 @@
       </template>
     </v-snackbar>
 
+    <!-- Status Bar -->
+    <StatusBar
+      :visible="statusBarStore.isVisible"
+      :message="statusBarStore.message"
+      :node-id="statusBarStore.nodeId"
+      :level="statusBarStore.level"
+      :timestamp="statusBarStore.timestamp"
+      :pump-details="statusBarStore.pumpDetails"
+      :pid-params="statusBarStore.pidParams"
+      :additional-params="statusBarStore.additionalParams"
+      :progress="statusBarStore.progress"
+      @close="statusBarStore.hide"
+      @toggle="statusBarStore.toggleExpanded"
+    />
+
     <!-- Node Auto-Discovery Indicator -->
     <NodeDiscoveryIndicator ref="discoveryIndicator" />
 
@@ -212,6 +227,7 @@ import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
+import { useStatusBarStore } from '@/stores/statusBar'
 import { useEventsStore } from '@/stores/events'
 import { useErrorsStore } from '@/stores/errors'
 import { useSettingsStore } from '@/stores/settings'
@@ -219,12 +235,14 @@ import { useTelemetryStore } from '@/stores/telemetry'
 import { useResponsive } from '@/composables/useResponsive'
 import { useOfflineMode } from '@/composables/useOfflineMode'
 import NodeDiscoveryIndicator from '@/components/NodeDiscoveryIndicator.vue'
+import StatusBar from '@/components/StatusBar.vue'
 import { getConnectionStatus } from '@/services/echo'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
+const statusBarStore = useStatusBarStore()
 const eventsStore = useEventsStore()
 const errorsStore = useErrorsStore()
 const settingsStore = useSettingsStore()
@@ -348,8 +366,13 @@ function setupWebSocketListeners() {
     console.log('🔔 New event:', data)
     eventsStore.addEventRealtime(data)
     
+    // Show status bar for events with pump or PID details
+    if (data.data && (data.data.pump_id || data.data.kp || data.data.current_value)) {
+      statusBarStore.showForEvent(data)
+    }
+    
     // Show notification for critical events
-    if (['critical', 'emergency'].includes(data.level)) {
+    if (data.level && ['critical', 'emergency'].includes(data.level)) {
       appStore.showSnackbar(
         `⚠️ ${data.message}`,
         'error',
