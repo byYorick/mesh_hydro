@@ -154,6 +154,7 @@ import { useNodesStore } from '@/stores/nodes'
 import { useTelemetryStore } from '@/stores/telemetry'
 import { useErrorsStore } from '@/stores/errors'
 import { useAppStore } from '@/stores/app'
+import { useNodeStatus } from '@/composables/useNodeStatus'
 import AdvancedChart from '@/components/AdvancedChart.vue'
 import NodeActions from '@/components/NodeActions.vue'
 import NodeManagementCard from '@/components/NodeManagementCard.vue'
@@ -189,12 +190,17 @@ const eventHeaders = [
   { title: 'Решено', key: 'resolved_at' },
 ]
 
-const statusColor = computed(() => {
-  if (!node.value) return 'grey'
-  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
-  const isOnline = node.value.is_online !== undefined ? node.value.is_online : node.value.online
-  return isOnline ? 'success' : 'error'
-})
+// Централизованная система статусов
+const {
+  isOnline,
+  isPumpRunning,
+  statusColor,
+  statusIcon,
+  statusText,
+  lastSeenText,
+  canPerformActions,
+  canRunPumps
+} = useNodeStatus(node)
 
 const telemetryFields = computed(() => {
   if (!node.value) return []

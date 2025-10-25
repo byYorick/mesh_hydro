@@ -14,7 +14,22 @@ const props = defineProps({
   gradient: {
     type: String,
     default: 'primary',
-    validator: (value) => value && typeof value === 'string' && ['primary', 'success', 'warning', 'error', 'info'].includes(value),
+    validator: (value) => {
+      if (!value || typeof value !== 'string') return false
+      const validValues = ['primary', 'success', 'warning', 'error', 'info']
+      try {
+        // Дополнительная проверка на undefined/null перед вызовом includes
+        if (validValues && Array.isArray(validValues) && value) {
+          return validValues.includes(value)
+        }
+        return false
+      } catch (error) {
+        console.error('GradientCard.vue: validator - Error in includes:', error)
+        console.error('GradientCard.vue: validator - value:', value, typeof value)
+        console.error('GradientCard.vue: validator - validValues:', validValues, typeof validValues)
+        return false
+      }
+    },
   },
 })
 

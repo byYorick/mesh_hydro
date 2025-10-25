@@ -40,7 +40,8 @@ class NodeController extends Controller
 
         // Добавление вычисляемых полей для каждого узла
         $nodes->each(function ($node) {
-            $node->is_online = $node->isOnline();
+            // Обновляем online статус на основе isOnline() метода
+            $node->online = $node->isOnline();
             $node->status_color = $node->status_color;
             $node->icon = $node->icon;
         });
@@ -67,7 +68,8 @@ class NodeController extends Controller
         ->where('node_id', $nodeId)
         ->firstOrFail();
 
-        $node->is_online = $node->isOnline();
+        // Обновляем online статус на основе isOnline() метода
+        $node->online = $node->isOnline();
         $node->status_color = $node->status_color;
         $node->icon = $node->icon;
 

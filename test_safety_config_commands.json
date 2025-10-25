@@ -1,0 +1,38 @@
+[
+  {
+    "type": "command",
+    "node_id": "ph_001",
+    "command": "update_safety_config",
+    "params": {
+      "max_pump_time_ms": 15000,
+      "cooldown_ms": 90000,
+      "max_daily_volume_ml": 1500,
+      "ph_emergency_low": 5.0,
+      "ph_emergency_high": 8.0
+    }
+  },
+  {
+    "type": "command",
+    "node_id": "ec_001",
+    "command": "update_safety_config",
+    "params": {
+      "max_pump_time_ms": 12000,
+      "cooldown_ms": 120000,
+      "max_daily_volume_ml": 2000,
+      "ec_emergency_high": 3.5
+    }
+  },
+  {
+    "type": "command",
+    "node_id": "ph_ec_001",
+    "command": "update_safety_config",
+    "params": {
+      "max_pump_time_ms": 20000,
+      "cooldown_ms": 60000,
+      "max_daily_volume_ml": 3000,
+      "ph_emergency_low": 4.5,
+      "ph_emergency_high": 8.5,
+      "ec_emergency_high": 4.0
+    }
+  }
+]

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Очистка кэша - Mesh Hydro System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #1976d2;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background: #1565c0;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .success {
+            background: #e8f5e8;
+            border-left-color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Очистка кэша браузера</h1>
+        <p>Этот инструмент поможет принудительно очистить кэш браузера и загрузить новую версию приложения.</p>
+        
+        <div class="status" id="status">
+            Готов к очистке кэша...
+        </div>
+        
+        <button class="button" onclick="clearCache()">🧹 Очистить кэш и перезагрузить</button>
+        <button class="button" onclick="hardReload()">🔄 Жесткая перезагрузка</button>
+        <button class="button" onclick="goToApp()">🚀 Перейти к приложению</button>
+        
+        <h3>Инструкции:</h3>
+        <ol>
+            <li>Нажмите "Очистить кэш и перезагрузить"</li>
+            <li>Если ошибки продолжаются, нажмите "Жесткая перезагрузка"</li>
+            <li>Откройте DevTools (F12) и включите "Disable cache" в Network tab</li>
+            <li>Обновите страницу несколько раз</li>
+        </ol>
+        
+        <h3>Проверка:</h3>
+        <p>После очистки кэша откройте консоль браузера (F12) и проверьте, что ошибки <code>Cannot read properties of undefined (reading 'includes')</code> исчезли.</p>
+    </div>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+
+        function clearCache() {
+            updateStatus('Очистка кэша...', 'info');
+            
+            // Очистка localStorage
+            try {
+                localStorage.clear();
+                console.log('localStorage очищен');
+            } catch (e) {
+                console.error('Ошибка очистки localStorage:', e);
+            }
+            
+            // Очистка sessionStorage
+            try {
+                sessionStorage.clear();
+                console.log('sessionStorage очищен');
+            } catch (e) {
+                console.error('Ошибка очистки sessionStorage:', e);
+            }
+            
+            // Очистка кэша через Cache API
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                    console.log('Cache API очищен');
+                });
+            }
+            
+            updateStatus('Кэш очищен! Перезагружаем страницу...', 'success');
+            
+            setTimeout(() => {
+                // Принудительная перезагрузка с очисткой кэша
+                window.location.href = '/?v=' + Date.now();
+            }, 1000);
+        }
+
+        function hardReload() {
+            updateStatus('Выполняется жесткая перезагрузка...', 'info');
+            
+            // Жесткая перезагрузка
+            if (navigator.serviceWorker) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
+            }
+            
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 500);
+        }
+
+        function goToApp() {
+            updateStatus('Переход к приложению...', 'info');
+            window.location.href = '/?v=' + Date.now();
+        }
+
+        // Автоматическая проверка версии
+        window.addEventListener('load', function() {
+            const currentTime = new Date().toLocaleString();
+            updateStatus(`Страница загружена: ${currentTime}. Готов к очистке кэша.`, 'success');
+        });
+    </script>
+</body>
+</html>

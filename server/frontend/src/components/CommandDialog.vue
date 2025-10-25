@@ -84,7 +84,7 @@
 
           <!-- No params needed -->
           <v-alert
-            v-if="selectedCommand && ['reboot', 'get_status', 'reset_errors'].includes(selectedCommand)"
+            v-if="selectedCommand && isNoParamsCommand(selectedCommand)"
             type="info"
             variant="tonal"
           >
@@ -173,6 +173,24 @@ const availableCommands = computed(() => {
 
   return commands
 })
+
+// Check if command requires no parameters
+function isNoParamsCommand(command) {
+  if (!command || typeof command !== 'string') return false
+  const noParamsCommands = ['reboot', 'get_status', 'reset_errors']
+  try {
+    // Дополнительная проверка на undefined/null перед вызовом includes
+    if (noParamsCommands && Array.isArray(noParamsCommands) && command) {
+      return noParamsCommands.includes(command)
+    }
+    return false
+  } catch (error) {
+    console.error('CommandDialog.vue: isNoParamsCommand - Error in includes:', error)
+    console.error('CommandDialog.vue: isNoParamsCommand - command:', command, typeof command)
+    console.error('CommandDialog.vue: isNoParamsCommand - noParamsCommands:', noParamsCommands, typeof noParamsCommands)
+    return false
+  }
+}
 
 async function sendCommand() {
   loading.value = true

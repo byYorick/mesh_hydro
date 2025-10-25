@@ -266,11 +266,21 @@ class MqttService
                 return;
             }
 
+            // Специальная обработка событий насосов
+            $message = $this->translateEventMessage($data['message'] ?? 'Unknown event');
+            $level = $data['level'] ?? Event::LEVEL_INFO;
+            
+            // Если это событие насоса, создаем специальное сообщение
+            if (isset($data['data']['event_type']) && strpos($data['data']['event_type'], 'pump_') === 0) {
+                $message = $this->translatePumpEventMessage($data['data']);
+                $level = $this->getPumpEventLevel($data['data']);
+            }
+            
             // Сохранение события в БД
             $event = Event::create([
                 'node_id' => $data['node_id'],
-                'level' => $data['level'] ?? Event::LEVEL_INFO,
-                'message' => $this->translateEventMessage($data['message'] ?? 'Unknown event'),
+                'level' => $level,
+                'message' => $message,
                 'data' => $data['data'] ?? [],
             ]);
 
@@ -987,6 +997,112 @@ class MqttService
         ];
 
         return $translations[$message] ?? $message;
+    }
+
+    /**
+     * Перевод сообщений событий насосов на русский язык
+     */
+    private function translatePumpEventMessage(array $data): string
+    {
+        $eventType = $data['event_type'] ?? 'unknown';
+        $pumpId = $data['pump_id'] ?? 0;
+        $dose = $data['dose_ml'] ?? 0;
+        $duration = $data['duration_ms'] ?? 0;
+        
+        // Определяем название насоса
+        $pumpName = $this->getPumpName($pumpId, $data);
+        
+        switch ($eventType) {
+            case 'pump_start':
+                return "🚰 Насос {$pumpName} запущен: {$dose} мл ({$duration} мс)";
+            case 'pump_stop':
+                return "🛑 Насос {$pumpName} остановлен: {$dose} мл ({$duration} мс)";
+            case 'pump_emergency_stop':
+                return "🚨 Аварийная остановка насоса {$pumpName}";
+            case 'pump_timeout':
+                return "⏰ Таймаут насоса {$pumpName}";
+            case 'pump_calibration_start':
+                return "🔧 Начало калибровки насоса {$pumpName}";
+            case 'pump_calibration_end':
+                return "✅ Калибровка насоса {$pumpName} завершена";
+            default:
+                return "🔧 Событие насоса {$pumpName}: {$eventType}";
+        }
+    }
+
+    /**
+     * Получение уровня события насоса
+     */
+    private function getPumpEventLevel(array $data): string
+    {
+        $eventType = $data['event_type'] ?? 'unknown';
+        
+        switch ($eventType) {
+            case 'pump_emergency_stop':
+                return Event::LEVEL_CRITICAL;
+            case 'pump_timeout':
+                return Event::LEVEL_WARNING;
+            case 'pump_start':
+            case 'pump_stop':
+            case 'pump_calibration_start':
+            case 'pump_calibration_end':
+            default:
+                return Event::LEVEL_INFO;
+        }
+    }
+
+    /**
+     * Получение названия насоса
+     */
+    private function getPumpName(int $pumpId, array $data): string
+    {
+        $nodeType = $data['node_type'] ?? 'unknown';
+        
+        // Для pH нод
+        if ($nodeType === 'ph') {
+            switch ($pumpId) {
+                case 0:
+                    return 'pH UP';
+                case 1:
+                    return 'pH DOWN';
+                default:
+                    return "pH #{$pumpId}";
+            }
+        }
+        
+        // Для EC нод
+        if ($nodeType === 'ec') {
+            switch ($pumpId) {
+                case 0:
+                    return 'EC A';
+                case 1:
+                    return 'EC B';
+                case 2:
+                    return 'EC C';
+                default:
+                    return "EC #{$pumpId}";
+            }
+        }
+        
+        // Для ph_ec нод
+        if ($nodeType === 'ph_ec') {
+            switch ($pumpId) {
+                case 0:
+                    return 'pH UP';
+                case 1:
+                    return 'pH DOWN';
+                case 2:
+                    return 'EC A';
+                case 3:
+                    return 'EC B';
+                case 4:
+                    return 'EC C';
+                default:
+                    return "Pump #{$pumpId}";
+            }
+        }
+        
+        return "Насос #{$pumpId}";
     }
 }
 

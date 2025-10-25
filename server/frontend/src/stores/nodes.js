@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import { useNodesStatus } from '@/composables/useNodeStatus'
 
 export const useNodesStore = defineStore('nodes', {
   state: () => ({
@@ -10,6 +11,11 @@ export const useNodesStore = defineStore('nodes', {
   }),
 
   getters: {
+    // Централизованная система статусов
+    status: (state) => {
+      return useNodesStatus({ value: state.nodes })
+    },
+
     // Get nodes by type
     nodesByType: (state) => (type) => {
       return state.nodes.filter(node => node.node_type === type)
@@ -17,19 +23,12 @@ export const useNodesStore = defineStore('nodes', {
 
     // Get online nodes
     onlineNodes: (state) => {
-      return state.nodes.filter(node => {
-        // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
-        return node.is_online !== undefined ? node.is_online : node.online
-      })
+      return state.nodes.filter(node => node.online)
     },
 
     // Get offline nodes
     offlineNodes: (state) => {
-      return state.nodes.filter(node => {
-        // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
-        const isOnline = node.is_online !== undefined ? node.is_online : node.online
-        return !isOnline
-      })
+      return state.nodes.filter(node => !node.online)
     },
 
     // Get node by ID

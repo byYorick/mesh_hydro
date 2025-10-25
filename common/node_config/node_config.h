@@ -53,17 +53,18 @@ typedef struct {
     float ph_min, ph_max;
     float ec_min, ec_max;
     
-    // Аварийные пороги
-    float ph_emergency_low, ph_emergency_high;
-    float ec_emergency_high;
-    
     // PID параметры (5 насосов)
     pump_pid_t pump_pid[5];
     
-    // Safety
-    uint32_t max_pump_time_ms;
-    uint32_t cooldown_ms;
-    uint32_t max_daily_volume_ml;
+    // Safety параметры
+    uint32_t max_pump_time_ms;        ///< Максимальное время работы насоса (мс)
+    uint32_t cooldown_ms;             ///< Время ожидания между включениями (мс)
+    uint32_t max_daily_volume_ml;      ///< Максимальный дневной объем (мл)
+    
+    // Emergency пороги (настраиваемые)
+    float ph_emergency_low;            ///< Критичный нижний pH (по умолчанию 5.5)
+    float ph_emergency_high;           ///< Критичный верхний pH (по умолчанию 7.5)
+    float ec_emergency_high;          ///< Критичный верхний EC
     
     // Автономный режим
     bool autonomous_enabled;
@@ -90,9 +91,14 @@ typedef struct {
     // Калибровка насосов (2 насоса: UP, DOWN)
     pump_calibration_t pump_calibration[2];
     
-    // Safety
-    uint32_t max_pump_time_ms;
-    uint32_t cooldown_ms;
+    // Safety параметры
+    uint32_t max_pump_time_ms;        ///< Максимальное время работы насоса (мс)
+    uint32_t cooldown_ms;             ///< Время ожидания между включениями (мс)
+    uint32_t max_daily_volume_ml;      ///< Максимальный дневной объем (мл)
+    
+    // Emergency пороги (настраиваемые)
+    float ph_emergency_low;            ///< Критичный нижний pH (по умолчанию 5.5)
+    float ph_emergency_high;           ///< Критичный верхний pH (по умолчанию 7.5)
     
     // Автономный режим
     bool autonomous_enabled;
@@ -118,9 +124,13 @@ typedef struct {
     // Калибровка насосов (3 насоса: A, B, C)
     pump_calibration_t pump_calibration[3];
     
-    // Safety
-    uint32_t max_pump_time_ms;
-    uint32_t cooldown_ms;
+    // Safety параметры
+    uint32_t max_pump_time_ms;        ///< Максимальное время работы насоса (мс)
+    uint32_t cooldown_ms;             ///< Время ожидания между включениями (мс)
+    uint32_t max_daily_volume_ml;      ///< Максимальный дневной объем (мл)
+    
+    // Emergency пороги (настраиваемые)
+    float ec_emergency_high;           ///< Критичный верхний EC
     
     // Автономный режим
     bool autonomous_enabled;

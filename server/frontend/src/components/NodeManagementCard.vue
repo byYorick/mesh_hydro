@@ -55,12 +55,17 @@
             <template v-slot:activator="{ props }">
               <v-btn
                 block
-                variant="outlined"
+                variant="elevated"
                 color="secondary"
                 v-bind="props"
                 prepend-icon="mdi-pencil"
+                size="large"
+                class="text-none font-weight-medium"
               >
-                Редактировать
+                <div class="d-flex flex-column align-center">
+                  <span>Редактировать</span>
+                  <span class="text-caption">Изменить настройки</span>
+                </div>
               </v-btn>
             </template>
           </EditNodeDialog>
@@ -70,12 +75,17 @@
         <v-col cols="12" sm="6">
           <v-btn
             block
-            variant="outlined"
+            variant="elevated"
             color="error"
             prepend-icon="mdi-delete"
             @click="confirmDelete = true"
+            size="large"
+            class="text-none font-weight-medium"
           >
-            Удалить узел
+            <div class="d-flex flex-column align-center">
+              <span>Удалить узел</span>
+              <span class="text-caption">Безвозвратно</span>
+            </div>
           </v-btn>
         </v-col>
       </v-row>

@@ -217,35 +217,72 @@
         <!-- Relay Quick Actions -->
         <v-btn
           v-if="node.node_type === 'relay'"
-          size="small"
+          size="large"
           color="primary"
+          variant="elevated"
           prepend-icon="mdi-window-open"
           @click="$emit('command', { command: 'open_all', params: {} })"
+          class="text-none font-weight-medium"
         >
-          Открыть
+          <div class="d-flex flex-column align-center">
+            <span>Открыть</span>
+            <span class="text-caption">Все окна</span>
+          </div>
         </v-btn>
 
         <!-- Climate Quick Action -->
         <v-btn
           v-if="node.node_type === 'climate'"
-          size="small"
+          size="large"
           color="primary"
+          variant="elevated"
           prepend-icon="mdi-refresh"
           @click="$emit('command', { command: 'update_sensors', params: {} })"
+          class="text-none font-weight-medium"
         >
-          Обновить
+          <div class="d-flex flex-column align-center">
+            <span>Обновить</span>
+            <span class="text-caption">Датчики</span>
+          </div>
         </v-btn>
+
+        <!-- Get Config Button -->
+        <ConfigViewDialog 
+          v-model="showConfigDialog" 
+          :node-id="node.node_id"
+        >
+          <template v-slot:activator="{ props: dialogProps }">
+            <v-btn
+              size="large"
+              color="info"
+              variant="elevated"
+              v-bind="dialogProps"
+              prepend-icon="mdi-download"
+              class="text-none font-weight-medium"
+            >
+              <div class="d-flex flex-column align-center">
+                <span>Конфиг</span>
+                <span class="text-caption">Получить настройки</span>
+              </div>
+            </v-btn>
+          </template>
+        </ConfigViewDialog>
 
         <!-- Command Dialog (all nodes) -->
         <CommandDialog :node="node" @command-sent="handleCommand">
           <template v-slot:activator="{ props: dialogProps }">
             <v-btn
-              size="small"
+              size="large"
               color="secondary"
+              variant="elevated"
               v-bind="dialogProps"
               prepend-icon="mdi-send"
+              class="text-none font-weight-medium"
             >
-              Команды
+              <div class="d-flex flex-column align-center">
+                <span>Команды</span>
+                <span class="text-caption">Отправить команду</span>
+              </div>
             </v-btn>
           </template>
         </CommandDialog>
@@ -260,9 +297,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { formatDistanceToNow } from '@/utils/time'
+import { ref, computed } from 'vue'
+import { useNodeStatus } from '@/composables/useNodeStatus'
 import CommandDialog from './CommandDialog.vue'
+import ConfigViewDialog from './ConfigViewDialog.vue'
 
 const props = defineProps({
   node: {
@@ -292,48 +330,25 @@ function handleCommand({ command, params }) {
   emit('command', { command, params })
 }
 
-// Node online status - используем данные с backend
-const isOnline = computed(() => {
-  // Приоритет: сначала is_online (вычисленное поле), потом online (поле БД)
-  return props.node.is_online !== undefined ? props.node.is_online : props.node.online
-})
+// Централизованная система статусов
+const {
+  isOnline,
+  isPumpRunning,
+  statusColor,
+  statusIcon,
+  statusText,
+  lastSeenText,
+  canPerformActions,
+  canRunPumps
+} = useNodeStatus({ value: () => props.node })
 
-// Status color - используем данные с backend
-const statusColor = computed(() => {
-  // Приоритет: сначала status_color (вычисленное поле), потом вычисляем сами
-  if (props.node.status_color) {
-    const colorMap = {
-      'green': 'success',
-      'orange': 'warning', 
-      'red': 'error',
-      'grey': 'grey'
-    }
-    return colorMap[props.node.status_color] || 'grey'
-  }
-  
-  // Fallback: вычисляем сами
-  if (!props.node.last_seen_at) return 'grey'
-  
-  const lastSeen = new Date(props.node.last_seen_at)
-  const seconds = (Date.now() - lastSeen.getTime()) / 1000
-  
-  if (seconds < 20) return 'success'   // Онлайн: < 20 секунд
-  if (seconds < 40) return 'warning'   // Предупреждение: 20-40 секунд
-  return 'error'                       // Офлайн: > 40 секунд
-})
-
-// Status icon
-const statusIcon = computed(() => {
-  return isOnline.value ? 'mdi-check-circle' : 'mdi-close-circle'
-})
-
-// Status text
-const statusText = computed(() => {
-  return isOnline.value ? 'Online' : 'Offline'
-})
+// Удалены дублирующиеся computed свойства - теперь используются из useNodeStatus
 
 // Node type icon
 const nodeIcon = computed(() => {
+  console.log('🔍 NodeCard: nodeIcon computed called')
+  console.log('🔍 NodeCard: props.node?.node_type:', props.node?.node_type)
+  
   const icons = {
     'ph_ec': 'mdi-flask',
     'ph': 'mdi-flask-outline',
@@ -344,7 +359,9 @@ const nodeIcon = computed(() => {
     'display': 'mdi-monitor',
     'root': 'mdi-server-network',
   }
-  return icons[props.node.node_type] || 'mdi-chip'
+  const result = icons[props.node.node_type] || 'mdi-chip'
+  console.log('🔍 NodeCard: nodeIcon result:', result)
+  return result
 })
 
 // Node type text
@@ -364,17 +381,17 @@ const nodeTypeText = computed(() => {
 
 // Last telemetry data
 const lastData = computed(() => {
+  if (!props.node) return null
   return props.node.last_telemetry?.data || props.node.last_data || null
 })
 
-// Last seen text
-const lastSeenText = computed(() => {
-  if (!props.node.last_seen_at) return 'Никогда'
-  return formatDistanceToNow(props.node.last_seen_at)
-})
+// Удален дублирующийся lastSeenText - теперь используется из useNodeStatus
 
 // Memory info
-const metadata = computed(() => props.node.metadata || {})
+const metadata = computed(() => {
+  if (!props.node) return {}
+  return props.node.metadata || {}
+})
 
 const hasMemoryInfo = computed(() => {
   return metadata.value.heap_total || metadata.value.total_heap || metadata.value.heap_used || metadata.value.heap_free
@@ -481,8 +498,18 @@ const processNodeMetrics = (nodeType, data) => {
 
 // Visible metrics для mobile layout
 const visibleMetrics = computed(() => {
-  return processNodeMetrics(props.node.node_type, lastData.value)
+  console.log('🔍 NodeCard: visibleMetrics computed called')
+  console.log('🔍 NodeCard: props.node:', props.node)
+  console.log('🔍 NodeCard: props.node.node_type:', props.node?.node_type)
+  console.log('🔍 NodeCard: lastData.value:', lastData.value)
+  
+  const result = processNodeMetrics(props.node.node_type, lastData.value)
+  console.log('🔍 NodeCard: visibleMetrics result:', result)
+  return result
 })
+
+// Config dialog state
+const showConfigDialog = ref(false)
 </script>
 
 <style scoped>

@@ -1,0 +1,12 @@
+{
+  "type": "command",
+  "node_id": "ph_001",
+  "command": "update_safety_config",
+  "params": {
+    "max_pump_time_ms": 15000,
+    "cooldown_ms": 90000,
+    "max_daily_volume_ml": 1500,
+    "ph_emergency_low": 5.0,
+    "ph_emergency_high": 8.0
+  }
+}

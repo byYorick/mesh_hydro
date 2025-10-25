@@ -144,7 +144,7 @@ export function initializeEcho() {
     }
   } catch (error) {
     console.error('❌ Echo initialization failed:', {
-      message: error?.message || 'undefined error',
+      message: error?.message || 'Unknown error',
       error: error,
       stack: error?.stack,
       type: typeof error

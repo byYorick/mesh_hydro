@@ -1,0 +1,20 @@
+[
+  {
+    "type": "command",
+    "node_id": "ph_001",
+    "command": "get_config",
+    "params": {}
+  },
+  {
+    "type": "command", 
+    "node_id": "ec_001",
+    "command": "get_config",
+    "params": {}
+  },
+  {
+    "type": "command",
+    "node_id": "ph_ec_001", 
+    "command": "get_config",
+    "params": {}
+  }
+]

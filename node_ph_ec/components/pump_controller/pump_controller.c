@@ -4,6 +4,7 @@
  */
 
 #include "pump_controller.h"
+#include "pump_events.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -45,6 +46,9 @@ static bool s_initialized = false;
 static void pump_timer_callback(TimerHandle_t timer);
 static esp_err_t pump_start_internal(pump_id_t pump, uint32_t duration_ms);
 static esp_err_t pump_stop_internal(pump_id_t pump);
+static void pump_send_start_event(pump_id_t pump, uint32_t duration_ms, float dose_ml);
+static void pump_send_stop_event(pump_id_t pump, uint32_t duration_ms, float dose_ml);
+static void pump_send_emergency_stop_event(pump_id_t pump, const char *reason);
 
 esp_err_t pump_controller_init(void) {
     if (s_initialized) {
@@ -149,6 +153,10 @@ esp_err_t pump_controller_emergency_stop(void) {
     ESP_LOGW(TAG, "EMERGENCY STOP - all pumps");
     
     for (int i = 0; i < PUMP_MAX; i++) {
+        if (s_pumps[i].is_running) {
+            // Отправка события аварийной остановки перед остановкой
+            pump_send_emergency_stop_event((pump_id_t)i, "Emergency stop activated");
+        }
         pump_stop_internal((pump_id_t)i);
     }
     
@@ -227,6 +235,10 @@ static esp_err_t pump_start_internal(pump_id_t pump, uint32_t duration_ms) {
     xTimerChangePeriod(s_pumps[pump].timer, pdMS_TO_TICKS(duration_ms), 0);
     xTimerStart(s_pumps[pump].timer, 0);
     
+    // Отправка события включения насоса
+    float dose_ml = (duration_ms / 1000.0f) * s_pumps[pump].ml_per_sec;
+    pump_send_start_event(pump, duration_ms, dose_ml);
+    
     return ESP_OK;
 }
 
@@ -259,6 +271,9 @@ static esp_err_t pump_stop_internal(pump_id_t pump) {
     
     s_pumps[pump].is_running = false;
     
+    // Отправка события выключения насоса
+    pump_send_stop_event(pump, (uint32_t)actual_time, ml);
+    
     return ESP_OK;
 }
 
@@ -268,5 +283,84 @@ static void pump_timer_callback(TimerHandle_t timer) {
     
     ESP_LOGD(TAG, "Timer callback for pump %d", pump);
     pump_stop_internal(pump);
+}
+
+// Отправка события включения насоса
+static void pump_send_start_event(pump_id_t pump, uint32_t duration_ms, float dose_ml) {
+    // TODO: Получить данные PID и системные параметры
+    // Пока что отправляем с заглушками
+    pump_event_pid_data_t pid_data = {
+        .kp = 1.0f,
+        .ki = 0.1f,
+        .kd = 0.5f,
+        .setpoint = 6.5f,
+        .current_value = 6.0f,
+        .error = 0.5f,
+        .output = dose_ml,
+        .integral = 0.0f,
+        .derivative = 0.0f,
+        .enabled = true
+    };
+
+    pump_events_send_start_event(
+        pump,
+        duration_ms,
+        dose_ml,
+        &pid_data,
+        6.0f,  // ph
+        1.2f,  // ec
+        6.5f,  // ph_target
+        1.5f,  // ec_target
+        false, // emergency_mode
+        false, // autonomous_mode
+        -50    // rssi
+    );
+}
+
+// Отправка события выключения насоса
+static void pump_send_stop_event(pump_id_t pump, uint32_t duration_ms, float dose_ml) {
+    // TODO: Получить данные PID и системные параметры
+    // Пока что отправляем с заглушками
+    pump_event_pid_data_t pid_data = {
+        .kp = 1.0f,
+        .ki = 0.1f,
+        .kd = 0.5f,
+        .setpoint = 6.5f,
+        .current_value = 6.0f,
+        .error = 0.5f,
+        .output = dose_ml,
+        .integral = 0.0f,
+        .derivative = 0.0f,
+        .enabled = true
+    };
+
+    pump_events_send_stop_event(
+        pump,
+        duration_ms,
+        dose_ml,
+        &pid_data,
+        6.0f,  // ph
+        1.2f,  // ec
+        6.5f,  // ph_target
+        1.5f,  // ec_target
+        false, // emergency_mode
+        false, // autonomous_mode
+        -50    // rssi
+    );
+}
+
+// Отправка события аварийной остановки насоса
+static void pump_send_emergency_stop_event(pump_id_t pump, const char *reason) {
+    pump_events_send_emergency_stop_event(
+        pump,
+        reason,
+        6.0f,  // ph
+        1.2f,  // ec
+        6.5f,  // ph_target
+        1.5f,  // ec_target
+        true,  // emergency_mode
+        false, // autonomous_mode
+        -50    // rssi
+    );
 }
 

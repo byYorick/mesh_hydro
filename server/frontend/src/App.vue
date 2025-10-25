@@ -10,7 +10,7 @@
     >
       <!-- Logo / Header -->
       <v-list-item
-        :prepend-avatar="rail ? undefined : '/logo.png'"
+        :prepend-avatar="rail ? undefined : '/favicon.svg'"
         :title="rail ? '' : 'Hydro System'"
         :subtitle="rail ? '' : 'v2.0'"
         class="px-2"
@@ -258,17 +258,34 @@ const showMobileMenu = ref(false)
 
 // Filtered menu routes (exclude hidden ones)
 const menuRoutes = computed(() => {
-  return router.getRoutes().filter(r => 
-    r.meta.icon && r.meta.showInMenu !== false
-  )
+  console.log('🔍 App.vue: menuRoutes computed called')
+  console.log('🔍 App.vue: router.getRoutes():', router.getRoutes())
+  
+  const routes = router.getRoutes().filter(r => {
+    console.log('🔍 App.vue: Processing route:', r)
+    console.log('🔍 App.vue: r.meta:', r.meta)
+    console.log('🔍 App.vue: r.meta.icon:', r.meta?.icon)
+    console.log('🔍 App.vue: r.meta.showInMenu:', r.meta?.showInMenu)
+    
+    return r.meta.icon && r.meta.showInMenu !== false
+  })
+  
+  console.log('🔍 App.vue: Filtered routes:', routes)
+  return routes
 })
 
 // Connection status text
 const connectionStatus = computed(() => {
+  console.log('🔍 App.vue: connectionStatus computed called')
+  console.log('🔍 App.vue: appStore.backendConnected:', appStore.backendConnected)
+  console.log('🔍 App.vue: appStore.mqttConnected:', appStore.mqttConnected)
+  
   if (!appStore.backendConnected) return 'Нет связи'
   if (!appStore.mqttConnected) return 'MQTT: offline'
   
   const wsStatus = getConnectionStatus()
+  console.log('🔍 App.vue: wsStatus:', wsStatus)
+  
   if (wsStatus.fallbackMode) return 'WebSocket: fallback'
   if (!wsStatus.isWebSocketConnected) return 'WebSocket: offline'
   
@@ -372,12 +389,20 @@ function setupWebSocketListeners() {
     }
     
     // Show notification for critical events
-    if (data.level && ['critical', 'emergency'].includes(data.level)) {
-      appStore.showSnackbar(
-        `⚠️ ${data.message}`,
-        'error',
-        8000
-      )
+    const criticalLevels = ['critical', 'emergency']
+    try {
+      // Дополнительная проверка на undefined/null перед вызовом includes
+      if (data && data.level && typeof data.level === 'string' && criticalLevels && Array.isArray(criticalLevels) && criticalLevels.includes(data.level)) {
+        appStore.showSnackbar(
+          `⚠️ ${data.message}`,
+          'error',
+          8000
+        )
+      }
+    } catch (error) {
+      console.error('App.vue: critical event notification - Error:', error)
+      console.error('App.vue: critical event notification - data:', data)
+      console.error('App.vue: critical event notification - criticalLevels:', criticalLevels)
     }
   })
 

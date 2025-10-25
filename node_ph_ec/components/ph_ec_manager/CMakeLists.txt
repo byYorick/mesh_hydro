@@ -10,6 +10,7 @@ idf_component_register(
         ec_sensor
         pump_controller
         pid_controller
+        pump_events
         mesh_manager
         mesh_protocol
         node_config

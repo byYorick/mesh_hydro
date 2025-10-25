@@ -840,7 +840,7 @@ function testNotification() {
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Hydro System', {
       body: 'Тестовое уведомление работает!',
-      icon: '/logo.png',
+      icon: '/favicon.svg',
     })
   } else if ('Notification' in window) {
     Notification.requestPermission().then(permission => {

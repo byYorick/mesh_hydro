@@ -8,6 +8,7 @@
 #include "pump_controller.h"
 #include "pid_controller.h"
 #include "adaptive_pid.h"
+#include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 
@@ -353,6 +354,7 @@ static void read_sensor(void) {
 static void control_ph(void) {
     float output = 0.0f;
     esp_err_t err;
+    int8_t rssi = get_rssi_to_parent();
     
     // Если pH < target - нужно повысить (pH UP)
     if (s_current_ph < s_config->ph_target) {
@@ -362,6 +364,24 @@ static void control_ph(void) {
             pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_up);
             ESP_LOGI(TAG, "pH UP: %.2f ml [%s zone] (current=%.2f, target=%.2f)", 
                      output, adaptive_pid_zone_to_str(zone), s_current_ph, s_config->ph_target);
+            
+            // Получение данных PID для события
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ph_up.pid, s_current_ph, &pid_data);
+            pid_data.output = output; // Устанавливаем реальный выход
+            
+            // Отправка события включения насоса pH UP
+            pump_events_send_start_event(
+                PUMP_PH_UP,
+                (uint32_t)((output / 2.0f) * 1000.0f), // Примерная длительность
+                output,
+                &pid_data,
+                s_current_ph,
+                s_config->ph_target,
+                s_emergency_mode, s_autonomous_mode,
+                rssi
+            );
+            
             pump_controller_run_dose(PUMP_PH_UP, output);
             
             // Отправка события при коррекции в FAR зоне
@@ -378,6 +398,24 @@ static void control_ph(void) {
             pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_down);
             ESP_LOGI(TAG, "pH DOWN: %.2f ml [%s zone] (current=%.2f, target=%.2f)", 
                      output, adaptive_pid_zone_to_str(zone), s_current_ph, s_config->ph_target);
+            
+            // Получение данных PID для события
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ph_down.pid, s_current_ph, &pid_data);
+            pid_data.output = output; // Устанавливаем реальный выход
+            
+            // Отправка события включения насоса pH DOWN
+            pump_events_send_start_event(
+                PUMP_PH_DOWN,
+                (uint32_t)((output / 2.0f) * 1000.0f), // Примерная длительность
+                output,
+                &pid_data,
+                s_current_ph,
+                s_config->ph_target,
+                s_emergency_mode, s_autonomous_mode,
+                rssi
+            );
+            
             pump_controller_run_dose(PUMP_PH_DOWN, output);
             
             // Отправка события при коррекции в FAR зоне
@@ -425,14 +463,15 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
 
 // Проверка аварийных условий
 static void check_emergency_conditions(void) {
-    // Emergency если pH слишком низкий или высокий
-    if (s_current_ph < s_config->ph_min || s_current_ph > s_config->ph_max) {
+    // Emergency если pH слишком низкий или высокий (используем настраиваемые пороги)
+    if (s_current_ph < s_config->ph_emergency_low || s_current_ph > s_config->ph_emergency_high) {
         if (!s_emergency_mode) {
-            ESP_LOGE(TAG, "EMERGENCY: pH out of range (%.2f)", s_current_ph);
+            ESP_LOGE(TAG, "EMERGENCY: pH out of range (%.2f) - limits: %.2f-%.2f", 
+                     s_current_ph, s_config->ph_emergency_low, s_config->ph_emergency_high);
             ph_manager_set_emergency(true);
             
             // Отправка критичного события
-            if (s_current_ph < s_config->ph_min) {
+            if (s_current_ph < s_config->ph_emergency_low) {
                 send_event(MESH_EVENT_CRITICAL, "pH too low", s_current_ph);
             } else {
                 send_event(MESH_EVENT_CRITICAL, "pH too high", s_current_ph);
@@ -440,7 +479,7 @@ static void check_emergency_conditions(void) {
         }
     } else {
         if (s_emergency_mode) {
-            ESP_LOGI(TAG, "pH back to normal range");
+            ESP_LOGI(TAG, "pH back to normal range (%.2f)", s_current_ph);
             ph_manager_set_emergency(false);
             
             // Отправка события восстановления
@@ -465,28 +504,7 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
     ESP_LOGI(TAG, "Params: %s", params ? "found" : "NULL");
     
     if (strcmp(command, "set_ph_target") == 0) {
-        cJSON *target = cJSON_GetObjectItem(params, "target");
-        if (cJSON_IsNumber(target)) {
-            float new_target = (float)target->valuedouble;
-            
-            // Валидация диапазона
-            if (new_target < 5.0f || new_target > 9.0f) {
-                ESP_LOGW(TAG, "Invalid pH target: %.2f (must be 5.0-9.0)", new_target);
-                return;
-            }
-            
-            s_config->ph_target = new_target;
-            adaptive_pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
-            adaptive_pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
-            
-            // ВАЖНО: Сохранение в NVS!
-            esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
-            if (err == ESP_OK) {
-                ESP_LOGI(TAG, "pH target set to %.2f and saved to NVS", s_config->ph_target);
-            } else {
-                ESP_LOGE(TAG, "Failed to save pH target to NVS: %s", esp_err_to_name(err));
-            }
-        }
+        ph_manager_handle_ph_target_command(params);
     }
     else if (strcmp(command, "emergency_stop") == 0) {
         ph_manager_set_emergency(true);
@@ -495,76 +513,13 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
         ph_manager_set_emergency(false);
     }
     else if (strcmp(command, "run_pump") == 0) {
-        cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
-        cJSON *duration = cJSON_GetObjectItem(params, "duration_ms");
-        
-        if (cJSON_IsNumber(pump_id) && cJSON_IsNumber(duration)) {
-            pump_id_t pump = (pump_id_t)pump_id->valueint;
-            uint32_t dur = (uint32_t)duration->valueint;
-            
-            if (pump < PUMP_MAX && dur > 0 && dur <= 10000) {
-                ESP_LOGI(TAG, "Manual pump run: %d for %lu ms", pump, dur);
-                pump_controller_run(pump, dur);
-            }
-        }
+        ph_manager_handle_pump_command(params);
     }
     else if (strcmp(command, "reset_stats") == 0) {
-        pump_controller_reset_stats(PUMP_PH_UP);
-        pump_controller_reset_stats(PUMP_PH_DOWN);
-        ESP_LOGI(TAG, "Pump stats reset");
+        ph_manager_handle_reset_stats_command();
     }
     else if (strcmp(command, "run_pump_manual") == 0) {
-        ESP_LOGI(TAG, "=== RUN PUMP MANUAL COMMAND ===");
-        
-        // Диагностика блокировок перед запуском
-        if (s_emergency_mode) {
-            ESP_LOGW(TAG, "Manual pump blocked: EMERGENCY mode active");
-            return;
-        }
-        if (!mesh_manager_is_connected()) {
-            ESP_LOGW(TAG, "Manual pump: mesh not connected (command will still be executed locally)");
-        }
-        
-        // Отладочный вывод параметров
-        if (params) {
-            char *params_str = cJSON_PrintUnformatted(params);
-            ESP_LOGI(TAG, "Command params: %s", params_str ? params_str : "NULL");
-            if (params_str) free(params_str);
-        } else {
-            ESP_LOGW(TAG, "Command params is NULL!");
-        }
-        
-        cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
-        cJSON *duration_sec = cJSON_GetObjectItem(params, "duration_sec");
-        
-        ESP_LOGI(TAG, "pump_id: %s, duration_sec: %s", 
-                 pump_id ? "found" : "NULL", 
-                 duration_sec ? "found" : "NULL");
-        
-        if (cJSON_IsNumber(pump_id) && cJSON_IsNumber(duration_sec)) {
-            int pump = pump_id->valueint;
-            float duration = (float)duration_sec->valuedouble;
-            
-            // Валидация
-            if (pump < 0 || pump > 1) {
-                ESP_LOGW(TAG, "Invalid pump_id: %d (must be 0-1)", pump);
-                return;
-            }
-            if (duration <= 0.0f || duration > 30.0f) {
-                ESP_LOGW(TAG, "Invalid duration: %.1f sec (must be 0.1-30.0)", duration);
-                return;
-            }
-            
-            // Запуск насоса вручную
-            pump_id_t pid = (pump == 0) ? PUMP_PH_UP : PUMP_PH_DOWN;
-            uint32_t duration_ms = (uint32_t)(duration * 1000.0f);
-            
-            ESP_LOGI(TAG, "Manual pump run: PUMP_%s (id=%d) for %.1f sec (%lu ms)", 
-                     (pump == 0) ? "UP" : "DOWN", pump, duration, (unsigned long)duration_ms);
-            // Информативный вывод текущей калибровки
-            ESP_LOGI(TAG, "Calibration: pump %d = %.2f ml/s", pump, s_config->pump_calibration[pump].ml_per_second);
-            pump_controller_run(pid, duration_ms);
-        }
+        ph_manager_handle_manual_pump_command(params);
     }
     else if (strcmp(command, "calibrate_pump") == 0) {
         cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
@@ -697,25 +652,8 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
             }
         }
     }
-    else if (strcmp(command, "set_safety_settings") == 0) {
-        cJSON *max_pump_time = cJSON_GetObjectItem(params, "max_pump_time_ms");
-        cJSON *cooldown = cJSON_GetObjectItem(params, "cooldown_ms");
-        
-        if (cJSON_IsNumber(max_pump_time)) {
-            s_config->max_pump_time_ms = (uint32_t)max_pump_time->valuedouble;
-        }
-        if (cJSON_IsNumber(cooldown)) {
-            s_config->cooldown_ms = (uint32_t)cooldown->valuedouble;
-        }
-        
-        // Сохраняем в NVS
-        esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Safety settings updated: max_pump=%lu ms, cooldown=%lu ms", 
-                     s_config->max_pump_time_ms, s_config->cooldown_ms);
-        } else {
-            ESP_LOGE(TAG, "Failed to save safety settings to NVS");
-        }
+    else if (strcmp(command, "set_safety_settings") == 0 || strcmp(command, "update_safety_config") == 0) {
+        ph_manager_handle_safety_command(params);
     }
     else if (strcmp(command, "emergency_stop") == 0) {
         ph_manager_set_emergency(true);
@@ -726,100 +664,7 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
         ESP_LOGI(TAG, "Emergency mode reset via command");
     }
     else if (strcmp(command, "get_config") == 0) {
-        // Проверка подключения к mesh
-        if (!mesh_manager_is_connected()) {
-            ESP_LOGW(TAG, "Cannot send config: mesh offline");
-            return;
-        }
-        
-        // Создание корневого объекта
-        cJSON *root = cJSON_CreateObject();
-        if (!root) {
-            ESP_LOGE(TAG, "Failed to create root JSON object");
-            return;
-        }
-        
-        cJSON_AddStringToObject(root, "type", "config_response");
-        cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
-        cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
-        
-        // Создание объекта конфигурации
-        cJSON *config = cJSON_CreateObject();
-        if (!config) {
-            ESP_LOGE(TAG, "Failed to create config JSON object");
-            cJSON_Delete(root);
-            return;
-        }
-        
-        cJSON_AddStringToObject(config, "node_id", s_config->base.node_id);
-        cJSON_AddStringToObject(config, "node_type", "ph");
-        cJSON_AddStringToObject(config, "zone", s_config->base.zone);
-        
-        // pH параметры
-        cJSON_AddNumberToObject(config, "ph_target", s_config->ph_target);
-        cJSON_AddNumberToObject(config, "ph_min", s_config->ph_min);
-        cJSON_AddNumberToObject(config, "ph_max", s_config->ph_max);
-        cJSON_AddNumberToObject(config, "ph_cal_offset", s_config->ph_cal_offset);
-        
-        // Калибровка насосов
-        cJSON *pumps_cal = cJSON_CreateArray();
-        if (pumps_cal) {
-            for (int i = 0; i < 2; i++) {
-                cJSON *pump = cJSON_CreateObject();
-                if (pump) {
-                    cJSON_AddNumberToObject(pump, "pump_id", i);
-                    cJSON_AddNumberToObject(pump, "ml_per_second", s_config->pump_calibration[i].ml_per_second);
-                    cJSON_AddNumberToObject(pump, "calibration_volume_ml", s_config->pump_calibration[i].calibration_volume_ml);
-                    cJSON_AddNumberToObject(pump, "calibration_time_ms", s_config->pump_calibration[i].calibration_time_ms);
-                    cJSON_AddBoolToObject(pump, "is_calibrated", s_config->pump_calibration[i].is_calibrated);
-                    cJSON_AddNumberToObject(pump, "last_calibrated", (double)s_config->pump_calibration[i].last_calibrated);
-                    cJSON_AddItemToArray(pumps_cal, pump);
-                }
-            }
-            cJSON_AddItemToObject(config, "pumps_calibration", pumps_cal);
-        }
-        
-        // PID параметры
-        cJSON *pumps_pid = cJSON_CreateArray();
-        if (pumps_pid) {
-            for (int i = 0; i < 2; i++) {
-                cJSON *pid = cJSON_CreateObject();
-                if (pid) {
-                    cJSON_AddNumberToObject(pid, "pump_id", i);
-                    cJSON_AddNumberToObject(pid, "kp", s_config->pump_pid[i].kp);
-                    cJSON_AddNumberToObject(pid, "ki", s_config->pump_pid[i].ki);
-                    cJSON_AddNumberToObject(pid, "kd", s_config->pump_pid[i].kd);
-                    cJSON_AddBoolToObject(pid, "enabled", s_config->pump_pid[i].enabled);
-                    cJSON_AddItemToArray(pumps_pid, pid);
-                }
-            }
-            cJSON_AddItemToObject(config, "pumps_pid", pumps_pid);
-        }
-        
-        // Safety
-        cJSON_AddNumberToObject(config, "max_pump_time_ms", s_config->max_pump_time_ms);
-        cJSON_AddNumberToObject(config, "cooldown_ms", s_config->cooldown_ms);
-        cJSON_AddBoolToObject(config, "autonomous_enabled", s_config->autonomous_enabled);
-        
-        // Добавление config к root
-        cJSON_AddItemToObject(root, "config", config);
-        
-        // Отправка конфигурации
-        char *json_str = cJSON_PrintUnformatted(root);
-        if (json_str) {
-            esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
-            if (err == ESP_OK) {
-                ESP_LOGI(TAG, "Config sent to ROOT (%d bytes)", strlen(json_str));
-            } else {
-                ESP_LOGE(TAG, "Failed to send config: %s", esp_err_to_name(err));
-            }
-            free(json_str);
-        } else {
-            ESP_LOGE(TAG, "Failed to serialize config JSON");
-        }
-        
-        // Всегда освобождаем память
-        cJSON_Delete(root);
+        ph_manager_send_config_response();
     }
     else {
         ESP_LOGW(TAG, "Unknown command: %s", command);
@@ -904,5 +749,269 @@ void ph_manager_handle_config_update(cJSON *config_json) {
             ESP_LOGE(TAG, "Failed to save config to NVS: %s", esp_err_to_name(err));
         }
     }
+}
+
+// ============================================================================
+// Внутренние функции для обработки команд
+// ============================================================================
+
+/**
+ * @brief Обработка команды set_ph_target
+ */
+void ph_manager_handle_ph_target_command(cJSON *params) {
+    cJSON *target = cJSON_GetObjectItem(params, "target");
+    if (cJSON_IsNumber(target)) {
+        float new_target = (float)target->valuedouble;
+        
+        // Валидация диапазона
+        if (new_target < 5.0f || new_target > 9.0f) {
+            ESP_LOGW(TAG, "Invalid pH target: %.2f (must be 5.0-9.0)", new_target);
+            return;
+        }
+        
+        s_config->ph_target = new_target;
+        adaptive_pid_set_setpoint(&s_pid_ph_up, s_config->ph_target);
+        adaptive_pid_set_setpoint(&s_pid_ph_down, s_config->ph_target);
+        
+        // ВАЖНО: Сохранение в NVS!
+        esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "pH target set to %.2f and saved to NVS", s_config->ph_target);
+        } else {
+            ESP_LOGE(TAG, "Failed to save pH target to NVS: %s", esp_err_to_name(err));
+        }
+    }
+}
+
+/**
+ * @brief Обработка команд насосов
+ */
+void ph_manager_handle_pump_command(cJSON *params) {
+    cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
+    cJSON *duration = cJSON_GetObjectItem(params, "duration_ms");
+    
+    if (cJSON_IsNumber(pump_id) && cJSON_IsNumber(duration)) {
+        pump_id_t pump = (pump_id_t)pump_id->valueint;
+        uint32_t dur = (uint32_t)duration->valueint;
+        
+        if (pump < PUMP_MAX && dur > 0 && dur <= 10000) {
+            ESP_LOGI(TAG, "Manual pump run: %d for %lu ms", pump, dur);
+            pump_controller_run(pump, dur);
+        }
+    }
+}
+
+/**
+ * @brief Обработка команды reset_stats
+ */
+void ph_manager_handle_reset_stats_command(void) {
+    pump_controller_reset_stats(PUMP_PH_UP);
+    pump_controller_reset_stats(PUMP_PH_DOWN);
+    ESP_LOGI(TAG, "Pump stats reset");
+}
+
+/**
+ * @brief Обработка команды run_pump_manual
+ */
+void ph_manager_handle_manual_pump_command(cJSON *params) {
+    ESP_LOGI(TAG, "=== RUN PUMP MANUAL COMMAND ===");
+    
+    // Диагностика блокировок перед запуском
+    if (s_emergency_mode) {
+        ESP_LOGW(TAG, "Manual pump blocked: EMERGENCY mode active");
+        return;
+    }
+    if (!mesh_manager_is_connected()) {
+        ESP_LOGW(TAG, "Manual pump: mesh not connected (command will still be executed locally)");
+    }
+    
+    // Отладочный вывод параметров
+    if (params) {
+        char *params_str = cJSON_PrintUnformatted(params);
+        ESP_LOGI(TAG, "Command params: %s", params_str ? params_str : "NULL");
+        if (params_str) free(params_str);
+    } else {
+        ESP_LOGW(TAG, "Command params is NULL!");
+    }
+    
+    cJSON *pump_id = cJSON_GetObjectItem(params, "pump_id");
+    cJSON *duration_sec = cJSON_GetObjectItem(params, "duration_sec");
+    
+    ESP_LOGI(TAG, "pump_id: %s, duration_sec: %s", 
+             pump_id ? "found" : "NULL", 
+             duration_sec ? "found" : "NULL");
+    
+    if (cJSON_IsNumber(pump_id) && cJSON_IsNumber(duration_sec)) {
+        int pump = pump_id->valueint;
+        float duration = (float)duration_sec->valuedouble;
+        
+        // Валидация
+        if (pump < 0 || pump > 1) {
+            ESP_LOGW(TAG, "Invalid pump_id: %d (must be 0-1)", pump);
+            return;
+        }
+        if (duration <= 0.0f || duration > 30.0f) {
+            ESP_LOGW(TAG, "Invalid duration: %.1f sec (must be 0.1-30.0)", duration);
+            return;
+        }
+        
+        // Запуск насоса вручную
+        pump_id_t pid = (pump == 0) ? PUMP_PH_UP : PUMP_PH_DOWN;
+        uint32_t duration_ms = (uint32_t)(duration * 1000.0f);
+        
+        ESP_LOGI(TAG, "Manual pump run: PUMP_%s (id=%d) for %.1f sec (%lu ms)", 
+                 (pump == 0) ? "UP" : "DOWN", pump, duration, (unsigned long)duration_ms);
+        // Информативный вывод текущей калибровки
+        ESP_LOGI(TAG, "Calibration: pump %d = %.2f ml/s", pump, s_config->pump_calibration[pump].ml_per_second);
+        pump_controller_run(pid, duration_ms);
+    }
+}
+
+/**
+ * @brief Обработка safety команд
+ */
+void ph_manager_handle_safety_command(cJSON *params) {
+    // Safety параметры
+    cJSON *max_pump_time = cJSON_GetObjectItem(params, "max_pump_time_ms");
+    cJSON *cooldown = cJSON_GetObjectItem(params, "cooldown_ms");
+    cJSON *max_daily_volume = cJSON_GetObjectItem(params, "max_daily_volume_ml");
+    
+    // Emergency пороги
+    cJSON *ph_emergency_low = cJSON_GetObjectItem(params, "ph_emergency_low");
+    cJSON *ph_emergency_high = cJSON_GetObjectItem(params, "ph_emergency_high");
+    
+    if (cJSON_IsNumber(max_pump_time)) {
+        s_config->max_pump_time_ms = (uint32_t)max_pump_time->valuedouble;
+    }
+    if (cJSON_IsNumber(cooldown)) {
+        s_config->cooldown_ms = (uint32_t)cooldown->valuedouble;
+    }
+    if (cJSON_IsNumber(max_daily_volume)) {
+        s_config->max_daily_volume_ml = (uint32_t)max_daily_volume->valuedouble;
+    }
+    if (cJSON_IsNumber(ph_emergency_low)) {
+        s_config->ph_emergency_low = (float)ph_emergency_low->valuedouble;
+    }
+    if (cJSON_IsNumber(ph_emergency_high)) {
+        s_config->ph_emergency_high = (float)ph_emergency_high->valuedouble;
+    }
+    
+    // Сохраняем в NVS
+    esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Safety settings updated: max_pump=%lu ms, cooldown=%lu ms, daily_vol=%lu ml, ph_emergency=%.2f-%.2f", 
+                 s_config->max_pump_time_ms, s_config->cooldown_ms, s_config->max_daily_volume_ml,
+                 s_config->ph_emergency_low, s_config->ph_emergency_high);
+    } else {
+        ESP_LOGE(TAG, "Failed to save safety settings to NVS");
+    }
+}
+
+/**
+ * @brief Отправка config response
+ */
+void ph_manager_send_config_response(void) {
+    // Проверка подключения к mesh
+    if (!mesh_manager_is_connected()) {
+        ESP_LOGW(TAG, "Cannot send config: mesh offline");
+        return;
+    }
+    
+    // Создание корневого объекта
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        ESP_LOGE(TAG, "Failed to create root JSON object");
+        return;
+    }
+    
+    cJSON_AddStringToObject(root, "type", "config_response");
+    cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
+    cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+    
+    // Создание объекта конфигурации
+    cJSON *config = cJSON_CreateObject();
+    if (!config) {
+        ESP_LOGE(TAG, "Failed to create config JSON object");
+        cJSON_Delete(root);
+        return;
+    }
+    
+    cJSON_AddStringToObject(config, "node_id", s_config->base.node_id);
+    cJSON_AddStringToObject(config, "node_type", "ph");
+    cJSON_AddStringToObject(config, "zone", s_config->base.zone);
+    
+    // pH параметры
+    cJSON_AddNumberToObject(config, "ph_target", s_config->ph_target);
+    cJSON_AddNumberToObject(config, "ph_min", s_config->ph_min);
+    cJSON_AddNumberToObject(config, "ph_max", s_config->ph_max);
+    cJSON_AddNumberToObject(config, "ph_cal_offset", s_config->ph_cal_offset);
+    
+    // Калибровка насосов
+    cJSON *pumps_cal = cJSON_CreateArray();
+    if (pumps_cal) {
+        for (int i = 0; i < 2; i++) {
+            cJSON *pump = cJSON_CreateObject();
+            if (pump) {
+                cJSON_AddNumberToObject(pump, "pump_id", i);
+                cJSON_AddNumberToObject(pump, "ml_per_second", s_config->pump_calibration[i].ml_per_second);
+                cJSON_AddNumberToObject(pump, "calibration_volume_ml", s_config->pump_calibration[i].calibration_volume_ml);
+                cJSON_AddNumberToObject(pump, "calibration_time_ms", s_config->pump_calibration[i].calibration_time_ms);
+                cJSON_AddBoolToObject(pump, "is_calibrated", s_config->pump_calibration[i].is_calibrated);
+                cJSON_AddNumberToObject(pump, "last_calibrated", (double)s_config->pump_calibration[i].last_calibrated);
+                cJSON_AddItemToArray(pumps_cal, pump);
+            }
+        }
+        cJSON_AddItemToObject(config, "pumps_calibration", pumps_cal);
+    }
+    
+    // PID параметры
+    cJSON *pumps_pid = cJSON_CreateArray();
+    if (pumps_pid) {
+        for (int i = 0; i < 2; i++) {
+            cJSON *pid = cJSON_CreateObject();
+            if (pid) {
+                cJSON_AddNumberToObject(pid, "pump_id", i);
+                cJSON_AddNumberToObject(pid, "kp", s_config->pump_pid[i].kp);
+                cJSON_AddNumberToObject(pid, "ki", s_config->pump_pid[i].ki);
+                cJSON_AddNumberToObject(pid, "kd", s_config->pump_pid[i].kd);
+                cJSON_AddBoolToObject(pid, "enabled", s_config->pump_pid[i].enabled);
+                cJSON_AddItemToArray(pumps_pid, pid);
+            }
+        }
+        cJSON_AddItemToObject(config, "pumps_pid", pumps_pid);
+    }
+    
+    // Safety параметры
+    cJSON_AddNumberToObject(config, "max_pump_time_ms", s_config->max_pump_time_ms);
+    cJSON_AddNumberToObject(config, "cooldown_ms", s_config->cooldown_ms);
+    cJSON_AddNumberToObject(config, "max_daily_volume_ml", s_config->max_daily_volume_ml);
+    
+    // Emergency пороги
+    cJSON_AddNumberToObject(config, "ph_emergency_low", s_config->ph_emergency_low);
+    cJSON_AddNumberToObject(config, "ph_emergency_high", s_config->ph_emergency_high);
+    
+    // Автономия
+    cJSON_AddBoolToObject(config, "autonomous_enabled", s_config->autonomous_enabled);
+    cJSON_AddNumberToObject(config, "mesh_timeout_ms", s_config->mesh_timeout_ms);
+    
+    // Добавление config к root
+    cJSON_AddItemToObject(root, "config", config);
+    
+    // Отправка конфигурации
+    char *json_str = cJSON_PrintUnformatted(root);
+    if (json_str) {
+        esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Config sent to ROOT (%d bytes)", strlen(json_str));
+        } else {
+            ESP_LOGE(TAG, "Failed to send config: %s", esp_err_to_name(err));
+        }
+        free(json_str);
+    } else {
+        ESP_LOGE(TAG, "Failed to serialize config JSON");
+    }
+    
+    // Всегда освобождаем память
+    cJSON_Delete(root);
 }
 

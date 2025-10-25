@@ -128,10 +128,15 @@ esp_err_t node_config_reset_to_default(void *config, const char *node_type) {
             cfg->pump_pid[i].enabled = true;
         }
         
-        // Safety
+        // Safety параметры
         cfg->max_pump_time_ms = 10000;  // 10 сек макс
         cfg->cooldown_ms = 60000;       // 1 мин между включениями
         cfg->max_daily_volume_ml = 1000; // 1 литр в день
+        
+        // Emergency пороги (настраиваемые)
+        cfg->ph_emergency_low = 5.5f;    // Критичный нижний pH
+        cfg->ph_emergency_high = 7.5f;   // Критичный верхний pH
+        cfg->ec_emergency_high = 3.0f;   // Критичный верхний EC
         
         // Автономия
         cfg->autonomous_enabled = true;
@@ -181,6 +186,109 @@ esp_err_t node_config_reset_to_default(void *config, const char *node_type) {
         cfg->windows.close_time_ms = 30000;  // 30 сек
         
         ESP_LOGI(TAG, "Reset to default: Relay config");
+        
+    } else if (strcmp(node_type, "ph") == 0) {
+        ph_node_config_t *cfg = (ph_node_config_t *)config;
+        memset(cfg, 0, sizeof(ph_node_config_t));
+        
+        strcpy(cfg->base.node_type, "ph");
+        cfg->base.config_valid = true;
+        cfg->base.config_version = 1;
+        
+        // Целевое значение
+        cfg->ph_target = 6.5f;
+        
+        // Диапазоны
+        cfg->ph_min = 5.5f;
+        cfg->ph_max = 7.5f;
+        
+        // PID параметры (2 насоса: UP, DOWN)
+        for (int i = 0; i < 2; i++) {
+            cfg->pump_pid[i].kp = 1.0f;
+            cfg->pump_pid[i].ki = 0.05f;
+            cfg->pump_pid[i].kd = 0.3f;
+            cfg->pump_pid[i].output_min = 0.0f;
+            cfg->pump_pid[i].output_max = 5.0f;
+            cfg->pump_pid[i].enabled = true;
+        }
+        
+        // Калибровка насосов (по умолчанию 1 мл/сек)
+        for (int i = 0; i < 2; i++) {
+            cfg->pump_calibration[i].ml_per_second = 1.0f;
+            cfg->pump_calibration[i].calibration_time_ms = 10000;  // 10 сек
+            cfg->pump_calibration[i].calibration_volume_ml = 10.0f;  // 10 мл
+            cfg->pump_calibration[i].is_calibrated = false;
+            cfg->pump_calibration[i].last_calibrated = 0;
+        }
+        
+        // Safety параметры
+        cfg->max_pump_time_ms = 10000;  // 10 сек макс
+        cfg->cooldown_ms = 60000;       // 1 мин между включениями
+        cfg->max_daily_volume_ml = 1000; // 1 литр в день
+        
+        // Emergency пороги (настраиваемые)
+        cfg->ph_emergency_low = 5.5f;    // Критичный нижний pH
+        cfg->ph_emergency_high = 7.5f;   // Критичный верхний pH
+        
+        // Автономия
+        cfg->autonomous_enabled = true;
+        cfg->mesh_timeout_ms = 30000;   // 30 сек
+        
+        // Калибровка датчика pH
+        cfg->ph_cal_offset = 0.0f;
+        
+        ESP_LOGI(TAG, "Reset to default: pH config");
+        
+    } else if (strcmp(node_type, "ec") == 0) {
+        ec_node_config_t *cfg = (ec_node_config_t *)config;
+        memset(cfg, 0, sizeof(ec_node_config_t));
+        
+        strcpy(cfg->base.node_type, "ec");
+        cfg->base.config_valid = true;
+        cfg->base.config_version = 1;
+        
+        // Целевое значение
+        cfg->ec_target = 2.5f;
+        
+        // Диапазоны
+        cfg->ec_min = 1.5f;
+        cfg->ec_max = 4.0f;
+        
+        // PID параметры (3 насоса: A, B, C)
+        for (int i = 0; i < 3; i++) {
+            cfg->pump_pid[i].kp = 0.8f;   // Консервативный Kp для EC
+            cfg->pump_pid[i].ki = 0.02f;  // Консервативный Ki для EC
+            cfg->pump_pid[i].kd = 0.2f;   // Консервативный Kd для EC
+            cfg->pump_pid[i].output_min = 0.0f;
+            cfg->pump_pid[i].output_max = 5.0f;
+            cfg->pump_pid[i].enabled = true;
+        }
+        
+        // Калибровка насосов (по умолчанию 1 мл/сек)
+        for (int i = 0; i < 3; i++) {
+            cfg->pump_calibration[i].ml_per_second = 1.0f;
+            cfg->pump_calibration[i].calibration_time_ms = 10000;  // 10 сек
+            cfg->pump_calibration[i].calibration_volume_ml = 10.0f;  // 10 мл
+            cfg->pump_calibration[i].is_calibrated = false;
+            cfg->pump_calibration[i].last_calibrated = 0;
+        }
+        
+        // Safety параметры
+        cfg->max_pump_time_ms = 10000;  // 10 сек макс
+        cfg->cooldown_ms = 60000;       // 1 мин между включениями
+        cfg->max_daily_volume_ml = 1000; // 1 литр в день
+        
+        // Emergency пороги (настраиваемые)
+        cfg->ec_emergency_high = 3.0f;   // Критичный верхний EC
+        
+        // Автономия
+        cfg->autonomous_enabled = true;
+        cfg->mesh_timeout_ms = 30000;   // 30 сек
+        
+        // Калибровка датчика EC
+        cfg->ec_cal_offset = 0.0f;
+        
+        ESP_LOGI(TAG, "Reset to default: EC config");
         
     } else if (strcmp(node_type, "water") == 0) {
         water_node_config_t *cfg = (water_node_config_t *)config;
@@ -321,6 +429,131 @@ esp_err_t node_config_update_from_json(void *config, cJSON *json_config, const c
         cfg->base.config_valid = true;
         
         ESP_LOGI(TAG, "pH/EC config updated from JSON (v%d)", cfg->base.config_version);
+        
+    } else if (strcmp(node_type, "ph") == 0) {
+        ph_node_config_t *cfg = (ph_node_config_t *)config;
+        
+        // Обновление базовых полей
+        cJSON *item;
+        if ((item = cJSON_GetObjectItem(json_config, "node_id")) && cJSON_IsString(item)) {
+            strncpy(cfg->base.node_id, item->valuestring, sizeof(cfg->base.node_id) - 1);
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "zone")) && cJSON_IsString(item)) {
+            strncpy(cfg->base.zone, item->valuestring, sizeof(cfg->base.zone) - 1);
+        }
+        
+        // Целевое значение
+        if ((item = cJSON_GetObjectItem(json_config, "ph_target")) && cJSON_IsNumber(item)) {
+            cfg->ph_target = (float)item->valuedouble;
+        }
+        
+        // Диапазоны
+        if ((item = cJSON_GetObjectItem(json_config, "ph_min")) && cJSON_IsNumber(item)) {
+            cfg->ph_min = (float)item->valuedouble;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "ph_max")) && cJSON_IsNumber(item)) {
+            cfg->ph_max = (float)item->valuedouble;
+        }
+        
+        // Emergency пороги
+        if ((item = cJSON_GetObjectItem(json_config, "ph_emergency_low")) && cJSON_IsNumber(item)) {
+            cfg->ph_emergency_low = (float)item->valuedouble;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "ph_emergency_high")) && cJSON_IsNumber(item)) {
+            cfg->ph_emergency_high = (float)item->valuedouble;
+        }
+        
+        // Safety параметры
+        if ((item = cJSON_GetObjectItem(json_config, "max_pump_time_ms")) && cJSON_IsNumber(item)) {
+            cfg->max_pump_time_ms = (uint32_t)item->valueint;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "cooldown_ms")) && cJSON_IsNumber(item)) {
+            cfg->cooldown_ms = (uint32_t)item->valueint;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "max_daily_volume_ml")) && cJSON_IsNumber(item)) {
+            cfg->max_daily_volume_ml = (uint32_t)item->valueint;
+        }
+        
+        // Автономия
+        if ((item = cJSON_GetObjectItem(json_config, "autonomous_enabled")) && cJSON_IsBool(item)) {
+            cfg->autonomous_enabled = cJSON_IsTrue(item);
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "mesh_timeout_ms")) && cJSON_IsNumber(item)) {
+            cfg->mesh_timeout_ms = (uint32_t)item->valueint;
+        }
+        
+        // Калибровка
+        if ((item = cJSON_GetObjectItem(json_config, "ph_cal_offset")) && cJSON_IsNumber(item)) {
+            cfg->ph_cal_offset = (float)item->valuedouble;
+        }
+        
+        // Обновление версии и времени
+        cfg->base.config_version++;
+        cfg->base.last_updated = (uint64_t)time(NULL);
+        cfg->base.config_valid = true;
+        
+        ESP_LOGI(TAG, "pH config updated from JSON (v%d)", cfg->base.config_version);
+        
+    } else if (strcmp(node_type, "ec") == 0) {
+        ec_node_config_t *cfg = (ec_node_config_t *)config;
+        
+        // Обновление базовых полей
+        cJSON *item;
+        if ((item = cJSON_GetObjectItem(json_config, "node_id")) && cJSON_IsString(item)) {
+            strncpy(cfg->base.node_id, item->valuestring, sizeof(cfg->base.node_id) - 1);
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "zone")) && cJSON_IsString(item)) {
+            strncpy(cfg->base.zone, item->valuestring, sizeof(cfg->base.zone) - 1);
+        }
+        
+        // Целевое значение
+        if ((item = cJSON_GetObjectItem(json_config, "ec_target")) && cJSON_IsNumber(item)) {
+            cfg->ec_target = (float)item->valuedouble;
+        }
+        
+        // Диапазоны
+        if ((item = cJSON_GetObjectItem(json_config, "ec_min")) && cJSON_IsNumber(item)) {
+            cfg->ec_min = (float)item->valuedouble;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "ec_max")) && cJSON_IsNumber(item)) {
+            cfg->ec_max = (float)item->valuedouble;
+        }
+        
+        // Emergency пороги
+        if ((item = cJSON_GetObjectItem(json_config, "ec_emergency_high")) && cJSON_IsNumber(item)) {
+            cfg->ec_emergency_high = (float)item->valuedouble;
+        }
+        
+        // Safety параметры
+        if ((item = cJSON_GetObjectItem(json_config, "max_pump_time_ms")) && cJSON_IsNumber(item)) {
+            cfg->max_pump_time_ms = (uint32_t)item->valueint;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "cooldown_ms")) && cJSON_IsNumber(item)) {
+            cfg->cooldown_ms = (uint32_t)item->valueint;
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "max_daily_volume_ml")) && cJSON_IsNumber(item)) {
+            cfg->max_daily_volume_ml = (uint32_t)item->valueint;
+        }
+        
+        // Автономия
+        if ((item = cJSON_GetObjectItem(json_config, "autonomous_enabled")) && cJSON_IsBool(item)) {
+            cfg->autonomous_enabled = cJSON_IsTrue(item);
+        }
+        if ((item = cJSON_GetObjectItem(json_config, "mesh_timeout_ms")) && cJSON_IsNumber(item)) {
+            cfg->mesh_timeout_ms = (uint32_t)item->valueint;
+        }
+        
+        // Калибровка
+        if ((item = cJSON_GetObjectItem(json_config, "ec_cal_offset")) && cJSON_IsNumber(item)) {
+            cfg->ec_cal_offset = (float)item->valuedouble;
+        }
+        
+        // Обновление версии и времени
+        cfg->base.config_version++;
+        cfg->base.last_updated = (uint64_t)time(NULL);
+        cfg->base.config_valid = true;
+        
+        ESP_LOGI(TAG, "EC config updated from JSON (v%d)", cfg->base.config_version);
         
     } else if (strcmp(node_type, "climate") == 0) {
         climate_node_config_t *cfg = (climate_node_config_t *)config;

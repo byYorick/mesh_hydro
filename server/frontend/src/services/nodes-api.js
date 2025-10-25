@@ -19,8 +19,8 @@ export default {
     
     const stats = {
       total: nodes.length,
-      online: nodes.filter(n => n.online || n.is_online).length,
-      offline: nodes.filter(n => !n.online && !n.is_online).length,
+      online: nodes.filter(n => n.online).length,
+      offline: nodes.filter(n => !n.online).length,
       byType: {},
     }
 

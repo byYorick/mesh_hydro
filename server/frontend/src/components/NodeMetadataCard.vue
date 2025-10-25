@@ -93,7 +93,7 @@
         </v-list-item>
 
         <!-- Sensors (для Climate) -->
-        <v-list-item v-if="metadata.sensors">
+        <v-list-item v-if="metadata.sensors && Array.isArray(metadata.sensors)">
           <template v-slot:prepend>
             <v-icon icon="mdi-thermometer" color="info"></v-icon>
           </template>
@@ -158,7 +158,21 @@ const props = defineProps({
   },
 })
 
-const metadata = computed(() => props.node.metadata || {})
+const metadata = computed(() => {
+  // Создаём копию metadata чтобы не мутировать исходный объект
+  const sourceMeta = props.node.metadata || {}
+  const meta = { ...sourceMeta }
+  
+  // Исправляем undefined sensors и capabilities
+  if (!Array.isArray(meta.sensors)) {
+    meta.sensors = []
+  }
+  if (!Array.isArray(meta.capabilities)) {
+    meta.capabilities = []
+  }
+  
+  return meta
+})
 
 // Memory calculations
 const heapTotal = computed(() => metadata.value.heap_total || metadata.value.total_heap || 320000)
@@ -212,15 +226,42 @@ const knownFields = [
 ]
 
 const additionalMetadata = computed(() => {
+  console.log('🔍 NodeMetadataCard: additionalMetadata computed called')
+  console.log('🔍 NodeMetadataCard: metadata.value:', metadata.value)
+  console.log('🔍 NodeMetadataCard: knownFields:', knownFields)
+  
   const additional = {}
   if (!metadata.value || typeof metadata.value !== 'object') {
+    console.log('NodeMetadataCard: metadata.value is not valid:', metadata.value)
     return additional
   }
-  Object.keys(metadata.value).forEach(key => {
-    if (!knownFields.includes(key)) {
-      additional[key] = metadata.value[key]
-    }
-  })
+  
+  // Проверяем что knownFields определен и является массивом
+  if (!knownFields || !Array.isArray(knownFields)) {
+    console.warn('NodeMetadataCard: knownFields is not defined or not an array:', knownFields)
+    return additional
+  }
+  
+  try {
+    console.log('🔍 NodeMetadataCard: Starting forEach loop')
+    Object.keys(metadata.value).forEach((key, index) => {
+      console.log(`🔍 NodeMetadataCard: Processing key ${index}:`, key)
+      console.log(`🔍 NodeMetadataCard: knownFields type:`, typeof knownFields)
+      console.log(`🔍 NodeMetadataCard: knownFields isArray:`, Array.isArray(knownFields))
+      
+      // Дополнительная проверка на undefined/null перед вызовом includes
+      if (knownFields && Array.isArray(knownFields) && key && !knownFields.includes(key)) {
+        console.log(`🔍 NodeMetadataCard: Adding key to additional:`, key)
+        additional[key] = metadata.value[key]
+      }
+    })
+    console.log('🔍 NodeMetadataCard: forEach loop completed')
+  } catch (error) {
+    console.error('NodeMetadataCard: Error in additionalMetadata computation:', error)
+    console.error('NodeMetadataCard: knownFields:', knownFields)
+    console.error('NodeMetadataCard: metadata.value:', metadata.value)
+  }
+  console.log('🔍 NodeMetadataCard: additionalMetadata result:', additional)
   return additional
 })
 
@@ -292,8 +333,14 @@ function formatMac(mac) {
   if (!mac || typeof mac !== 'string') return 'N/A'
   
   // Если уже форматировано с двоеточиями (00:4b:12:37:d5:a4)
-  if (mac.includes(':')) {
-    return mac.toUpperCase()
+  try {
+    // Дополнительная проверка на undefined/null перед вызовом includes
+    if (mac && typeof mac === 'string' && mac.includes && mac.includes(':')) {
+      return mac.toUpperCase()
+    }
+  } catch (error) {
+    console.error('NodeMetadataCard.vue: formatMac - Error in includes (colons):', error)
+    console.error('NodeMetadataCard.vue: formatMac - mac:', mac, typeof mac)
   }
   
   // Если без разделителей (004b1237d5a4)
@@ -302,8 +349,14 @@ function formatMac(mac) {
   }
   
   // Если с дефисами (00-4b-12-37-d5-a4)
-  if (mac.includes('-')) {
-    return mac.replace(/-/g, ':').toUpperCase()
+  try {
+    // Дополнительная проверка на undefined/null перед вызовом includes
+    if (mac && typeof mac === 'string' && mac.includes && mac.includes('-')) {
+      return mac.replace(/-/g, ':').toUpperCase()
+    }
+  } catch (error) {
+    console.error('NodeMetadataCard.vue: formatMac - Error in includes (dashes):', error)
+    console.error('NodeMetadataCard.vue: formatMac - mac:', mac, typeof mac)
   }
   
   return mac.toUpperCase()

@@ -427,7 +427,7 @@ const validateCalibrationDuration = (value) => {
 // Запуск насоса
 const runPump = async (pumpId) => {
   // Проверяем статус узла
-  if (!props.node.online && !props.node.is_online) {
+  if (!props.node.online) {
     toast.error('❌ Узел офлайн. Проверьте подключение.')
     return
   }

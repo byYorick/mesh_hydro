@@ -21,6 +21,22 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    // Отключение кеширования для development
+    rollupOptions: {
+      output: {
+        // Добавляем timestamp к именам файлов для предотвращения кеширования
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/[name]-[hash].js`,
+        assetFileNames: `assets/[name]-[hash].[ext]`
+      }
+    }
+  },
+  // Отключение кеширования в development режиме
+  define: {
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false
   }
 })
 

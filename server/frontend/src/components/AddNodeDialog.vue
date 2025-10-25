@@ -601,9 +601,21 @@ function validateJson(value) {
 }
 
 function addZone() {
-  if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
-    zones.value.push(newZone.value)
-    newNode.value.zone = newZone.value
+  console.log('🔍 AddNodeDialog: addZone function called')
+  console.log('🔍 AddNodeDialog: newZone.value:', newZone.value, typeof newZone.value)
+  console.log('🔍 AddNodeDialog: zones.value:', zones.value, typeof zones.value)
+  
+  try {
+    // Дополнительная проверка на undefined/null перед вызовом includes
+    if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
+      console.log('🔍 AddNodeDialog: Adding new zone:', newZone.value)
+      zones.value.push(newZone.value)
+      newNode.value.zone = newZone.value
+    }
+  } catch (error) {
+    console.error('AddNodeDialog.vue: addZone - Error in includes:', error)
+    console.error('AddNodeDialog.vue: addZone - newZone.value:', newZone.value, typeof newZone.value)
+    console.error('AddNodeDialog.vue: addZone - zones.value:', zones.value, typeof zones.value)
   }
   addZoneDialog.value = false
   newZone.value = ''

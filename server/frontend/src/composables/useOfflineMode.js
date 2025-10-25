@@ -95,13 +95,26 @@ export function useOfflineMode() {
     if (!actionType || typeof actionType !== 'string') {
       return false
     }
+    
     const offlineCapableActions = [
       'view_nodes',
       'view_events',
       'view_telemetry',
       'view_settings'
     ]
-    return offlineCapableActions.includes(actionType)
+    
+    try {
+      // Дополнительная проверка на undefined/null перед вызовом includes
+      if (offlineCapableActions && Array.isArray(offlineCapableActions) && actionType) {
+        return offlineCapableActions.includes(actionType)
+      }
+      return false
+    } catch (error) {
+      console.error('useOfflineMode.js: isOfflineCapable - Error in includes:', error)
+      console.error('useOfflineMode.js: isOfflineCapable - actionType:', actionType, typeof actionType)
+      console.error('useOfflineMode.js: isOfflineCapable - offlineCapableActions:', offlineCapableActions, typeof offlineCapableActions)
+      return false
+    }
   }
 
   // Получение офлайн данных из localStorage

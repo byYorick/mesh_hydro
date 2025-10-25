@@ -127,13 +127,37 @@ const filteredNodes = computed(() => {
   let nodes = [...nodesStore.nodes]
 
   // Search filter с debounce
-  if (debouncedSearch.value) {
+  if (debouncedSearch.value && typeof debouncedSearch.value === 'string') {
     const query = debouncedSearch.value.toLowerCase()
-    nodes = nodes.filter(node =>
-      (node.node_id && node.node_id.toLowerCase().includes(query)) ||
-      (node.node_type && node.node_type.toLowerCase().includes(query)) ||
-      (node.zone && node.zone.toLowerCase().includes(query))
-    )
+    try {
+      nodes = nodes.filter(node => {
+        if (!node || typeof node !== 'object') return false
+        
+        const nodeId = node.node_id
+        const nodeType = node.node_type
+        const nodeZone = node.zone
+        
+        try {
+          // Дополнительная проверка на undefined/null перед вызовом includes
+          const idMatch = nodeId && typeof nodeId === 'string' && query && nodeId.toLowerCase && nodeId.toLowerCase().includes(query)
+          const typeMatch = nodeType && typeof nodeType === 'string' && query && nodeType.toLowerCase && nodeType.toLowerCase().includes(query)
+          const zoneMatch = nodeZone && typeof nodeZone === 'string' && query && nodeZone.toLowerCase && nodeZone.toLowerCase().includes(query)
+          
+          return idMatch || typeMatch || zoneMatch
+        } catch (includesError) {
+          console.error('Nodes.vue: search filter - Error in includes:', includesError)
+          console.error('Nodes.vue: search filter - nodeId:', nodeId, typeof nodeId)
+          console.error('Nodes.vue: search filter - nodeType:', nodeType, typeof nodeType)
+          console.error('Nodes.vue: search filter - nodeZone:', nodeZone, typeof nodeZone)
+          console.error('Nodes.vue: search filter - query:', query)
+          return false
+        }
+      })
+    } catch (error) {
+      console.error('Nodes.vue: search filter - Error in filter:', error)
+      console.error('Nodes.vue: search filter - nodes:', nodes)
+      console.error('Nodes.vue: search filter - query:', query)
+    }
   }
 
   // Type filter
@@ -144,9 +168,9 @@ const filteredNodes = computed(() => {
   // Status filter
   if (filterStatus.value) {
     if (filterStatus.value === 'online') {
-      nodes = nodes.filter(node => node.online || node.is_online)
+      nodes = nodes.filter(node => node.online)
     } else {
-      nodes = nodes.filter(node => !node.online && !node.is_online)
+      nodes = nodes.filter(node => !node.online)
     }
   }
 

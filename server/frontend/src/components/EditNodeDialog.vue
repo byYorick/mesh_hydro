@@ -222,9 +222,16 @@ function validateJson(value) {
 }
 
 function addZone() {
-  if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
-    zones.value.push(newZone.value)
-    editedNode.value.zone = newZone.value
+  try {
+    // Дополнительная проверка на undefined/null перед вызовом includes
+    if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
+      zones.value.push(newZone.value)
+      editedNode.value.zone = newZone.value
+    }
+  } catch (error) {
+    console.error('EditNodeDialog.vue: addZone - Error in includes:', error)
+    console.error('EditNodeDialog.vue: addZone - newZone.value:', newZone.value, typeof newZone.value)
+    console.error('EditNodeDialog.vue: addZone - zones.value:', zones.value, typeof zones.value)
   }
   addZoneDialog.value = false
   newZone.value = ''

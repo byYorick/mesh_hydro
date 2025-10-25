@@ -146,8 +146,20 @@ export const useAppStore = defineStore('app', {
       }
       
       // Критичные ошибки
-      if (error.message && typeof error.message === 'string' && error.message.includes('critical')) {
-        return 'critical'
+      try {
+        if (error && error.message && typeof error.message === 'string') {
+          try {
+            // Дополнительная проверка на undefined/null перед вызовом includes
+            if (error.message && error.message.toLowerCase && error.message.toLowerCase().includes('critical')) {
+              return 'critical'
+            }
+          } catch (includesError) {
+            console.error('app.js: getErrorLevel - Error in includes:', includesError)
+            console.error('app.js: getErrorLevel - error.message:', error?.message, typeof error?.message)
+          }
+        }
+      } catch (error) {
+        console.error('app.js: getErrorLevel - Error in outer try:', error)
       }
       
       return 'unknown'

@@ -1,0 +1,156 @@
+[
+  {
+    "description": "Тест полной цепочки: pH нода → ROOT → MQTT → Сервер → БД → Фронт",
+    "node_type": "ph",
+    "node_id": "ph_001",
+    "event": {
+      "type": "event",
+      "node_id": "ph_001",
+      "node_type": "ph",
+      "timestamp": 1703123456,
+      "level": "info",
+      "data": {
+        "event_type": "pump_start",
+        "pump_id": 0,
+        "duration_ms": 3000,
+        "dose_ml": 1.5,
+        "ml_per_second": 2.0,
+        "pid_data": {
+          "kp": 1.5,
+          "ki": 0.2,
+          "kd": 0.8,
+          "setpoint": 6.5,
+          "current_value": 6.0,
+          "error": 0.5,
+          "output": 1.5,
+          "integral": 0.0,
+          "derivative": 0.0,
+          "enabled": true
+        },
+        "current_ph": 6.0,
+        "ph_target": 6.5,
+        "emergency_mode": false,
+        "autonomous_mode": false,
+        "rssi": -45
+      }
+    },
+    "expected_server_message": "🚰 Насос pH UP запущен: 1.5 мл (3000 мс)",
+    "expected_level": "info"
+  },
+  {
+    "description": "Тест полной цепочки: EC нода → ROOT → MQTT → Сервер → БД → Фронт",
+    "node_type": "ec",
+    "node_id": "ec_001",
+    "event": {
+      "type": "event",
+      "node_id": "ec_001",
+      "node_type": "ec",
+      "timestamp": 1703123456,
+      "level": "info",
+      "data": {
+        "event_type": "pump_start",
+        "pump_id": 0,
+        "duration_ms": 2000,
+        "dose_ml": 2.5,
+        "ml_per_second": 2.0,
+        "pid_data": {
+          "kp": 1.2,
+          "ki": 0.15,
+          "kd": 0.6,
+          "setpoint": 1.5,
+          "current_value": 1.2,
+          "error": 0.3,
+          "output": 2.5,
+          "integral": 0.0,
+          "derivative": 0.0,
+          "enabled": true
+        },
+        "current_ec": 1.2,
+        "ec_target": 1.5,
+        "emergency_mode": false,
+        "autonomous_mode": false,
+        "rssi": -45
+      }
+    },
+    "expected_server_message": "🚰 Насос EC A запущен: 2.5 мл (2000 мс)",
+    "expected_level": "info"
+  },
+  {
+    "description": "Тест полной цепочки: ph_ec нода → ROOT → MQTT → Сервер → БД → Фронт",
+    "node_type": "ph_ec",
+    "node_id": "ph_ec_001",
+    "event": {
+      "type": "event",
+      "node_id": "ph_ec_001",
+      "node_type": "ph_ec",
+      "timestamp": 1703123456,
+      "level": "info",
+      "data": {
+        "event_type": "pump_start",
+        "pump_id": 0,
+        "duration_ms": 5000,
+        "dose_ml": 2.5,
+        "ml_per_second": 2.0,
+        "pid_data": {
+          "kp": 1.2,
+          "ki": 0.1,
+          "kd": 0.5,
+          "setpoint": 6.5,
+          "current_value": 6.0,
+          "error": 0.5,
+          "output": 2.5,
+          "integral": 0.0,
+          "derivative": 0.0,
+          "enabled": true
+        },
+        "current_ph": 6.0,
+        "current_ec": 1.2,
+        "ph_target": 6.5,
+        "ec_target": 1.5,
+        "emergency_mode": false,
+        "autonomous_mode": false,
+        "rssi": -45
+      }
+    },
+    "expected_server_message": "🚰 Насос pH UP запущен: 2.5 мл (5000 мс)",
+    "expected_level": "info"
+  },
+  {
+    "description": "Тест аварийной остановки насоса",
+    "node_type": "ph",
+    "node_id": "ph_001",
+    "event": {
+      "type": "event",
+      "node_id": "ph_001",
+      "node_type": "ph",
+      "timestamp": 1703123500,
+      "level": "critical",
+      "data": {
+        "event_type": "pump_emergency_stop",
+        "pump_id": 0,
+        "duration_ms": 0,
+        "dose_ml": 0.0,
+        "ml_per_second": 0.0,
+        "pid_data": {
+          "kp": 1.0,
+          "ki": 0.1,
+          "kd": 0.5,
+          "setpoint": 6.5,
+          "current_value": 4.0,
+          "error": 2.5,
+          "output": 0.0,
+          "integral": 0.0,
+          "derivative": 0.0,
+          "enabled": false
+        },
+        "current_ph": 4.0,
+        "ph_target": 6.5,
+        "emergency_mode": true,
+        "autonomous_mode": false,
+        "rssi": -50
+      }
+    },
+    "expected_server_message": "🚨 Аварийная остановка насоса pH UP",
+    "expected_level": "critical"
+  }
+]

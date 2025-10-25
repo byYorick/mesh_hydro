@@ -68,6 +68,16 @@ esp_err_t ph_manager_set_emergency(bool enable);
  */
 esp_err_t ph_manager_get_value(float *ph);
 
+// Внутренние функции для обработки команд
+void ph_manager_handle_ph_target_command(cJSON *params);
+void ph_manager_handle_pump_command(cJSON *params);
+void ph_manager_handle_reset_stats_command(void);
+void ph_manager_handle_manual_pump_command(cJSON *params);
+void ph_manager_handle_safety_command(cJSON *params);
+void ph_manager_handle_pid_command(cJSON *params);
+void ph_manager_handle_autonomous_command(cJSON *params);
+void ph_manager_send_config_response(void);
+
 #ifdef __cplusplus
 }
 #endif

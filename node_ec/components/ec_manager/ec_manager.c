@@ -8,6 +8,7 @@
 #include "pump_controller.h"
 #include "pid_controller.h"
 #include "adaptive_pid.h"
+#include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 
@@ -335,6 +336,7 @@ static void read_sensor(void) {
 static void control_ec(void) {
     float output = 0.0f;
     esp_err_t err;
+    int8_t rssi = get_rssi_to_parent();
     
     // Если EC < target - нужно повысить
     if (s_current_ec < s_config->ec_target) {
@@ -350,6 +352,51 @@ static void control_ec(void) {
             ESP_LOGI(TAG, "EC: %.2f ml [%s zone] (A:%.2f B:%.2f C:%.2f) current=%.2f target=%.2f", 
                      output, adaptive_pid_zone_to_str(zone), dose_a, dose_b, dose_c, 
                      s_current_ec, s_config->ec_target);
+            
+            // Получение данных PID для событий
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ec.pid, s_current_ec, &pid_data);
+            pid_data.output = output; // Устанавливаем реальный выход
+            
+            // Отправка событий включения для всех 3 насосов EC
+            if (dose_a > 0.0f) {
+                pump_events_send_start_event(
+                    PUMP_EC_A,
+                    (uint32_t)((dose_a / 2.0f) * 1000.0f),
+                    dose_a,
+                    &pid_data,
+                    s_current_ec,
+                    s_config->ec_target,
+                    s_emergency_mode, s_autonomous_mode,
+                    rssi
+                );
+            }
+            
+            if (dose_b > 0.0f) {
+                pump_events_send_start_event(
+                    PUMP_EC_B,
+                    (uint32_t)((dose_b / 2.0f) * 1000.0f),
+                    dose_b,
+                    &pid_data,
+                    s_current_ec,
+                    s_config->ec_target,
+                    s_emergency_mode, s_autonomous_mode,
+                    rssi
+                );
+            }
+            
+            if (dose_c > 0.0f) {
+                pump_events_send_start_event(
+                    PUMP_EC_C,
+                    (uint32_t)((dose_c / 2.0f) * 1000.0f),
+                    dose_c,
+                    &pid_data,
+                    s_current_ec,
+                    s_config->ec_target,
+                    s_emergency_mode, s_autonomous_mode,
+                    rssi
+                );
+            }
             
             // Запуск всех 3 насосов последовательно
             pump_controller_run_dose(PUMP_EC_A, dose_a);
@@ -408,22 +455,19 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
 
 // Проверка аварийных условий
 static void check_emergency_conditions(void) {
-    // Emergency если EC слишком низкий или высокий
-    if (s_current_ec < s_config->ec_min || s_current_ec > s_config->ec_max) {
+    // Emergency если EC слишком высокий (используем настраиваемый порог)
+    if (s_current_ec > s_config->ec_emergency_high) {
         if (!s_emergency_mode) {
-            ESP_LOGE(TAG, "EMERGENCY: EC out of range (%.2f)", s_current_ec);
+            ESP_LOGE(TAG, "EMERGENCY: EC out of range (%.2f) - limit: %.2f", 
+                     s_current_ec, s_config->ec_emergency_high);
             ec_manager_set_emergency(true);
             
             // Отправка критичного события
-            if (s_current_ec < s_config->ec_min) {
-                send_event(MESH_EVENT_CRITICAL, "EC too low", s_current_ec);
-            } else {
-                send_event(MESH_EVENT_CRITICAL, "EC too high", s_current_ec);
-            }
+            send_event(MESH_EVENT_CRITICAL, "EC too high", s_current_ec);
         }
     } else {
         if (s_emergency_mode) {
-            ESP_LOGI(TAG, "EC back to normal range");
+            ESP_LOGI(TAG, "EC back to normal range (%.2f)", s_current_ec);
             ec_manager_set_emergency(false);
             
             // Отправка события восстановления
@@ -629,10 +673,17 @@ void ec_manager_handle_command(const char *command, cJSON *params) {
             cJSON_AddItemToObject(config, "pumps_pid", pumps_pid);
         }
         
-        // Safety
+        // Safety параметры
         cJSON_AddNumberToObject(config, "max_pump_time_ms", s_config->max_pump_time_ms);
         cJSON_AddNumberToObject(config, "cooldown_ms", s_config->cooldown_ms);
+        cJSON_AddNumberToObject(config, "max_daily_volume_ml", s_config->max_daily_volume_ml);
+        
+        // Emergency пороги
+        cJSON_AddNumberToObject(config, "ec_emergency_high", s_config->ec_emergency_high);
+        
+        // Автономия
         cJSON_AddBoolToObject(config, "autonomous_enabled", s_config->autonomous_enabled);
+        cJSON_AddNumberToObject(config, "mesh_timeout_ms", s_config->mesh_timeout_ms);
         
         // Добавление config к root
         cJSON_AddItemToObject(root, "config", config);
@@ -721,6 +772,38 @@ void ec_manager_handle_config_update(cJSON *config_json) {
             config_changed = true;
             ESP_LOGI(TAG, "PID params updated: Kp=%.2f Ki=%.2f Kd=%.2f", 
                      (float)kp->valuedouble, (float)ki->valuedouble, (float)kd->valuedouble);
+        }
+    }
+    else if (strcmp(command, "set_safety_settings") == 0 || strcmp(command, "update_safety_config") == 0) {
+        // Safety параметры
+        cJSON *max_pump_time = cJSON_GetObjectItem(params, "max_pump_time_ms");
+        cJSON *cooldown = cJSON_GetObjectItem(params, "cooldown_ms");
+        cJSON *max_daily_volume = cJSON_GetObjectItem(params, "max_daily_volume_ml");
+        
+        // Emergency пороги
+        cJSON *ec_emergency_high = cJSON_GetObjectItem(params, "ec_emergency_high");
+        
+        if (cJSON_IsNumber(max_pump_time)) {
+            s_config->max_pump_time_ms = (uint32_t)max_pump_time->valuedouble;
+        }
+        if (cJSON_IsNumber(cooldown)) {
+            s_config->cooldown_ms = (uint32_t)cooldown->valuedouble;
+        }
+        if (cJSON_IsNumber(max_daily_volume)) {
+            s_config->max_daily_volume_ml = (uint32_t)max_daily_volume->valuedouble;
+        }
+        if (cJSON_IsNumber(ec_emergency_high)) {
+            s_config->ec_emergency_high = (float)ec_emergency_high->valuedouble;
+        }
+        
+        // Сохраняем в NVS
+        esp_err_t err = node_config_save(s_config, sizeof(ec_node_config_t), "ec_ns");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Safety settings updated: max_pump=%lu ms, cooldown=%lu ms, daily_vol=%lu ml, ec_emergency=%.2f", 
+                     s_config->max_pump_time_ms, s_config->cooldown_ms, s_config->max_daily_volume_ml,
+                     s_config->ec_emergency_high);
+        } else {
+            ESP_LOGE(TAG, "Failed to save safety settings to NVS");
         }
     }
     

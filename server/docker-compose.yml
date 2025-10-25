@@ -212,6 +212,8 @@ services:
         - VITE_WS_HOST=localhost
         - VITE_WS_PORT=8080
         - VITE_PUSHER_KEY=hydro-app-key
+      # Принудительная пересборка без кеша
+      no_cache: true
     container_name: hydro_frontend
     restart: unless-stopped
     ports:

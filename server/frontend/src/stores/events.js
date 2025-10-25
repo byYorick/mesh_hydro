@@ -22,9 +22,64 @@ export const useEventsStore = defineStore('events', {
 
     // Get critical events
     criticalEvents: (state) => {
-      return state.events.filter(e => 
-        e.level && ['critical', 'emergency'].includes(e.level) && !e.resolved_at
-      )
+      console.log('🔍 events.js: criticalEvents getter called')
+      console.log('🔍 events.js: state.events:', state.events)
+      
+      if (!state.events || !Array.isArray(state.events)) {
+        console.log('🔍 events.js: state.events is not valid array')
+        return []
+      }
+      
+      const criticalLevels = ['critical', 'emergency']
+      console.log('🔍 events.js: criticalLevels:', criticalLevels)
+      
+      try {
+        console.log('🔍 events.js: Starting filter operation')
+        const result = state.events.filter((e, index) => {
+          console.log(`🔍 events.js: Processing event ${index}:`, e)
+          
+          if (!e) {
+            console.warn('events.js: criticalEvents - event is null/undefined:', e)
+            return false
+          }
+          if (!e.level) {
+            console.warn('events.js: criticalEvents - event.level is null/undefined:', e)
+            return false
+          }
+          if (typeof e.level !== 'string') {
+            console.warn('events.js: criticalEvents - event.level is not string:', e.level, typeof e.level)
+            return false
+          }
+          if (!criticalLevels || !Array.isArray(criticalLevels)) {
+            console.error('events.js: criticalEvents - criticalLevels is not array:', criticalLevels)
+            return false
+          }
+          
+          console.log(`🔍 events.js: Checking includes for level: ${e.level}`)
+          let includesResult = false
+          try {
+            // Дополнительная проверка на undefined/null перед вызовом includes
+            if (criticalLevels && Array.isArray(criticalLevels) && e.level) {
+              includesResult = criticalLevels.includes(e.level)
+            }
+            console.log(`🔍 events.js: includes result:`, includesResult)
+          } catch (includesError) {
+            console.error('events.js: criticalEvents - Error in includes:', includesError)
+            console.error('events.js: criticalEvents - criticalLevels:', criticalLevels, typeof criticalLevels)
+            console.error('events.js: criticalEvents - e.level:', e.level, typeof e.level)
+            includesResult = false
+          }
+          
+          return includesResult && !e.resolved_at
+        })
+        console.log('🔍 events.js: Filter completed, result:', result)
+        return result
+      } catch (error) {
+        console.error('events.js: criticalEvents - Error in filter:', error)
+        console.error('events.js: criticalEvents - state.events:', state.events)
+        console.error('events.js: criticalEvents - criticalLevels:', criticalLevels)
+        return []
+      }
     },
 
     // Get events by level
@@ -39,9 +94,45 @@ export const useEventsStore = defineStore('events', {
 
     // Count active critical events
     criticalCount: (state) => {
-      return state.events.filter(e => 
-        e.level && ['critical', 'emergency'].includes(e.level) && !e.resolved_at
-      ).length
+      if (!state.events || !Array.isArray(state.events)) return 0
+      const criticalLevels = ['critical', 'emergency']
+      try {
+        return state.events.filter(e => {
+          if (!e) {
+            console.warn('events.js: criticalCount - event is null/undefined:', e)
+            return false
+          }
+          if (!e.level) {
+            console.warn('events.js: criticalCount - event.level is null/undefined:', e)
+            return false
+          }
+          if (typeof e.level !== 'string') {
+            console.warn('events.js: criticalCount - event.level is not string:', e.level, typeof e.level)
+            return false
+          }
+          if (!criticalLevels || !Array.isArray(criticalLevels)) {
+            console.error('events.js: criticalCount - criticalLevels is not array:', criticalLevels)
+            return false
+          }
+          try {
+            // Дополнительная проверка на undefined/null перед вызовом includes
+            if (criticalLevels && Array.isArray(criticalLevels) && e.level) {
+              return criticalLevels.includes(e.level) && !e.resolved_at
+            }
+            return false
+          } catch (includesError) {
+            console.error('events.js: criticalCount - Error in includes:', includesError)
+            console.error('events.js: criticalCount - criticalLevels:', criticalLevels, typeof criticalLevels)
+            console.error('events.js: criticalCount - e.level:', e.level, typeof e.level)
+            return false
+          }
+        }).length
+      } catch (error) {
+        console.error('events.js: criticalCount - Error in filter:', error)
+        console.error('events.js: criticalCount - state.events:', state.events)
+        console.error('events.js: criticalCount - criticalLevels:', criticalLevels)
+        return 0
+      }
     },
   },
 

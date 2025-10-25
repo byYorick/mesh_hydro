@@ -39,14 +39,35 @@ api.interceptors.response.use(
     
     // Не retry для определенных статусов
     const noRetryStatuses = [400, 401, 403, 404, 422]
-    if (error.response && error.response.status && noRetryStatuses.includes(error.response.status)) {
-      return handleError(error)
+    try {
+      // Дополнительная проверка на undefined/null перед вызовом includes
+      if (error && error.response && error.response.status && noRetryStatuses && Array.isArray(noRetryStatuses) && noRetryStatuses.includes(error.response.status)) {
+        return handleError(error)
+      }
+    } catch (includesError) {
+      console.error('api.js: retry logic - Error in includes (noRetryStatuses):', includesError)
+      console.error('api.js: retry logic - error.response.status:', error?.response?.status, typeof error?.response?.status)
+      console.error('api.js: retry logic - noRetryStatuses:', noRetryStatuses, typeof noRetryStatuses)
     }
     
     // Retry только для определенных 5xx ошибок
     const retryableStatuses = [500, 502, 503, 504]
-    const isRetryableError = !error.response || 
-      (error.response.status >= 500 && error.response.status && retryableStatuses.includes(error.response.status))
+    let isRetryableError = false
+    try {
+      // Дополнительная проверка на undefined/null перед вызовом includes
+      if (!error || !error.response) {
+        isRetryableError = false
+      } else if (error.response.status >= 500 && error.response.status && retryableStatuses && Array.isArray(retryableStatuses)) {
+        isRetryableError = retryableStatuses.includes(error.response.status)
+      } else {
+        isRetryableError = false
+      }
+    } catch (includesError) {
+      console.error('api.js: retry logic - Error in includes (retryableStatuses):', includesError)
+      console.error('api.js: retry logic - error.response.status:', error?.response?.status, typeof error?.response?.status)
+      console.error('api.js: retry logic - retryableStatuses:', retryableStatuses, typeof retryableStatuses)
+      isRetryableError = false
+    }
     
     if (isRetryableError) {
       config.retry.count += 1

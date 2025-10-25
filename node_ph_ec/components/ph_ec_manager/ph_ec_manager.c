@@ -8,6 +8,7 @@
 #include "ec_sensor.h"
 #include "pump_controller.h"
 #include "pid_controller.h"
+#include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 
@@ -268,21 +269,25 @@ static void read_sensors(void) {
 static void check_emergency_conditions(void) {
     bool emergency = false;
     
-    if (s_current_ph < s_config->ph_min || s_current_ph > s_config->ph_max) {
-        ESP_LOGW(TAG, "pH out of range: %.2f (%.2f-%.2f)", 
-                 s_current_ph, s_config->ph_min, s_config->ph_max);
+    // Проверка pH emergency порогов (настраиваемые)
+    if (s_current_ph < s_config->ph_emergency_low || s_current_ph > s_config->ph_emergency_high) {
+        ESP_LOGW(TAG, "pH emergency: %.2f (limits: %.2f-%.2f)", 
+                 s_current_ph, s_config->ph_emergency_low, s_config->ph_emergency_high);
         emergency = true;
     }
     
-    if (s_current_ec < s_config->ec_min || s_current_ec > s_config->ec_max) {
-        ESP_LOGW(TAG, "EC out of range: %.2f (%.2f-%.2f)",
-                 s_current_ec, s_config->ec_min, s_config->ec_max);
+    // Проверка EC emergency порога (настраиваемый)
+    if (s_current_ec > s_config->ec_emergency_high) {
+        ESP_LOGW(TAG, "EC emergency: %.2f (limit: %.2f)",
+                 s_current_ec, s_config->ec_emergency_high);
         emergency = true;
     }
     
     if (emergency && !s_emergency_mode) {
+        ESP_LOGE(TAG, "EMERGENCY MODE ACTIVATED - pH: %.2f, EC: %.2f", s_current_ph, s_current_ec);
         ph_ec_manager_set_emergency(true);
     } else if (!emergency && s_emergency_mode) {
+        ESP_LOGI(TAG, "Emergency mode deactivated - pH: %.2f, EC: %.2f", s_current_ph, s_current_ec);
         ph_ec_manager_set_emergency(false);
     }
 }
@@ -290,12 +295,30 @@ static void check_emergency_conditions(void) {
 // Управление pH/EC через PID
 static void control_ph_ec(void) {
     float dt = 1.0f; // Цикл 1 секунда
+    int8_t rssi = get_rssi_to_parent();
     
     // Управление pH
     if (s_current_ph < s_config->ph_target - 0.1f) {
         // pH низкий - нужен pH UP
         float dose = pid_compute(&s_pid_ph_up, s_current_ph, dt);
         if (dose > 0.1f) {
+            // Получение данных PID для события
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ph_up, s_current_ph, &pid_data);
+            pid_data.output = dose; // Устанавливаем реальный выход
+            
+            // Отправка события с реальными данными PID
+            pump_events_send_start_event(
+                PUMP_PH_UP,
+                (uint32_t)((dose / 2.0f) * 1000.0f), // Примерная длительность
+                dose,
+                &pid_data,
+                s_current_ph, s_current_ec,
+                s_config->ph_target, s_config->ec_target,
+                s_emergency_mode, s_autonomous_mode,
+                rssi
+            );
+            
             pump_controller_run_dose(PUMP_PH_UP, dose);
             ESP_LOGI(TAG, "pH UP: %.2f ml (current=%.2f, target=%.2f)", 
                      dose, s_current_ph, s_config->ph_target);
@@ -304,6 +327,23 @@ static void control_ph_ec(void) {
         // pH высокий - нужен pH DOWN
         float dose = pid_compute(&s_pid_ph_down, s_current_ph, dt);
         if (dose > 0.1f) {
+            // Получение данных PID для события
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ph_down, s_current_ph, &pid_data);
+            pid_data.output = dose; // Устанавливаем реальный выход
+            
+            // Отправка события с реальными данными PID
+            pump_events_send_start_event(
+                PUMP_PH_DOWN,
+                (uint32_t)((dose / 2.0f) * 1000.0f), // Примерная длительность
+                dose,
+                &pid_data,
+                s_current_ph, s_current_ec,
+                s_config->ph_target, s_config->ec_target,
+                s_emergency_mode, s_autonomous_mode,
+                rssi
+            );
+            
             pump_controller_run_dose(PUMP_PH_DOWN, dose);
             ESP_LOGI(TAG, "pH DOWN: %.2f ml (current=%.2f, target=%.2f)",
                      dose, s_current_ph, s_config->ph_target);
@@ -315,6 +355,23 @@ static void control_ph_ec(void) {
         // EC низкая - нужны удобрения
         float dose = pid_compute(&s_pid_ec, s_current_ec, dt);
         if (dose > 0.1f) {
+            // Получение данных PID для события
+            pump_event_pid_data_t pid_data;
+            pump_events_get_pid_data(&s_pid_ec, s_current_ec, &pid_data);
+            pid_data.output = dose; // Устанавливаем реальный выход
+            
+            // Отправка события с реальными данными PID
+            pump_events_send_start_event(
+                PUMP_EC_A,
+                (uint32_t)((dose / 2.0f) * 1000.0f), // Примерная длительность
+                dose,
+                &pid_data,
+                s_current_ph, s_current_ec,
+                s_config->ph_target, s_config->ec_target,
+                s_emergency_mode, s_autonomous_mode,
+                rssi
+            );
+            
             // Распределяем между A, B, C (упрощённо - только A)
             pump_controller_run_dose(PUMP_EC_A, dose);
             ESP_LOGI(TAG, "EC A: %.2f ml (current=%.2f, target=%.2f)",
@@ -484,6 +541,120 @@ void ph_ec_manager_handle_command(const char *command, cJSON *params) {
             node_config_save(s_config, sizeof(ph_ec_node_config_t), "ph_ec_ns");
             ESP_LOGI(TAG, "EC target updated: %.2f", s_config->ec_target);
         }
+    } else if (strcmp(command, "set_safety_settings") == 0 || strcmp(command, "update_safety_config") == 0) {
+        // Safety параметры
+        cJSON *max_pump_time = cJSON_GetObjectItem(params, "max_pump_time_ms");
+        cJSON *cooldown = cJSON_GetObjectItem(params, "cooldown_ms");
+        cJSON *max_daily_volume = cJSON_GetObjectItem(params, "max_daily_volume_ml");
+        
+        // Emergency пороги
+        cJSON *ph_emergency_low = cJSON_GetObjectItem(params, "ph_emergency_low");
+        cJSON *ph_emergency_high = cJSON_GetObjectItem(params, "ph_emergency_high");
+        cJSON *ec_emergency_high = cJSON_GetObjectItem(params, "ec_emergency_high");
+        
+        if (cJSON_IsNumber(max_pump_time)) {
+            s_config->max_pump_time_ms = (uint32_t)max_pump_time->valuedouble;
+        }
+        if (cJSON_IsNumber(cooldown)) {
+            s_config->cooldown_ms = (uint32_t)cooldown->valuedouble;
+        }
+        if (cJSON_IsNumber(max_daily_volume)) {
+            s_config->max_daily_volume_ml = (uint32_t)max_daily_volume->valuedouble;
+        }
+        if (cJSON_IsNumber(ph_emergency_low)) {
+            s_config->ph_emergency_low = (float)ph_emergency_low->valuedouble;
+        }
+        if (cJSON_IsNumber(ph_emergency_high)) {
+            s_config->ph_emergency_high = (float)ph_emergency_high->valuedouble;
+        }
+        if (cJSON_IsNumber(ec_emergency_high)) {
+            s_config->ec_emergency_high = (float)ec_emergency_high->valuedouble;
+        }
+        
+        // Сохраняем в NVS
+        esp_err_t err = node_config_save(s_config, sizeof(ph_ec_node_config_t), "ph_ec_ns");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Safety settings updated: max_pump=%lu ms, cooldown=%lu ms, daily_vol=%lu ml, ph_emergency=%.2f-%.2f, ec_emergency=%.2f", 
+                     s_config->max_pump_time_ms, s_config->cooldown_ms, s_config->max_daily_volume_ml,
+                     s_config->ph_emergency_low, s_config->ph_emergency_high, s_config->ec_emergency_high);
+        } else {
+            ESP_LOGE(TAG, "Failed to save safety settings to NVS");
+        }
+    }
+    else if (strcmp(command, "get_config") == 0) {
+        // Проверка подключения к mesh
+        if (!mesh_manager_is_connected()) {
+            ESP_LOGW(TAG, "Cannot send config: mesh offline");
+            return;
+        }
+        
+        // Создание корневого объекта
+        cJSON *root = cJSON_CreateObject();
+        if (!root) {
+            ESP_LOGE(TAG, "Failed to create root JSON object");
+            return;
+        }
+        
+        cJSON_AddStringToObject(root, "type", "config_response");
+        cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
+        cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+        
+        // Создание объекта конфигурации
+        cJSON *config = cJSON_CreateObject();
+        if (!config) {
+            ESP_LOGE(TAG, "Failed to create config JSON object");
+            cJSON_Delete(root);
+            return;
+        }
+        
+        cJSON_AddStringToObject(config, "node_id", s_config->base.node_id);
+        cJSON_AddStringToObject(config, "node_type", "ph_ec");
+        cJSON_AddStringToObject(config, "zone", s_config->base.zone);
+        
+        // pH параметры
+        cJSON_AddNumberToObject(config, "ph_target", s_config->ph_target);
+        cJSON_AddNumberToObject(config, "ph_min", s_config->ph_min);
+        cJSON_AddNumberToObject(config, "ph_max", s_config->ph_max);
+        cJSON_AddNumberToObject(config, "ph_cal_offset", s_config->ph_cal_offset);
+        
+        // EC параметры
+        cJSON_AddNumberToObject(config, "ec_target", s_config->ec_target);
+        cJSON_AddNumberToObject(config, "ec_min", s_config->ec_min);
+        cJSON_AddNumberToObject(config, "ec_max", s_config->ec_max);
+        cJSON_AddNumberToObject(config, "ec_cal_offset", s_config->ec_cal_offset);
+        
+        // Safety параметры
+        cJSON_AddNumberToObject(config, "max_pump_time_ms", s_config->max_pump_time_ms);
+        cJSON_AddNumberToObject(config, "cooldown_ms", s_config->cooldown_ms);
+        cJSON_AddNumberToObject(config, "max_daily_volume_ml", s_config->max_daily_volume_ml);
+        
+        // Emergency пороги
+        cJSON_AddNumberToObject(config, "ph_emergency_low", s_config->ph_emergency_low);
+        cJSON_AddNumberToObject(config, "ph_emergency_high", s_config->ph_emergency_high);
+        cJSON_AddNumberToObject(config, "ec_emergency_high", s_config->ec_emergency_high);
+        
+        // Автономия
+        cJSON_AddBoolToObject(config, "autonomous_enabled", s_config->autonomous_enabled);
+        cJSON_AddNumberToObject(config, "mesh_timeout_ms", s_config->mesh_timeout_ms);
+        
+        // Добавление config к root
+        cJSON_AddItemToObject(root, "config", config);
+        
+        // Отправка конфигурации
+        char json_buffer[2048];
+        char *json_string = cJSON_PrintUnformatted(root);
+        if (json_string) {
+            if (strlen(json_string) < sizeof(json_buffer)) {
+                strcpy(json_buffer, json_string);
+                mesh_manager_send_to_root((uint8_t*)json_buffer, strlen(json_buffer));
+                ESP_LOGI(TAG, "Config sent to server");
+            } else {
+                ESP_LOGE(TAG, "Config JSON too large");
+            }
+            free(json_string);
+        }
+        
+        cJSON_Delete(root);
     }
 }
 
