@@ -100,7 +100,7 @@ class NodeController extends Controller
             ], 201);
             
         } catch (\Illuminate\Database\QueryException $e) {
-            // Handle duplicate node_id (SQLite: 19, PostgreSQL/MySQL: 23000)
+            // Handle duplicate node_id (PostgreSQL: 23000)
             if ($e->errorInfo[0] == 23000 || $e->errorInfo[1] == 19) {
                 return response()->json([
                     'success' => false,

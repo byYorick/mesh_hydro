@@ -13,7 +13,6 @@ static const char *TAG = "adaptive_pid";
 
 // Вспомогательные функции
 static pid_zone_t determine_zone(const adaptive_pid_t *pid, float error);
-static void apply_anti_windup(adaptive_pid_t *pid, float output);
 static void adapt_coefficients(adaptive_pid_t *pid, float error, float output);
 static bool check_safety_interval(const adaptive_pid_t *pid);
 
@@ -458,7 +457,7 @@ esp_err_t adaptive_pid_set_target(adaptive_pid_t *pid, float target) {
         return ESP_ERR_INVALID_ARG;
     }
     
-    pid->target = target;
+    pid->setpoint = target;
     ESP_LOGI(TAG, "PID target set to %.2f", target);
     
     return ESP_OK;

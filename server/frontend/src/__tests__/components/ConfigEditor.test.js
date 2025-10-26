@@ -14,8 +14,8 @@ describe('ConfigEditor.vue', () => {
     config: {
       interval: 30,
       temp_threshold_min: 18,
-      temp_threshold_max: 30,
-    },
+      temp_threshold_max: 30
+    }
   }
 
   beforeEach(() => {
@@ -27,8 +27,8 @@ describe('ConfigEditor.vue', () => {
       props: { node: sampleNode },
       global: { plugins: [pinia] },
       slots: {
-        activator: '<button>Open Config</button>',
-      },
+        activator: '<button>Open Config</button>'
+      }
     })
 
     expect(wrapper.html()).toContain('Open Config')
@@ -37,7 +37,7 @@ describe('ConfigEditor.vue', () => {
   it('initializes config from node props', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     // Open dialog
@@ -51,7 +51,7 @@ describe('ConfigEditor.vue', () => {
   it('validates JSON correctly', () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -68,7 +68,7 @@ describe('ConfigEditor.vue', () => {
   it('resetConfig restores original values', () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -82,7 +82,7 @@ describe('ConfigEditor.vue', () => {
   it('saveConfig emits config-updated event', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -97,7 +97,7 @@ describe('ConfigEditor.vue', () => {
   it('saveConfig uses JSON if edited', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -117,13 +117,13 @@ describe('ConfigEditor.vue', () => {
       config: {
         interval: 30,
         ph_threshold_min: 5.5,
-        ph_threshold_max: 6.5,
-      },
+        ph_threshold_max: 6.5
+      }
     }
 
     wrapper = mount(ConfigEditor, {
       props: { node: phEcNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -136,7 +136,7 @@ describe('ConfigEditor.vue', () => {
   it('renders Climate specific fields', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -149,7 +149,7 @@ describe('ConfigEditor.vue', () => {
   it('closes dialog after successful save', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
@@ -160,4 +160,3 @@ describe('ConfigEditor.vue', () => {
     expect(wrapper.vm.dialog).toBe(false)
   })
 })
-

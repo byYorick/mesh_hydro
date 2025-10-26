@@ -53,6 +53,95 @@
     </v-col>
   </v-row>
 
+    <!-- Configuration Management Section -->
+    <v-row v-if="node.online && (node.node_type === 'ph_ec' || node.node_type === 'ph' || node.node_type === 'ec')">
+      <v-col cols="12">
+        <v-card>
+          <v-card-title>
+            <v-icon icon="mdi-cog" class="mr-2"></v-icon>
+            Управление конфигурацией
+          </v-card-title>
+          <v-card-text>
+            <v-tabs v-model="configTab" bg-color="primary">
+              <v-tab value="manual">
+                <v-icon icon="mdi-pump" start></v-icon>
+                Ручное управление
+              </v-tab>
+              <v-tab value="calibration">
+                <v-icon icon="mdi-medical-bag" start></v-icon>
+                Калибровка
+              </v-tab>
+            </v-tabs>
+
+            <v-window v-model="configTab" class="mt-4">
+              <!-- Manual Pump Control -->
+              <v-window-item value="manual">
+                <ManualPumpControl
+                  :node-id="node.node_id"
+                  :is-online="node.online"
+                  @pump-started="onPumpStart"
+                  @pump-stopped="onPumpStop"
+                />
+              </v-window-item>
+
+              <!-- Calibration -->
+              <v-window-item value="calibration">
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-card variant="outlined">
+                      <v-card-title class="text-subtitle-1">
+                        Калибровка насосов
+                      </v-card-title>
+                      <v-card-text>
+                        <p class="mb-4">
+                          Калибровка насосов необходима для точного дозирования реагентов.
+                          Введите объем жидкости и длительность работы насоса.
+                        </p>
+                        <v-btn
+                          color="primary"
+                          block
+                          size="large"
+                          @click="calibrationDialog = true"
+                        >
+                          <v-icon icon="mdi-medical-bag" start></v-icon>
+                          Открыть калибровку
+                        </v-btn>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-card variant="outlined">
+                      <v-card-title class="text-subtitle-1">
+                        Информация
+                      </v-card-title>
+                      <v-card-text>
+                        <v-alert type="info" variant="tonal" density="compact">
+                          <strong>Советы по калибровке:</strong>
+                          <ul class="mt-2 mb-0">
+                            <li>Используйте известный объем (10-50 мл)</li>
+                            <li>Измерьте время работы насоса (5-15 сек)</li>
+                            <li>Соберите жидкость в мерный стакан</li>
+                            <li>Введите фактический объем для расчета производительности</li>
+                          </ul>
+                        </v-alert>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </v-window-item>
+            </v-window>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Calibration Dialog -->
+    <PumpCalibrationDialog
+      v-model="calibrationDialog"
+      :node-id="node.node_id"
+      @calibrated="onCalibrated"
+    />
+
     <!-- Memory, Metadata and Health -->
     <v-row>
       <v-col cols="12" md="4">
@@ -165,6 +254,8 @@ import ErrorTimeline from '@/components/ErrorTimeline.vue'
 import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
 import PhNode from '@/components/PhNode.vue'
 import EcNode from '@/components/EcNode.vue'
+import ManualPumpControl from '@/components/node-config/ManualPumpControl.vue'
+import PumpCalibrationDialog from '@/components/node-config/PumpCalibrationDialog.vue'
 import { formatDateTime } from '@/utils/time'
 import api from '@/services/api'
 
@@ -182,6 +273,8 @@ const selectedRange = ref('24h')
 const loading = ref(false)
 const selectedError = ref(null)
 const showErrorDialog = ref(false)
+const configTab = ref('manual')
+const calibrationDialog = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
@@ -392,5 +485,45 @@ async function handleNodeDelete(nodeId) {
     appStore.showSnackbar('Ошибка удаления узла', 'error')
   }
 }
+
+// Pump control event handlers
+function onPumpStart(event) {
+  console.log('Pump started:', event)
+  appStore.showSnackbar(`Насос ${event.pump_id} запущен на ${event.duration} сек`, 'success')
+}
+
+function onPumpStop() {
+  console.log('Pump stopped')
+  appStore.showSnackbar('Насос остановлен', 'info')
+}
+
+// Calibration event handler
+function onCalibrated(result) {
+  console.log('Pump calibrated:', result)
+  appStore.showSnackbar(`Насос откалиброван: ${result.ml_per_second?.toFixed(2)} мл/сек`, 'success')
+}
 </script>
+
+<style scoped>
+/* Фиксированная высота для вкладок */
+.v-tabs {
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+/* Контент вкладок */
+.v-window {
+  min-height: 400px;
+}
+
+/* Карточки внутри вкладок */
+.v-card {
+  overflow: visible;
+}
+
+/* Кнопки управления */
+.v-btn.size-large {
+  min-height: 56px;
+  font-size: 16px;
+}
+</style>
 

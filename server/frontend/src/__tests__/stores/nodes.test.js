@@ -10,8 +10,8 @@ vi.mock('@/services/api', () => ({
     getNode: vi.fn(),
     sendCommand: vi.fn(),
     updateNodeConfig: vi.fn(),
-    deleteNode: vi.fn(),
-  },
+    deleteNode: vi.fn()
+  }
 }))
 
 describe('useNodesStore', () => {
@@ -32,7 +32,7 @@ describe('useNodesStore', () => {
   it('fetchNodes loads nodes from API', async () => {
     const mockNodes = [
       { node_id: 'climate_001', node_type: 'climate', online: true },
-      { node_id: 'ph_ec_001', node_type: 'ph_ec', online: false },
+      { node_id: 'ph_ec_001', node_type: 'ph_ec', online: false }
     ]
 
     api.getNodes.mockResolvedValue(mockNodes)
@@ -46,14 +46,14 @@ describe('useNodesStore', () => {
 
   it('fetches single node and updates in array', async () => {
     store.nodes = [
-      { node_id: 'climate_001', node_type: 'climate', online: true },
+      { node_id: 'climate_001', node_type: 'climate', online: true }
     ]
 
     const updatedNode = {
       node_id: 'climate_001',
       node_type: 'climate',
       online: false,
-      last_seen_at: new Date(),
+      last_seen_at: new Date()
     }
 
     api.getNode.mockResolvedValue(updatedNode)
@@ -69,7 +69,7 @@ describe('useNodesStore', () => {
     store.nodes = [
       { node_id: 'climate_001', node_type: 'climate' },
       { node_id: 'climate_002', node_type: 'climate' },
-      { node_id: 'ph_ec_001', node_type: 'ph_ec' },
+      { node_id: 'ph_ec_001', node_type: 'ph_ec' }
     ]
 
     const climateNodes = store.nodesByType('climate')
@@ -82,7 +82,7 @@ describe('useNodesStore', () => {
     store.nodes = [
       { node_id: 'node_001', online: true },
       { node_id: 'node_002', is_online: true },
-      { node_id: 'node_003', online: false },
+      { node_id: 'node_003', online: false }
     ]
 
     const onlineNodes = store.onlineNodes
@@ -94,7 +94,7 @@ describe('useNodesStore', () => {
     store.nodes = [
       { node_id: 'node_001', online: true },
       { node_id: 'node_002', online: false, is_online: false },
-      { node_id: 'node_003', online: false },
+      { node_id: 'node_003', online: false }
     ]
 
     const offlineNodes = store.offlineNodes
@@ -114,7 +114,7 @@ describe('useNodesStore', () => {
     const newNode = {
       node_id: 'new_001',
       node_type: 'climate',
-      online: true,
+      online: true
     }
 
     store.updateNodeRealtime(newNode)
@@ -125,13 +125,13 @@ describe('useNodesStore', () => {
 
   it('updateNodeRealtime updates existing node', () => {
     store.nodes = [
-      { node_id: 'climate_001', node_type: 'climate', online: false },
+      { node_id: 'climate_001', node_type: 'climate', online: false }
     ]
 
     const updatedData = {
       node_id: 'climate_001',
       online: true,
-      last_seen_at: new Date(),
+      last_seen_at: new Date()
     }
 
     store.updateNodeRealtime(updatedData)
@@ -144,7 +144,7 @@ describe('useNodesStore', () => {
   it('deleteNode removes node from store', async () => {
     store.nodes = [
       { node_id: 'climate_001', node_type: 'climate' },
-      { node_id: 'ph_ec_001', node_type: 'ph_ec' },
+      { node_id: 'ph_ec_001', node_type: 'ph_ec' }
     ]
 
     api.deleteNode.mockResolvedValue({ success: true })
@@ -158,7 +158,7 @@ describe('useNodesStore', () => {
   it('getNodeById returns correct node', () => {
     store.nodes = [
       { node_id: 'climate_001', node_type: 'climate' },
-      { node_id: 'ph_ec_001', node_type: 'ph_ec' },
+      { node_id: 'ph_ec_001', node_type: 'ph_ec' }
     ]
 
     const node = store.getNodeById('ph_ec_001')
@@ -171,7 +171,7 @@ describe('useNodesStore', () => {
     store.nodes = [
       { node_id: 'climate_001', node_type: 'climate' },
       { node_id: 'climate_002', node_type: 'climate' },
-      { node_id: 'ph_ec_001', node_type: 'ph_ec' },
+      { node_id: 'ph_ec_001', node_type: 'ph_ec' }
     ]
 
     const counts = store.nodeCountByType
@@ -180,4 +180,3 @@ describe('useNodesStore', () => {
     expect(counts.ph_ec).toBe(1)
   })
 })
-

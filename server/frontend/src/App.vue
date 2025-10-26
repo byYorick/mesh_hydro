@@ -219,6 +219,9 @@
         </v-list>
       </v-card>
     </v-dialog>
+
+    <!-- Universal Dialog System -->
+    <UniversalDialog />
   </v-app>
 </template>
 
@@ -236,6 +239,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { useOfflineMode } from '@/composables/useOfflineMode'
 import NodeDiscoveryIndicator from '@/components/NodeDiscoveryIndicator.vue'
 import StatusBar from '@/components/StatusBar.vue'
+import UniversalDialog from '@/components/ui/UniversalDialog.vue'
 import { getConnectionStatus } from '@/services/echo'
 
 const router = useRouter()
@@ -421,47 +425,10 @@ function setupWebSocketListeners() {
     }
   })
 
-  console.log('✅ WebSocket listeners configured')
-  
-  // Также подписываемся на fallback события (на случай отключения WS)
-  setupFallbackListeners()
-}
-
-// Обработка fallback polling событий
-function setupFallbackListeners() {
-  // Слушаем события от fallback polling
-  window.addEventListener('echo:fallback', (event) => {
-    const { channel, event: eventName, data } = event.detail
-    
-    if (channel === 'hydro.nodes' && Array.isArray(data)) {
-      console.log('📡 Fallback nodes update:', data.length, 'nodes')
-      // Обновляем все узлы из fallback polling
-      data.forEach(node => {
-        nodesStore.updateNodeRealtime(node)
-      })
-    }
-    
-    if (channel === 'hydro.events' && Array.isArray(data)) {
-      console.log('🔔 Fallback events update:', data.length, 'events')
-      // Обновляем события (если метод существует)
-      if (eventsStore.updateEventsFromFallback) {
-        eventsStore.updateEventsFromFallback(data)
-      } else {
-        data.forEach(event => {
-          eventsStore.addEventRealtime(event)
-        })
-      }
-    }
-  })
 }
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;

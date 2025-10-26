@@ -14,7 +14,7 @@ describe('EventLog.vue', () => {
       level: 'critical',
       message: 'Temperature too high',
       created_at: new Date(),
-      resolved_at: null,
+      resolved_at: null
     },
     {
       id: 2,
@@ -22,7 +22,7 @@ describe('EventLog.vue', () => {
       level: 'warning',
       message: 'pH below optimal',
       created_at: new Date(),
-      resolved_at: null,
+      resolved_at: null
     },
     {
       id: 3,
@@ -30,8 +30,8 @@ describe('EventLog.vue', () => {
       level: 'info',
       message: 'Temperature stabilized',
       created_at: new Date(),
-      resolved_at: new Date(),
-    },
+      resolved_at: new Date()
+    }
   ]
 
   beforeEach(() => {
@@ -41,7 +41,7 @@ describe('EventLog.vue', () => {
   it('renders all events when filter is "all"', () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.text()).toContain('Temperature too high')
@@ -52,7 +52,7 @@ describe('EventLog.vue', () => {
   it('filters active events correctly', async () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.filter = 'active'
@@ -65,7 +65,7 @@ describe('EventLog.vue', () => {
   it('filters critical events correctly', async () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     wrapper.vm.filter = 'critical'
@@ -82,12 +82,12 @@ describe('EventLog.vue', () => {
       level: 'info',
       message: `Event ${i}`,
       created_at: new Date(),
-      resolved_at: null,
+      resolved_at: null
     }))
 
     wrapper = mount(EventLog, {
       props: { events: manyEvents, limit: 5 },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.filteredEvents).toHaveLength(5)
@@ -96,7 +96,7 @@ describe('EventLog.vue', () => {
   it('emits resolve event when resolve button clicked', async () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     // Find resolve button (should be for unresolved events only)
@@ -105,7 +105,7 @@ describe('EventLog.vue', () => {
 
     if (resolveButtons.length > 0) {
       await resolveButtons[0].trigger('click')
-      
+
       expect(wrapper.emitted()).toHaveProperty('resolve')
     }
   })
@@ -113,7 +113,7 @@ describe('EventLog.vue', () => {
   it('shows "no events" message when events array is empty', () => {
     wrapper = mount(EventLog, {
       props: { events: [] },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.text()).toContain('Нет событий')
@@ -122,7 +122,7 @@ describe('EventLog.vue', () => {
   it('shows correct level color', () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.getLevelColor('critical')).toBe('red')
@@ -133,7 +133,7 @@ describe('EventLog.vue', () => {
   it('shows correct level icon', () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.getLevelIcon('critical')).toBe('mdi-alert-circle')
@@ -145,7 +145,7 @@ describe('EventLog.vue', () => {
   it('shows resolve-all button when there are active events', () => {
     wrapper = mount(EventLog, {
       props: { events: sampleEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.hasActiveEvents).toBe(true)
@@ -155,15 +155,14 @@ describe('EventLog.vue', () => {
   it('does not show resolve-all button when all events are resolved', () => {
     const resolvedEvents = sampleEvents.map(e => ({
       ...e,
-      resolved_at: new Date(),
+      resolved_at: new Date()
     }))
 
     wrapper = mount(EventLog, {
       props: { events: resolvedEvents },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.hasActiveEvents).toBe(false)
   })
 })
-

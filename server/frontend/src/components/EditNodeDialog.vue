@@ -157,6 +157,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { safeIncludes } from '@/utils/array-utils'
 
 const props = defineProps({
   node: {
@@ -222,16 +223,10 @@ function validateJson(value) {
 }
 
 function addZone() {
-  try {
-    // Дополнительная проверка на undefined/null перед вызовом includes
-    if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
-      zones.value.push(newZone.value)
-      editedNode.value.zone = newZone.value
-    }
-  } catch (error) {
-    console.error('EditNodeDialog.vue: addZone - Error in includes:', error)
-    console.error('EditNodeDialog.vue: addZone - newZone.value:', newZone.value, typeof newZone.value)
-    console.error('EditNodeDialog.vue: addZone - zones.value:', zones.value, typeof zones.value)
+  // Безопасная проверка наличия элемента в массиве
+  if (newZone.value && !safeIncludes(zones.value, newZone.value)) {
+    zones.value.push(newZone.value)
+    editedNode.value.zone = newZone.value
   }
   addZoneDialog.value = false
   newZone.value = ''

@@ -1,0 +1,30 @@
+# ========================================
+# Vue.js Frontend Development Dockerfile
+# ========================================
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Установка глобальных зависимостей
+RUN npm install -g glob
+
+# Копирование package files
+COPY package*.json ./
+
+# Установка зависимостей
+RUN npm install --legacy-peer-deps
+
+# Копирование исходников
+COPY . .
+
+# Создание директории для скриптов
+RUN mkdir -p scripts
+
+# Установка прав на выполнение
+RUN chmod +x scripts/*.mjs
+
+# Команда по умолчанию
+CMD ["npm", "run", "dev"]
+
+

@@ -7,7 +7,7 @@ import * as directives from 'vuetify/directives'
 // Mock Vuetify
 const vuetify = createVuetify({
   components,
-  directives,
+  directives
 })
 
 config.global.plugins = [vuetify]
@@ -23,27 +23,27 @@ Object.defineProperty(window, 'matchMedia', {
     removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
+    dispatchEvent: vi.fn()
+  }))
 })
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  takeRecords() {
+  constructor () {}
+  disconnect () {}
+  observe () {}
+  takeRecords () {
     return []
   }
-  unobserve() {}
+  unobserve () {}
 }
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
+  constructor () {}
+  disconnect () {}
+  observe () {}
+  unobserve () {}
 }
 
 // Mock localStorage
@@ -51,7 +51,6 @@ const localStorageMock = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),
-  clear: vi.fn(),
+  clear: vi.fn()
 }
 global.localStorage = localStorageMock
-

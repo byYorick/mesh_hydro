@@ -666,7 +666,7 @@ ESP_LOGI(TAG, "Mesh layer: %d", layer);
          ▼
 ┌─────────────────┐
 │    Database     │
-│ database.sqlite │
+│   PostgreSQL    │
 └─────────────────┘
 ```
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
   plugins: [
     vue(),
-    vuetify({ autoImport: true }),
+    vuetify({ autoImport: true })
   ],
   test: {
     globals: true,
@@ -19,14 +19,13 @@ export default defineConfig({
         'node_modules/',
         'src/__tests__/',
         '*.config.js',
-        'src/main.js',
-      ],
-    },
+        'src/main.js'
+      ]
+    }
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  }
 })
-

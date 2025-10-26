@@ -568,7 +568,7 @@
               </v-card-title>
               <v-card-text>
                 <v-alert type="info" variant="tonal" class="mb-4">
-                  <div><strong>Тип БД:</strong> {{ systemStatus?.database || 'SQLite' }}</div>
+                  <div><strong>Тип БД:</strong> {{ systemStatus?.database || 'PostgreSQL' }}</div>
                   <div><strong>Записей телеметрии:</strong> ~{{ estimatedRecords }}</div>
                 </v-alert>
 
@@ -962,7 +962,7 @@
                   <v-list-item>
                     <v-list-item-title>Технологии</v-list-item-title>
                     <v-list-item-subtitle>
-                      Vue.js 3.4 • Vuetify 3.5 • Laravel 10 • MQTT • SQLite/PostgreSQL
+                      Vue.js 3.4 • Vuetify 3.5 • Laravel 11 • MQTT • PostgreSQL
                     </v-list-item-subtitle>
                   </v-list-item>
                   <v-list-item>

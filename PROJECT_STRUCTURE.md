@@ -103,7 +103,7 @@ mesh_hydro/
 │
 ├── server/                      # 🌐 Веб-сервер
 │   ├── README.md
-│   ├── backend/                # Laravel 10 API
+│   ├── backend/                # Laravel 11 API
 │   │   ├── README.md
 │   │   ├── composer.json
 │   │   └── .env.example

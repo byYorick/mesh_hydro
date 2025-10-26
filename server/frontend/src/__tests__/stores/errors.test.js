@@ -9,9 +9,9 @@ vi.mock('axios', () => ({
     create: vi.fn(() => ({
       get: vi.fn(),
       post: vi.fn(),
-      delete: vi.fn(),
-    })),
-  },
+      delete: vi.fn()
+    }))
+  }
 }))
 
 describe('useErrorsStore', () => {
@@ -34,7 +34,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, node_id: 'climate_001', severity: 'high' },
       { id: 2, node_id: 'climate_001', severity: 'medium' },
-      { id: 3, node_id: 'ph_ec_001', severity: 'critical' },
+      { id: 3, node_id: 'ph_ec_001', severity: 'critical' }
     ]
 
     const climateErrors = store.errorsByNode('climate_001')
@@ -47,7 +47,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, resolved_at: null },
       { id: 2, resolved_at: new Date() },
-      { id: 3, resolved_at: null },
+      { id: 3, resolved_at: null }
     ]
 
     const unresolved = store.unresolvedErrors
@@ -60,7 +60,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, severity: 'critical', resolved_at: null },
       { id: 2, severity: 'high', resolved_at: null },
-      { id: 3, severity: 'critical', resolved_at: new Date() },
+      { id: 3, severity: 'critical', resolved_at: new Date() }
     ]
 
     const critical = store.criticalErrors
@@ -73,7 +73,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, severity: 'critical' },
       { id: 2, severity: 'critical' },
-      { id: 3, severity: 'medium' },
+      { id: 3, severity: 'medium' }
     ]
 
     const criticalErrors = store.errorsBySeverity('critical')
@@ -85,7 +85,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, error_type: 'hardware' },
       { id: 2, error_type: 'software' },
-      { id: 3, error_type: 'hardware' },
+      { id: 3, error_type: 'hardware' }
     ]
 
     const hardwareErrors = store.errorsByType('hardware')
@@ -97,7 +97,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, severity: 'critical', resolved_at: null },
       { id: 2, severity: 'high', resolved_at: null },
-      { id: 3, severity: 'critical', resolved_at: new Date() },
+      { id: 3, severity: 'critical', resolved_at: new Date() }
     ]
 
     expect(store.criticalCount).toBe(1)
@@ -107,7 +107,7 @@ describe('useErrorsStore', () => {
     store.errors = [
       { id: 1, resolved_at: null },
       { id: 2, resolved_at: null },
-      { id: 3, resolved_at: new Date() },
+      { id: 3, resolved_at: new Date() }
     ]
 
     expect(store.unresolvedCount).toBe(2)
@@ -119,7 +119,7 @@ describe('useErrorsStore', () => {
       node_id: 'climate_001',
       severity: 'high',
       message: 'Test error',
-      occurred_at: new Date(),
+      occurred_at: new Date()
     }
 
     store.addErrorRealtime(newError)
@@ -133,13 +133,13 @@ describe('useErrorsStore', () => {
     store.errors = Array.from({ length: 500 }, (_, i) => ({
       id: i,
       node_id: 'test',
-      message: `Error ${i}`,
+      message: `Error ${i}`
     }))
 
     const newError = {
       id: 500,
       node_id: 'test',
-      message: 'New error',
+      message: 'New error'
     }
 
     store.addErrorRealtime(newError)
@@ -158,4 +158,3 @@ describe('useErrorsStore', () => {
     expect(store.selectedError).toBeNull()
   })
 })
-

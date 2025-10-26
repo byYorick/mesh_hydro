@@ -27,7 +27,7 @@ ENV VITE_WS_HOST=$VITE_WS_HOST
 ENV VITE_WS_PORT=$VITE_WS_PORT
 ENV VITE_PUSHER_KEY=$VITE_PUSHER_KEY
 
-# Сборка production
+# Сборка production (console.log удаляется через Vite Terser minification)
 RUN npm run build
 
 # Stage 2: Production

@@ -85,6 +85,7 @@
 import { computed, ref } from 'vue'
 import { formatDateTime, formatDistanceToNow } from '@/utils/time'
 import { useVirtualList } from '@/composables/useVirtualList'
+import { safeIncludes } from '@/utils/array-utils'
 
 const props = defineProps({
   events: {
@@ -103,64 +104,24 @@ const filter = ref('all')
 
 // Filtered events
 const filteredEvents = computed(() => {
-  console.log('🔍 EventLog: filteredEvents computed called')
-  console.log('🔍 EventLog: props.events:', props.events)
-  console.log('🔍 EventLog: filter.value:', filter.value)
-  
   let filtered = [...props.events]
 
   if (filter.value === 'active') {
-    console.log('🔍 EventLog: Filtering active events')
     filtered = filtered.filter(e => !e.resolved_at)
   } else if (filter.value === 'critical') {
-    console.log('🔍 EventLog: Filtering critical events')
     const criticalLevels = ['critical', 'emergency']
-    console.log('🔍 EventLog: criticalLevels:', criticalLevels)
     
-    try {
-      console.log('🔍 EventLog: Starting critical filter')
-      filtered = filtered.filter((e, index) => {
-        console.log(`🔍 EventLog: Processing event ${index}:`, e)
-        
-        if (!e) {
-          console.warn('EventLog.vue: critical filter - event is null/undefined:', e)
-          return false
-        }
-        if (!e.level) {
-          console.warn('EventLog.vue: critical filter - event.level is null/undefined:', e)
-          return false
-        }
-        if (typeof e.level !== 'string') {
-          console.warn('EventLog.vue: critical filter - event.level is not string:', e.level, typeof e.level)
-          return false
-        }
-        if (!criticalLevels || !Array.isArray(criticalLevels)) {
-          console.error('EventLog.vue: critical filter - criticalLevels is not array:', criticalLevels)
-          return false
-        }
-        
-        console.log(`🔍 EventLog: Checking includes for level: ${e.level}`)
-        // Дополнительная проверка на undefined/null перед вызовом includes
-        let includesResult = false
-        if (criticalLevels && Array.isArray(criticalLevels) && e.level) {
-          includesResult = criticalLevels.includes(e.level)
-        }
-        console.log(`🔍 EventLog: includes result:`, includesResult)
-        
-        return includesResult && !e.resolved_at
-      })
-      console.log('🔍 EventLog: Critical filter completed')
-    } catch (error) {
-      console.error('EventLog.vue: critical filter - Error in filter:', error)
-      console.error('EventLog.vue: critical filter - filtered events:', filtered)
-      console.error('EventLog.vue: critical filter - criticalLevels:', criticalLevels)
-    }
+    filtered = filtered.filter((e) => {
+      if (!e || !e.level || typeof e.level !== 'string') {
+        return false
+      }
+      
+      return safeIncludes(criticalLevels, e.level) && !e.resolved_at
+    })
   }
 
   // Limit number of events
-  const result = filtered.slice(0, props.limit)
-  console.log('🔍 EventLog: filteredEvents result:', result)
-  return result
+  return filtered.slice(0, props.limit)
 })
 
 // Has active events

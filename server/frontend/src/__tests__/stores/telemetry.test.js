@@ -9,8 +9,8 @@ vi.mock('@/services/api', () => ({
     getTelemetry: vi.fn(),
     getLatestTelemetry: vi.fn(),
     getAggregateTelemetry: vi.fn(),
-    exportTelemetry: vi.fn(),
-  },
+    exportTelemetry: vi.fn()
+  }
 }))
 
 describe('useTelemetryStore', () => {
@@ -33,7 +33,7 @@ describe('useTelemetryStore', () => {
     const mockData = {
       data: [
         { node_id: 'climate_001', data: { temp: 24.5 }, received_at: new Date() },
-        { node_id: 'climate_001', data: { temp: 24.6 }, received_at: new Date() },
+        { node_id: 'climate_001', data: { temp: 24.6 }, received_at: new Date() }
       ]
     }
 
@@ -49,7 +49,7 @@ describe('useTelemetryStore', () => {
   it('fetchLatestTelemetry loads latest data', async () => {
     const mockLatest = [
       { node_id: 'climate_001', telemetry: { data: { temp: 24.5 } } },
-      { node_id: 'ph_ec_001', telemetry: { data: { ph: 6.5 } } },
+      { node_id: 'ph_ec_001', telemetry: { data: { ph: 6.5 } } }
     ]
 
     api.getLatestTelemetry.mockResolvedValue(mockLatest)
@@ -63,7 +63,7 @@ describe('useTelemetryStore', () => {
     store.telemetry = [
       { node_id: 'climate_001', data: { temp: 24 } },
       { node_id: 'climate_001', data: { temp: 25 } },
-      { node_id: 'ph_ec_001', data: { ph: 6.5 } },
+      { node_id: 'ph_ec_001', data: { ph: 6.5 } }
     ]
 
     const climateTelemetry = store.getTelemetryByNode('climate_001')
@@ -75,7 +75,7 @@ describe('useTelemetryStore', () => {
   it('getLatestByNode getter returns correct data', () => {
     store.latestTelemetry = [
       { node_id: 'climate_001', telemetry: { data: { temp: 24.5 } } },
-      { node_id: 'ph_ec_001', telemetry: { data: { ph: 6.5 } } },
+      { node_id: 'ph_ec_001', telemetry: { data: { ph: 6.5 } } }
     ]
 
     const latest = store.getLatestByNode('ph_ec_001')
@@ -87,7 +87,7 @@ describe('useTelemetryStore', () => {
   it('fetchAggregatedData stores with key', async () => {
     const mockAggregate = {
       data: [
-        { time_bucket: '2025-10-20 10:00:00', avg: 24.5, min: 24.0, max: 25.0 },
+        { time_bucket: '2025-10-20 10:00:00', avg: 24.5, min: 24.0, max: 25.0 }
       ]
     }
 
@@ -103,7 +103,7 @@ describe('useTelemetryStore', () => {
     const newData = {
       node_id: 'climate_001',
       data: { temp: 25.0 },
-      received_at: new Date(),
+      received_at: new Date()
     }
 
     store.addTelemetryRealtime(newData)
@@ -117,13 +117,13 @@ describe('useTelemetryStore', () => {
     store.telemetry = Array.from({ length: 1000 }, (_, i) => ({
       node_id: 'test',
       data: { value: i },
-      received_at: new Date(),
+      received_at: new Date()
     }))
 
     const newData = {
       node_id: 'test',
       data: { value: 1000 },
-      received_at: new Date(),
+      received_at: new Date()
     }
 
     store.addTelemetryRealtime(newData)
@@ -134,13 +134,13 @@ describe('useTelemetryStore', () => {
 
   it('addTelemetryRealtime updates latestTelemetry', () => {
     store.latestTelemetry = [
-      { node_id: 'climate_001', data: { temp: 24.0 } },
+      { node_id: 'climate_001', data: { temp: 24.0 } }
     ]
 
     const newData = {
       node_id: 'climate_001',
       data: { temp: 25.0 },
-      received_at: new Date(),
+      received_at: new Date()
     }
 
     store.addTelemetryRealtime(newData)
@@ -154,7 +154,7 @@ describe('useTelemetryStore', () => {
     const newData = {
       node_id: 'ph_ec_001',
       data: { ph: 6.5 },
-      received_at: new Date(),
+      received_at: new Date()
     }
 
     store.addTelemetryRealtime(newData)
@@ -173,4 +173,3 @@ describe('useTelemetryStore', () => {
     expect(store.aggregatedData).toEqual({})
   })
 })
-

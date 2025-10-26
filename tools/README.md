@@ -143,7 +143,7 @@ send_command("water_001", "run_pump", {"duration_sec": 60})
 ```
 
 **Что бэкапится:**
-- SQLite database
+- PostgreSQL database
 - .env файлы
 - NVS конфигурации узлов
 - Docker volumes

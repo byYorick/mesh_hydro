@@ -58,15 +58,14 @@
 
     <!-- Loading skeleton -->
     <div v-if="nodesStore.loading" class="v-row">
-      <v-col
-        v-for="n in 8"
-        :key="`skeleton-${n}`"
-        cols="12"
-        sm="6"
-        md="4"
-        lg="3"
-      >
-        <SkeletonCard />
+      <v-col cols="12" class="text-center pa-12">
+        <v-progress-circular
+          indeterminate
+          size="64"
+          width="6"
+          color="primary"
+        ></v-progress-circular>
+        <div class="mt-4 text-h6">Загрузка узлов...</div>
       </v-col>
     </div>
 
@@ -107,7 +106,6 @@ import { useNodesStore } from '@/stores/nodes'
 import { useDebounce } from '@/composables/useDebounce'
 import NodeCard from '@/components/NodeCard.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
-import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()

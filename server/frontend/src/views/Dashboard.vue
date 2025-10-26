@@ -96,12 +96,14 @@
 
     <!-- Loading skeleton -->
     <div v-if="nodesStore.loading" class="v-row">
-      <v-col
-        v-for="n in 6"
-        :key="`skeleton-${n}`"
-        :cols="cardCols"
-      >
-        <SkeletonCard />
+      <v-col cols="12" class="text-center pa-12">
+        <v-progress-circular
+          indeterminate
+          size="64"
+          width="6"
+          color="primary"
+        ></v-progress-circular>
+        <div class="mt-4 text-h6">Загрузка узлов...</div>
       </v-col>
     </div>
 
@@ -194,7 +196,6 @@ import EventLog from '@/components/EventLog.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import PullToRefreshIndicator from '@/components/ui/PullToRefreshIndicator.vue'
-import SkeletonCard from '@/components/ui/SkeletonCard.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()
@@ -213,7 +214,6 @@ const { isPulling, pullDistance, isRefreshing } = usePullToRefresh(async () => {
 
 // Hero section styling
 const heroStyle = computed(() => {
-  console.log('🔍 Dashboard: heroStyle computed called')
   const isDark = appStore.theme === 'dark'
   const gradient = isDark
     ? 'linear-gradient(135deg, rgba(66, 165, 245, 0.1), rgba(156, 39, 176, 0.1))'
@@ -226,16 +226,11 @@ const heroStyle = computed(() => {
 
 // System status indicator
 const systemStatusColor = computed(() => {
-  console.log('🔍 Dashboard: systemStatusColor computed called')
-  console.log('🔍 Dashboard: summary.value:', summary.value)
-  
   if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
-    console.log('🔍 Dashboard: No nodes total, returning grey')
     return 'grey'
   }
   
   const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
-  console.log('🔍 Dashboard: onlinePercent:', onlinePercent)
   
   if (onlinePercent >= 80) return 'success'
   if (onlinePercent >= 50) return 'warning'
@@ -243,16 +238,11 @@ const systemStatusColor = computed(() => {
 })
 
 const systemStatusIcon = computed(() => {
-  console.log('🔍 Dashboard: systemStatusIcon computed called')
-  console.log('🔍 Dashboard: summary.value:', summary.value)
-  
   if (!summary.value?.nodes?.total || summary.value.nodes.total === 0) {
-    console.log('🔍 Dashboard: No nodes total, returning help-circle')
     return 'mdi-help-circle'
   }
   
   const onlinePercent = (summary.value.nodes.online / summary.value.nodes.total) * 100
-  console.log('🔍 Dashboard: onlinePercent:', onlinePercent)
   
   if (onlinePercent >= 80) return 'mdi-check-circle'
   if (onlinePercent >= 50) return 'mdi-alert-circle'
@@ -260,15 +250,9 @@ const systemStatusIcon = computed(() => {
 })
 
 onMounted(async () => {
-  console.log('🔍 Dashboard: onMounted called')
   try {
-    console.log('🔍 Dashboard: Fetching dashboard summary...')
     summary.value = await appStore.fetchDashboardSummary()
-    console.log('🔍 Dashboard: Summary fetched:', summary.value)
-    
-    console.log('🔍 Dashboard: Fetching nodes...')
     await nodesStore.fetchNodes()
-    console.log('🔍 Dashboard: Nodes fetched:', nodesStore.nodes)
   } catch (error) {
     console.error('Error loading dashboard:', error)
   }

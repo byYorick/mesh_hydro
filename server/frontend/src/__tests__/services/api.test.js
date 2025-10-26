@@ -11,10 +11,10 @@ vi.mock('axios', () => ({
       delete: vi.fn(),
       interceptors: {
         request: { use: vi.fn() },
-        response: { use: vi.fn() },
-      },
-    })),
-  },
+        response: { use: vi.fn() }
+      }
+    }))
+  }
 }))
 
 describe('API Service', () => {
@@ -28,7 +28,7 @@ describe('API Service', () => {
   it('creates axios instance with correct config', () => {
     expect(axios.create).toHaveBeenCalled()
     const config = axios.create.mock.calls[0][0]
-    
+
     expect(config.timeout).toBe(10000)
     expect(config.headers['Content-Type']).toBe('application/json')
   })
@@ -53,4 +53,3 @@ describe('API Service', () => {
     expect(typeof api.exportTelemetry).toBe('function')
   })
 })
-

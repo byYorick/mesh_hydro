@@ -68,7 +68,7 @@ services:
       - hydro_network
 
   # ========================================
-  # Backend (Laravel 10)
+  # Backend (Laravel 11)
   # REST API + MQTT обработка
   # PostgreSQL база данных
   # ========================================

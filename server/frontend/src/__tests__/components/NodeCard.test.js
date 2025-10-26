@@ -22,7 +22,7 @@ describe('NodeCard.vue', () => {
         data: {
           temperature: 24.5,
           humidity: 65.2,
-          co2: 850,
+          co2: 850
         }
       },
       metadata: {}
@@ -31,8 +31,8 @@ describe('NodeCard.vue', () => {
     wrapper = mount(NodeCard, {
       props: { node },
       global: {
-        plugins: [pinia],
-      },
+        plugins: [pinia]
+      }
     })
 
     expect(wrapper.text()).toContain('climate_001')
@@ -52,7 +52,7 @@ describe('NodeCard.vue', () => {
 
     wrapper = mount(NodeCard, {
       props: { node },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     // Status should be success (green) for online node
@@ -71,7 +71,7 @@ describe('NodeCard.vue', () => {
 
     wrapper = mount(NodeCard, {
       props: { node },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.isOnline).toBe(false)
@@ -85,13 +85,13 @@ describe('NodeCard.vue', () => {
       last_seen_at: new Date(),
       metadata: {
         heap_total: 320000,
-        heap_free: 160000,
+        heap_free: 160000
       }
     }
 
     wrapper = mount(NodeCard, {
       props: { node },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     expect(wrapper.vm.heapPercent).toBe(50)
@@ -108,7 +108,7 @@ describe('NodeCard.vue', () => {
 
     wrapper = mount(NodeCard, {
       props: { node },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     // Simulate quick pump action for ph_ec node
@@ -120,7 +120,7 @@ describe('NodeCard.vue', () => {
     expect(wrapper.emitted()).toHaveProperty('command')
     expect(wrapper.emitted('command')[0][0]).toEqual({
       command: 'run_pump',
-      params: { pump: 'ph_up', duration: 5 },
+      params: { pump: 'ph_up', duration: 5 }
     })
   })
 
@@ -131,7 +131,7 @@ describe('NodeCard.vue', () => {
       { type: 'relay', expected: 'mdi-electric-switch' },
       { type: 'water', expected: 'mdi-water' },
       { type: 'display', expected: 'mdi-monitor' },
-      { type: 'root', expected: 'mdi-server-network' },
+      { type: 'root', expected: 'mdi-server-network' }
     ]
 
     testCases.forEach(({ type, expected }) => {
@@ -145,7 +145,7 @@ describe('NodeCard.vue', () => {
 
       wrapper = mount(NodeCard, {
         props: { node },
-        global: { plugins: [pinia] },
+        global: { plugins: [pinia] }
       })
 
       expect(wrapper.vm.nodeIcon).toBe(expected)
@@ -159,17 +159,16 @@ describe('NodeCard.vue', () => {
       online: true,
       last_seen_at: new Date(),
       metadata: {
-        wifi_rssi: -60, // -30 = 100%, -90 = 0%
+        wifi_rssi: -60 // -30 = 100%, -90 = 0%
       }
     }
 
     wrapper = mount(NodeCard, {
       props: { node },
-      global: { plugins: [pinia] },
+      global: { plugins: [pinia] }
     })
 
     // -60 dBm should be ~50% ((-60 + 90) * 100 / 60 = 50)
     expect(wrapper.vm.rssiPercent).toBe(50)
   })
 })
-

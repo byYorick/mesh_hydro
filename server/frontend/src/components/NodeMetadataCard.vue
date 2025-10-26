@@ -150,6 +150,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDateTime, formatDate } from '@/utils/time'
+import { safeIncludes } from '@/utils/array-utils'
 
 const props = defineProps({
   node: {
@@ -249,8 +250,8 @@ const additionalMetadata = computed(() => {
       console.log(`🔍 NodeMetadataCard: knownFields type:`, typeof knownFields)
       console.log(`🔍 NodeMetadataCard: knownFields isArray:`, Array.isArray(knownFields))
       
-      // Дополнительная проверка на undefined/null перед вызовом includes
-      if (knownFields && Array.isArray(knownFields) && key && !knownFields.includes(key)) {
+      // Безопасная проверка наличия элемента в массиве
+      if (key && !safeIncludes(knownFields, key)) {
         console.log(`🔍 NodeMetadataCard: Adding key to additional:`, key)
         additional[key] = metadata.value[key]
       }

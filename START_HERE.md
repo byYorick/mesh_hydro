@@ -72,7 +72,7 @@ tools\server_start.bat
 - ✅ Запустится Laravel backend (http://localhost:8000)
 - ✅ Запустится MQTT Listener (обработка сообщений от узлов)
 - ✅ Запустится Frontend (http://localhost:3000)
-- ✅ Создастся SQLite база данных
+- ✅ Создастся PostgreSQL база данных
 
 **Ожидаемый вывод:**
 ```
@@ -277,7 +277,7 @@ I (5100) mesh: Node is currently root (voting)
    ```batch
    docker exec hydro_backend ls -la /var/www/html/database/
    ```
-   Должен быть: `database.sqlite -> hydro_system.sqlite`
+   Должен быть: `PostgreSQL connected to hydro_system`
 
 ---
 
@@ -635,7 +635,7 @@ idf.py -p COM7 monitor
 ✅ Backend API (Laravel + MQTT Listener)
 ✅ Frontend Dashboard (Vue.js)
 ✅ MQTT Broker (Mosquitto)
-✅ Database (SQLite с auto-discovery)
+✅ Database (PostgreSQL с auto-discovery)
 
 **Все узлы общаются через mesh, данные идут на сервер в реальном времени!**
 

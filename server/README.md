@@ -28,7 +28,7 @@
 
 ## 🎯 Возможности
 
-### 💻 Backend (Laravel 10)
+### 💻 Backend (Laravel 11)
 - ✅ REST API для управления всей системой
 - ✅ **PostgreSQL 15** база данных с JSONB индексами (⚠️ только PostgreSQL!)
 - ✅ MQTT Listener для приема данных от ROOT узла
@@ -113,7 +113,7 @@ npm run dev
 
 ```
 server/
-├── backend/                 # Laravel 10 API
+├── backend/                 # Laravel 11 API
 │   ├── app/
 │   │   ├── Models/          # Node, Telemetry, Event, Command
 │   │   ├── Services/        # MqttService, TelegramService, SmsService

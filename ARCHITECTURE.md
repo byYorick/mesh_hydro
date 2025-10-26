@@ -45,7 +45,7 @@
 - Датчик уровня воды
 
 ### 7. Сервер
-- **Backend:** Laravel 10 + PostgreSQL 15
+- **Backend:** Laravel 11 + PostgreSQL 15
 - **Frontend:** Vue.js 3 + Vuetify 3
 - **MQTT:** Mosquitto broker
 - **Уведомления:** Telegram Bot + SMS Gateway
