@@ -313,6 +313,53 @@
                 </v-btn>
               </v-col>
             </v-row>
+            
+            <!-- Дополнительная информация -->
+            <v-divider class="my-4"></v-divider>
+            <v-row>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="primary"
+                  variant="outlined"
+                  prepend-icon="mdi-information"
+                  @click="sendCommand('get_info')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Информация о узле
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="info"
+                  variant="outlined"
+                  prepend-icon="mdi-memory"
+                  @click="sendCommand('get_memory_info')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Информация о памяти
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="success"
+                  variant="outlined"
+                  prepend-icon="mdi-wifi"
+                  @click="sendCommand('get_network_info')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Информация о сети
+                </v-btn>
+              </v-col>
+            </v-row>
           </v-expansion-panel-text>
         </v-expansion-panel>
 
@@ -395,6 +442,53 @@
                 </v-btn>
               </v-col>
             </v-row>
+            
+            <!-- Дополнительные конфигурационные действия -->
+            <v-divider class="my-4"></v-divider>
+            <v-row>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="primary"
+                  variant="outlined"
+                  prepend-icon="mdi-history"
+                  @click="sendCommand('get_config_history')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  История конфигураций
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="success"
+                  variant="outlined"
+                  prepend-icon="mdi-backup-restore"
+                  @click="sendCommand('restore_config')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Восстановить конфиг
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="warning"
+                  variant="outlined"
+                  prepend-icon="mdi-file-export"
+                  @click="sendCommand('export_config')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Экспорт конфигурации
+                </v-btn>
+              </v-col>
+            </v-row>
           </v-expansion-panel-text>
         </v-expansion-panel>
 
@@ -472,6 +566,53 @@
                     <span>Информация</span>
                     <span class="text-caption">О узле</span>
                   </div>
+                </v-btn>
+              </v-col>
+            </v-row>
+            
+            <!-- Дополнительные действия -->
+            <v-divider class="my-4"></v-divider>
+            <v-row>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="error"
+                  variant="outlined"
+                  prepend-icon="mdi-alert"
+                  @click="sendCommand('set_emergency_mode')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Аварийный режим
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="warning"
+                  variant="outlined"
+                  prepend-icon="mdi-test-tube"
+                  @click="sendCommand('set_mock_mode')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Режим тестирования
+                </v-btn>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-btn
+                  block
+                  color="info"
+                  variant="outlined"
+                  prepend-icon="mdi-update"
+                  @click="sendCommand('check_for_updates')"
+                  :disabled="!canPerformActions"
+                  size="large"
+                  class="text-none"
+                >
+                  Проверить обновления
                 </v-btn>
               </v-col>
             </v-row>
@@ -561,6 +702,24 @@
             label="Аварийный режим"
             prepend-icon="mdi-alert"
             color="error"
+          ></v-switch>
+          
+          <!-- Дополнительные настройки -->
+          <v-divider class="my-4"></v-divider>
+          <h4 class="text-subtitle-1 mb-3">Дополнительные настройки</h4>
+          
+          <v-text-field
+            v-model.number="telemetryInterval"
+            label="Интервал телеметрии (сек)"
+            type="number"
+            min="1"
+            max="3600"
+          ></v-text-field>
+          
+          <v-switch
+            v-model="enableLogging"
+            label="Включить логирование"
+            prepend-icon="mdi-file-document"
           ></v-switch>
         </v-card-text>
         <v-card-actions>
@@ -714,6 +873,8 @@ const systemMode = ref('autonomous')
 const isMockMode = ref(false)
 const isEmergencyMode = ref(false)
 const applyingSettings = ref(false)
+const telemetryInterval = ref(30)
+const enableLogging = ref(true)
 
 // PID настройки
 const pidPresets = ref([])
@@ -853,7 +1014,9 @@ async function applySystemSettings() {
     await api.sendCommand(props.node.node_id, 'set_system_mode', {
       mode: systemMode.value,
       mock_mode: isMockMode.value,
-      emergency_mode: isEmergencyMode.value
+      emergency_mode: isEmergencyMode.value,
+      telemetry_interval: telemetryInterval.value,
+      enable_logging: enableLogging.value
     })
     systemControlDialog.value = false
   } catch (error) {

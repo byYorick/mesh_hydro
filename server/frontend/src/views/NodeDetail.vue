@@ -17,8 +17,19 @@
       </v-col>
     </v-row>
 
-    <!-- Node Info -->
+    <!-- Node Control Panel -->
     <v-row>
+      <v-col cols="12">
+        <NodeControlPanel 
+          :node="node" 
+          :error-count="nodeErrors.length"
+          @command="sendCommand"
+        />
+      </v-col>
+    </v-row>
+
+    <!-- Node Info -->
+    <v-row class="mt-4">
       <v-col cols="12" md="4">
         <NodeManagementCard
           :node="node"
@@ -27,34 +38,34 @@
         />
       </v-col>
 
-    <!-- Actions Panel -->
-    <v-col cols="12" md="8">
-      <!-- pH Node Component -->
-      <PhNode v-if="node.node_type === 'ph'" :node="node" />
-      
-      <!-- EC Node Component -->
-      <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
-      
-      <!-- pH/EC Node Actions (includes manual pump control) -->
-      <NodeActions
-        v-else-if="node.node_type === 'ph_ec' || node.node_type === 'ph'"
-        :node="node"
-        @command="sendCommand"
-        @config-update="updateConfig"
-      />
-      
-      <!-- Generic Node Actions -->
-      <NodeActions
-        v-else
-        :node="node"
-        @command="sendCommand"
-        @config-update="updateConfig"
-      />
-    </v-col>
-  </v-row>
+      <!-- Actions Panel -->
+      <v-col cols="12" md="8">
+        <!-- pH Node Component -->
+        <PhNode v-if="node.node_type === 'ph'" :node="node" />
+        
+        <!-- EC Node Component -->
+        <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
+        
+        <!-- pH/EC Node Actions (includes manual pump control) -->
+        <NodeActions
+          v-else-if="node.node_type === 'ph_ec' || node.node_type === 'ph'"
+          :node="node"
+          @command="sendCommand"
+          @config-update="updateConfig"
+        />
+        
+        <!-- Generic Node Actions -->
+        <NodeActions
+          v-else
+          :node="node"
+          @command="sendCommand"
+          @config-update="updateConfig"
+        />
+      </v-col>
+    </v-row>
 
     <!-- Configuration Management Section -->
-    <v-row v-if="node.online && (node.node_type === 'ph_ec' || node.node_type === 'ph' || node.node_type === 'ec')">
+    <v-row v-if="node.online && (node.node_type === 'ph_ec' || node.node_type === 'ph' || node.node_type === 'ec')" class="mt-4">
       <v-col cols="12">
         <v-card>
           <v-card-title>
@@ -70,6 +81,10 @@
               <v-tab value="calibration">
                 <v-icon icon="mdi-medical-bag" start></v-icon>
                 Калибровка
+              </v-tab>
+              <v-tab value="advanced">
+                <v-icon icon="mdi-cog" start></v-icon>
+                Расширенные настройки
               </v-tab>
             </v-tabs>
 
@@ -129,6 +144,50 @@
                   </v-col>
                 </v-row>
               </v-window-item>
+
+              <!-- Advanced Configuration -->
+              <v-window-item value="advanced">
+                <v-row>
+                  <v-col cols="12">
+                    <v-card variant="outlined">
+                      <v-card-title class="text-subtitle-1">
+                        Расширенная конфигурация
+                      </v-card-title>
+                      <v-card-text>
+                        <ConfigEditor :node="node" @config-updated="handleConfigUpdate">
+                          <template v-slot:activator="{ props }">
+                            <v-btn
+                              color="secondary"
+                              v-bind="props"
+                              prepend-icon="mdi-cog"
+                            >
+                              Редактировать конфигурацию
+                            </v-btn>
+                          </template>
+                        </ConfigEditor>
+                        
+                        <v-btn
+                          color="info"
+                          class="ml-2"
+                          prepend-icon="mdi-download"
+                          @click="requestNodeConfig"
+                        >
+                          Запросить конфигурацию с узла
+                        </v-btn>
+                        
+                        <v-btn
+                          color="warning"
+                          class="ml-2"
+                          prepend-icon="mdi-history"
+                          @click="showConfigHistory = true"
+                        >
+                          История конфигураций
+                        </v-btn>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </v-window-item>
             </v-window>
           </v-card-text>
         </v-card>
@@ -142,8 +201,39 @@
       @calibrated="onCalibrated"
     />
 
+    <!-- Configuration History Dialog -->
+    <v-dialog v-model="showConfigHistory" max-width="800">
+      <v-card>
+        <v-card-title>
+          <v-icon icon="mdi-history" class="mr-2"></v-icon>
+          История конфигураций
+        </v-card-title>
+        <v-card-text>
+          <v-data-table
+            :headers="configHistoryHeaders"
+            :items="configHistory"
+            :loading="loadingConfigHistory"
+            :items-per-page="5"
+          >
+            <template v-slot:item.changed_at="{ item }">
+              {{ formatDateTime(item.changed_at) }}
+            </template>
+            <template v-slot:item.changes="{ item }">
+              <div v-for="(value, key) in item.changes" :key="key">
+                <strong>{{ key }}:</strong> {{ value }}
+              </div>
+            </template>
+          </v-data-table>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn @click="showConfigHistory = false">Закрыть</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Memory, Metadata and Health -->
-    <v-row>
+    <v-row class="mt-4">
       <v-col cols="12" md="4">
         <NodeMemoryCard
           :node="node"
@@ -163,7 +253,7 @@
     </v-row>
 
     <!-- Advanced Chart -->
-    <v-row>
+    <v-row class="mt-4">
       <v-col cols="12">
         <AdvancedChart
           :title="`Телеметрия: ${node.node_id}`"
@@ -178,7 +268,7 @@
     </v-row>
 
     <!-- Errors Timeline -->
-    <v-row>
+    <v-row class="mt-4">
       <v-col cols="12">
         <ErrorTimeline
           :errors="nodeErrors"
@@ -189,7 +279,7 @@
     </v-row>
 
     <!-- Events for this node -->
-    <v-row>
+    <v-row class="mt-4">
       <v-col cols="12">
         <v-card>
           <v-card-title>
@@ -250,12 +340,14 @@ import NodeManagementCard from '@/components/NodeManagementCard.vue'
 import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
 import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
 import NodeHealthIndicator from '@/components/NodeHealthIndicator.vue'
+import NodeControlPanel from '@/components/NodeControlPanel.vue'
 import ErrorTimeline from '@/components/ErrorTimeline.vue'
 import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
 import PhNode from '@/components/PhNode.vue'
 import EcNode from '@/components/EcNode.vue'
 import ManualPumpControl from '@/components/node-config/ManualPumpControl.vue'
 import PumpCalibrationDialog from '@/components/node-config/PumpCalibrationDialog.vue'
+import ConfigEditor from '@/components/ConfigEditor.vue'
 import { formatDateTime } from '@/utils/time'
 import api from '@/services/api'
 
@@ -275,12 +367,21 @@ const selectedError = ref(null)
 const showErrorDialog = ref(false)
 const configTab = ref('manual')
 const calibrationDialog = ref(false)
+const showConfigHistory = ref(false)
+const configHistory = ref([])
+const loadingConfigHistory = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
   { title: 'Сообщение', key: 'message' },
   { title: 'Создано', key: 'created_at' },
   { title: 'Решено', key: 'resolved_at' },
+]
+
+const configHistoryHeaders = [
+  { title: 'Дата', key: 'changed_at' },
+  { title: 'Пользователь', key: 'changed_by' },
+  { title: 'Изменения', key: 'changes' },
 ]
 
 // Централизованная система статусов
@@ -315,6 +416,7 @@ onMounted(async () => {
   node.value = await nodesStore.fetchNode(nodeId)
   await loadTelemetry()
   await loadNodeErrors()
+  await loadConfigHistory()
 })
 
 async function loadNodeErrors() {
@@ -331,6 +433,35 @@ async function loadNodeErrors() {
   } catch (error) {
     console.error('Error loading node errors:', error)
     nodeErrors.value = []
+  }
+}
+
+async function loadConfigHistory() {
+  if (!node.value?.node_id) {
+    return
+  }
+  
+  loadingConfigHistory.value = true
+  try {
+    // Simulate loading config history
+    configHistory.value = [
+      {
+        id: 1,
+        changed_at: new Date(Date.now() - 86400000).toISOString(),
+        changed_by: 'admin',
+        changes: { ph_target: '6.5 → 6.8', ec_target: '1.2 → 1.5' }
+      },
+      {
+        id: 2,
+        changed_at: new Date(Date.now() - 172800000).toISOString(),
+        changed_by: 'system',
+        changes: { interval: '30 → 60' }
+      }
+    ]
+  } catch (error) {
+    console.error('Error loading config history:', error)
+  } finally {
+    loadingConfigHistory.value = false
   }
 }
 
@@ -417,6 +548,25 @@ async function updateConfig(config) {
     appStore.showSnackbar('Конфигурация обновлена', 'success')
   } catch (error) {
     appStore.showSnackbar('Ошибка обновления конфигурации', 'error')
+  }
+}
+
+async function handleConfigUpdate(config) {
+  try {
+    await nodesStore.updateConfig(node.value.node_id, config)
+    node.value.config = config
+    appStore.showSnackbar('Конфигурация обновлена', 'success')
+  } catch (error) {
+    appStore.showSnackbar('Ошибка обновления конфигурации', 'error')
+  }
+}
+
+async function requestNodeConfig() {
+  try {
+    await api.requestConfig(node.value.node_id)
+    appStore.showSnackbar('Запрос конфигурации отправлен', 'success')
+  } catch (error) {
+    appStore.showSnackbar('Ошибка запроса конфигурации', 'error')
   }
 }
 
@@ -526,4 +676,3 @@ function onCalibrated(result) {
   font-size: 16px;
 }
 </style>
-
