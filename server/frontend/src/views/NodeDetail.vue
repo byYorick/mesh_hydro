@@ -17,7 +17,7 @@
       </v-col>
     </v-row>
 
-    <!-- Node Info -->
+    <!-- Node Info and Node-specific Details -->
     <v-row>
       <v-col cols="12" md="4">
         <NodeManagementCard
@@ -27,120 +27,29 @@
         />
       </v-col>
 
-    <!-- Actions Panel -->
-    <v-col cols="12" md="8">
-      <!-- pH Node Component -->
-      <PhNode v-if="node.node_type === 'ph'" :node="node" />
-      
-      <!-- EC Node Component -->
-      <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
-      
-      <!-- pH/EC Node Actions (includes manual pump control) -->
-      <NodeActions
-        v-else-if="node.node_type === 'ph_ec' || node.node_type === 'ph'"
-        :node="node"
-        @command="sendCommand"
-        @config-update="updateConfig"
-      />
-      
-      <!-- Generic Node Actions -->
-      <NodeActions
-        v-else
-        :node="node"
-        @command="sendCommand"
-        @config-update="updateConfig"
-      />
-    </v-col>
-  </v-row>
-
-    <!-- Configuration Management Section -->
-    <v-row v-if="node.online && (node.node_type === 'ph_ec' || node.node_type === 'ph' || node.node_type === 'ec')">
-      <v-col cols="12">
-        <v-card>
-          <v-card-title>
-            <v-icon icon="mdi-cog" class="mr-2"></v-icon>
-            Управление конфигурацией
-          </v-card-title>
+      <!-- Node-specific Details Panel -->
+      <v-col cols="12" md="8">
+        <!-- pH Node Detail -->
+        <PhDetail
+          v-if="node.node_type === 'ph'"
+          :node="node"
+          :telemetry-data="telemetryData"
+          :node-errors="nodeErrors"
+        />
+        
+        <!-- EC Node Detail -->
+        <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
+        
+        <!-- Fallback for other types -->
+        <v-card v-else>
           <v-card-text>
-            <v-tabs v-model="configTab" bg-color="primary">
-              <v-tab value="manual">
-                <v-icon icon="mdi-pump" start></v-icon>
-                Ручное управление
-              </v-tab>
-              <v-tab value="calibration">
-                <v-icon icon="mdi-medical-bag" start></v-icon>
-                Калибровка
-              </v-tab>
-            </v-tabs>
-
-            <v-window v-model="configTab" class="mt-4">
-              <!-- Manual Pump Control -->
-              <v-window-item value="manual">
-                <ManualPumpControl
-                  :node-id="node.node_id"
-                  :is-online="node.online"
-                  @pump-started="onPumpStart"
-                  @pump-stopped="onPumpStop"
-                />
-              </v-window-item>
-
-              <!-- Calibration -->
-              <v-window-item value="calibration">
-                <v-row>
-                  <v-col cols="12" md="6">
-                    <v-card variant="outlined">
-                      <v-card-title class="text-subtitle-1">
-                        Калибровка насосов
-                      </v-card-title>
-                      <v-card-text>
-                        <p class="mb-4">
-                          Калибровка насосов необходима для точного дозирования реагентов.
-                          Введите объем жидкости и длительность работы насоса.
-                        </p>
-                        <v-btn
-                          color="primary"
-                          block
-                          size="large"
-                          @click="calibrationDialog = true"
-                        >
-                          <v-icon icon="mdi-medical-bag" start></v-icon>
-                          Открыть калибровку
-                        </v-btn>
-                      </v-card-text>
-                    </v-card>
-                  </v-col>
-                  <v-col cols="12" md="6">
-                    <v-card variant="outlined">
-                      <v-card-title class="text-subtitle-1">
-                        Информация
-                      </v-card-title>
-                      <v-card-text>
-                        <v-alert type="info" variant="tonal" density="compact">
-                          <strong>Советы по калибровке:</strong>
-                          <ul class="mt-2 mb-0">
-                            <li>Используйте известный объем (10-50 мл)</li>
-                            <li>Измерьте время работы насоса (5-15 сек)</li>
-                            <li>Соберите жидкость в мерный стакан</li>
-                            <li>Введите фактический объем для расчета производительности</li>
-                          </ul>
-                        </v-alert>
-                      </v-card-text>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-window-item>
-            </v-window>
+            <v-alert type="warning">
+              Детальный компонент для типа "{{ node.node_type }}" еще не реализован
+            </v-alert>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
-
-    <!-- Calibration Dialog -->
-    <PumpCalibrationDialog
-      v-model="calibrationDialog"
-      :node-id="node.node_id"
-      @calibrated="onCalibrated"
-    />
 
     <!-- Memory, Metadata and Health -->
     <v-row>
@@ -245,7 +154,6 @@ import { useErrorsStore } from '@/stores/errors'
 import { useAppStore } from '@/stores/app'
 import { useNodeStatus } from '@/composables/useNodeStatus'
 import AdvancedChart from '@/components/AdvancedChart.vue'
-import NodeActions from '@/components/NodeActions.vue'
 import NodeManagementCard from '@/components/NodeManagementCard.vue'
 import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
 import NodeMetadataCard from '@/components/NodeMetadataCard.vue'
@@ -254,10 +162,8 @@ import ErrorTimeline from '@/components/ErrorTimeline.vue'
 import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
 import PhNode from '@/components/PhNode.vue'
 import EcNode from '@/components/EcNode.vue'
-import ManualPumpControl from '@/components/node-config/ManualPumpControl.vue'
-import PumpCalibrationDialog from '@/components/node-config/PumpCalibrationDialog.vue'
+import PhDetail from '@/components/detail/PhDetail.vue'
 import { formatDateTime } from '@/utils/time'
-import api from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,8 +179,6 @@ const selectedRange = ref('24h')
 const loading = ref(false)
 const selectedError = ref(null)
 const showErrorDialog = ref(false)
-const configTab = ref('manual')
-const calibrationDialog = ref(false)
 
 const eventHeaders = [
   { title: 'Уровень', key: 'level' },
@@ -308,13 +212,6 @@ const telemetryFields = computed(() => {
     default:
       return []
   }
-})
-
-onMounted(async () => {
-  const nodeId = route.params.nodeId
-  node.value = await nodesStore.fetchNode(nodeId)
-  await loadTelemetry()
-  await loadNodeErrors()
 })
 
 async function loadNodeErrors() {
@@ -379,31 +276,8 @@ async function sendCommand({ command, params }) {
   }
   
   try {
-    // Специальная обработка для команды run_pump
-    if (command === 'run_pump') {
-      // Определяем pump_id на основе типа насоса
-      const pumpIdMap = {
-        'ph_up': 0,
-        'ph_down': 1,
-        'ec_up': 2,
-        'ec_down': 3,
-        'water': 4
-      }
-      
-      const pumpId = pumpIdMap[params.pump] || 0
-      
-      // Отправляем запрос на запуск насоса
-      await api.post(`/nodes/${node.value.node_id}/pump/run`, {
-        pump_id: pumpId,
-        duration_sec: params.duration
-      })
-      
-      appStore.showSnackbar(`Насос ${params.pump} запущен на ${params.duration} сек`, 'success')
-    } else {
-      // Обычные команды через стандартный API
-      await nodesStore.sendCommand(node.value.node_id, command, params)
-      appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
-    }
+    await nodesStore.sendCommand(node.value.node_id, command, params)
+    appStore.showSnackbar(`Команда "${command}" отправлена`, 'success')
   } catch (error) {
     console.error('Error sending command:', error)
     appStore.showSnackbar('Ошибка отправки команды', 'error')
@@ -459,8 +333,8 @@ function getLevelColor(level) {
 
 async function handleNodeUpdate(updateData) {
   try {
-    // Update node via API
-    await api.updateNodeConfig(node.value.node_id, {
+    // Update node via nodes store
+    await nodesStore.updateConfig(node.value.node_id, {
       ...node.value.config,
       ...updateData.config,
     })
@@ -487,21 +361,12 @@ async function handleNodeDelete(nodeId) {
 }
 
 // Pump control event handlers
-function onPumpStart(event) {
-  console.log('Pump started:', event)
-  appStore.showSnackbar(`Насос ${event.pump_id} запущен на ${event.duration} сек`, 'success')
-}
-
-function onPumpStop() {
-  console.log('Pump stopped')
-  appStore.showSnackbar('Насос остановлен', 'info')
-}
-
-// Calibration event handler
-function onCalibrated(result) {
-  console.log('Pump calibrated:', result)
-  appStore.showSnackbar(`Насос откалиброван: ${result.ml_per_second?.toFixed(2)} мл/сек`, 'success')
-}
+onMounted(async () => {
+  const nodeId = route.params.nodeId
+  node.value = await nodesStore.fetchNode(nodeId)
+  await loadTelemetry()
+  await loadNodeErrors()
+})
 </script>
 
 <style scoped>
@@ -525,5 +390,7 @@ function onCalibrated(result) {
   min-height: 56px;
   font-size: 16px;
 }
+
+
 </style>
 

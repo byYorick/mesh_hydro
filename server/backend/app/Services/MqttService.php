@@ -161,9 +161,14 @@ class MqttService
 
             // Валидация node_type
             $validTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
-            $nodeType = isset($data['type']) && in_array($data['type'], $validTypes) 
-                ? $data['type'] 
-                : 'unknown';
+            $nodeType = 'unknown';
+            
+            // Проверяем поле 'node_type' (приоритетно) или 'type'
+            if (isset($data['node_type']) && in_array($data['node_type'], $validTypes)) {
+                $nodeType = $data['node_type'];
+            } elseif (isset($data['type']) && in_array($data['type'], $validTypes)) {
+                $nodeType = $data['type'];
+            }
 
             // Сохранение телеметрии в БД
             $telemetry = Telemetry::create([
@@ -198,7 +203,7 @@ class MqttService
                 'last_seen_at' => now(),
             ];
             
-            // Только для новых узлов
+            // Только для новых узлов или если node_type = 'unknown'
             if ($isNewNode) {
                 $updateData['node_type'] = $nodeType;
                 $updateData['metadata'] = array_merge([
@@ -206,6 +211,14 @@ class MqttService
                     'created_at' => now()->toIso8601String(),
                 ], $metadata);
             } else {
+                // Обновляем node_type если был 'unknown' (для исправления уже существующих узлов)
+                if ($node && $node->node_type === 'unknown' && $nodeType !== 'unknown') {
+                    $updateData['node_type'] = $nodeType;
+                    Log::info("Updating node_type from 'unknown' to '{$nodeType}'", [
+                        'node_id' => $node->node_id
+                    ]);
+                }
+                
                 // Обновляем только metadata для существующих
                 if (!empty($metadata)) {
                     $updateData['metadata'] = array_merge($node->metadata ?? [], $metadata);

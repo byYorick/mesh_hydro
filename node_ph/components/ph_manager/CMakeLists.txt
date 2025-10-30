@@ -11,5 +11,6 @@ idf_component_register(
         mesh_protocol
         node_config
         esp_wifi
+        json
 )
 

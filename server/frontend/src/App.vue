@@ -262,33 +262,15 @@ const showMobileMenu = ref(false)
 
 // Filtered menu routes (exclude hidden ones)
 const menuRoutes = computed(() => {
-  console.log('🔍 App.vue: menuRoutes computed called')
-  console.log('🔍 App.vue: router.getRoutes():', router.getRoutes())
-  
-  const routes = router.getRoutes().filter(r => {
-    console.log('🔍 App.vue: Processing route:', r)
-    console.log('🔍 App.vue: r.meta:', r.meta)
-    console.log('🔍 App.vue: r.meta.icon:', r.meta?.icon)
-    console.log('🔍 App.vue: r.meta.showInMenu:', r.meta?.showInMenu)
-    
-    return r.meta.icon && r.meta.showInMenu !== false
-  })
-  
-  console.log('🔍 App.vue: Filtered routes:', routes)
-  return routes
+  return router.getRoutes().filter(r => r.meta.icon && r.meta.showInMenu !== false)
 })
 
 // Connection status text
 const connectionStatus = computed(() => {
-  console.log('🔍 App.vue: connectionStatus computed called')
-  console.log('🔍 App.vue: appStore.backendConnected:', appStore.backendConnected)
-  console.log('🔍 App.vue: appStore.mqttConnected:', appStore.mqttConnected)
-  
   if (!appStore.backendConnected) return 'Нет связи'
   if (!appStore.mqttConnected) return 'MQTT: offline'
   
   const wsStatus = getConnectionStatus()
-  console.log('🔍 App.vue: wsStatus:', wsStatus)
   
   if (wsStatus.fallbackMode) return 'WebSocket: fallback'
   if (!wsStatus.isWebSocketConnected) return 'WebSocket: offline'
@@ -319,11 +301,63 @@ const refreshData = async () => {
 }
 
 onMounted(async () => {
+  // Setup global error handlers
+  const app = window.appInstance
+  if (app) {
+    // Global error handler
+    app.config.errorHandler = (err, instance, info) => {
+      console.error('🔴 GLOBAL ERROR:', {
+        error: err,
+        instance,
+        info,
+        timestamp: new Date().toISOString()
+      })
+      
+      // Show error notification
+      appStore.showSnackbar(
+        `Критическая ошибка: ${err?.message || 'Неизвестная ошибка'}`,
+        'error',
+        8000
+      )
+    }
+
+    // Vue warn handler
+    app.config.warnHandler = (msg, instance, trace) => {
+      console.warn('⚠️ VUE WARNING:', {
+        message: msg,
+        instance,
+        trace,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+  
+  // Continue with mounted logic
   // Initial data load
   await refreshData()
 
   // Setup WebSocket listeners for real-time updates
   setupWebSocketListeners()
+  
+  // Catch unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('🔴 UNHANDLED PROMISE REJECTION:', event.reason)
+    appStore.showSnackbar(
+      `Необработанная ошибка: ${event.reason?.message || 'Неизвестная ошибка'}`,
+      'error',
+      8000
+    )
+  })
+  
+  // Catch uncaught errors
+  window.addEventListener('error', (event) => {
+    console.error('🔴 UNCAUGHT ERROR:', event.error)
+    appStore.showSnackbar(
+      `Системная ошибка: ${event.error?.message || 'Неизвестная ошибка'}`,
+      'error',
+      8000
+    )
+  })
 })
 
 onUnmounted(() => {
@@ -392,21 +426,46 @@ function setupWebSocketListeners() {
       statusBarStore.showForEvent(data)
     }
     
-    // Show notification for critical events
-    const criticalLevels = ['critical', 'emergency']
+    // Показываем popup для всех событий в зависимости от уровня
     try {
-      // Дополнительная проверка на undefined/null перед вызовом includes
-      if (data && data.level && typeof data.level === 'string' && criticalLevels && Array.isArray(criticalLevels) && criticalLevels.includes(data.level)) {
-        appStore.showSnackbar(
-          `⚠️ ${data.message}`,
-          'error',
-          8000
-        )
+      if (data && data.level && typeof data.level === 'string') {
+        const eventLevelMap = {
+          'emergency': { type: 'error', icon: '🚨', duration: 15000 },
+          'critical': { type: 'error', icon: '⚠️', duration: 10000 },
+          'error': { type: 'error', icon: '❌', duration: 8000 },
+          'warning': { type: 'warning', icon: '⚡', duration: 6000 },
+          'info': { type: 'info', icon: 'ℹ️', duration: 4000 },
+          'success': { type: 'success', icon: '✅', duration: 3000 }
+        }
+        
+        const eventConfig = eventLevelMap[data.level] || { type: 'info', icon: '📢', duration: 4000 }
+        
+        // Формируем сообщение с деталями
+        let message = `${eventConfig.icon} ${data.message}`
+        
+        // Добавляем node_id если есть
+        if (data.node_id) {
+          message = `[${data.node_id}] ${message}`
+        }
+        
+        // Добавляем детали из data если есть
+        if (data.data) {
+          if (data.data.pump_id !== undefined) {
+            message += ` | Насос ${data.data.pump_id}`
+          }
+          if (data.data.volume_ml !== undefined) {
+            message += ` | ${data.data.volume_ml.toFixed(1)} мл`
+          }
+          if (data.data.duration_ms !== undefined) {
+            message += ` | ${(data.data.duration_ms / 1000).toFixed(1)}с`
+          }
+        }
+        
+        appStore.showSnackbar(message, eventConfig.type, eventConfig.duration)
       }
     } catch (error) {
-      console.error('App.vue: critical event notification - Error:', error)
-      console.error('App.vue: critical event notification - data:', data)
-      console.error('App.vue: critical event notification - criticalLevels:', criticalLevels)
+      console.error('App.vue: event notification - Error:', error)
+      console.error('App.vue: event notification - data:', data)
     }
   })
 

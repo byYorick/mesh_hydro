@@ -227,42 +227,27 @@ const knownFields = [
 ]
 
 const additionalMetadata = computed(() => {
-  console.log('🔍 NodeMetadataCard: additionalMetadata computed called')
-  console.log('🔍 NodeMetadataCard: metadata.value:', metadata.value)
-  console.log('🔍 NodeMetadataCard: knownFields:', knownFields)
-  
   const additional = {}
   if (!metadata.value || typeof metadata.value !== 'object') {
-    console.log('NodeMetadataCard: metadata.value is not valid:', metadata.value)
     return additional
   }
   
   // Проверяем что knownFields определен и является массивом
   if (!knownFields || !Array.isArray(knownFields)) {
-    console.warn('NodeMetadataCard: knownFields is not defined or not an array:', knownFields)
     return additional
   }
   
   try {
-    console.log('🔍 NodeMetadataCard: Starting forEach loop')
-    Object.keys(metadata.value).forEach((key, index) => {
-      console.log(`🔍 NodeMetadataCard: Processing key ${index}:`, key)
-      console.log(`🔍 NodeMetadataCard: knownFields type:`, typeof knownFields)
-      console.log(`🔍 NodeMetadataCard: knownFields isArray:`, Array.isArray(knownFields))
-      
+    Object.keys(metadata.value).forEach((key) => {
       // Безопасная проверка наличия элемента в массиве
       if (key && !safeIncludes(knownFields, key)) {
-        console.log(`🔍 NodeMetadataCard: Adding key to additional:`, key)
         additional[key] = metadata.value[key]
       }
     })
-    console.log('🔍 NodeMetadataCard: forEach loop completed')
   } catch (error) {
     console.error('NodeMetadataCard: Error in additionalMetadata computation:', error)
-    console.error('NodeMetadataCard: knownFields:', knownFields)
-    console.error('NodeMetadataCard: metadata.value:', metadata.value)
   }
-  console.log('🔍 NodeMetadataCard: additionalMetadata result:', additional)
+  
   return additional
 })
 

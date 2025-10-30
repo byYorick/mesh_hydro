@@ -32,6 +32,11 @@
 
 static const char *TAG = "ph_node";
 
+// Глобальные переменные для pump_events
+const char *g_node_id = NULL;
+bool g_emergency_mode = false;
+bool g_autonomous_mode = false;
+
 // I2C конфигурация для ESP32 (стандартные пины)
 #define I2C_MASTER_SCL_IO   22
 #define I2C_MASTER_SDA_IO   21
@@ -70,6 +75,10 @@ void app_main(void)
         init_default_config();
         node_config_save(&s_node_config, sizeof(ph_node_config_t), "ph_ns");
     }
+    
+    // Установка глобального node_id для pump_events
+    g_node_id = s_node_config.base.node_id;
+    
     ESP_LOGI(TAG, "  Node ID: %s", s_node_config.base.node_id);
     ESP_LOGI(TAG, "  pH target: %.2f (%.2f-%.2f)", 
              s_node_config.ph_target, s_node_config.ph_min, s_node_config.ph_max);
@@ -178,6 +187,15 @@ static void init_default_config(void) {
     // Диапазоны
     s_node_config.ph_min = 5.5f;
     s_node_config.ph_max = 7.5f;
+    
+    // Аварийные лимиты (критические границы)
+    s_node_config.ph_emergency_low = 4.0f;   // Критично низкий pH
+    s_node_config.ph_emergency_high = 9.0f;  // Критично высокий pH
+    
+    // Лимиты безопасности насосов
+    s_node_config.max_pump_time_ms = 60000;      // Максимум 60 секунд
+    s_node_config.cooldown_ms = 5000;            // 5 секунд между запусками
+    s_node_config.max_daily_volume_ml = 1000;    // Максимум 1 литр в день
     
     // PID параметры для 2 насосов (консервативные настройки)
     for (int i = 0; i < 2; i++) {

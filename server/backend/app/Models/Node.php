@@ -102,6 +102,8 @@ class Node extends Model
     {
         return match($this->node_type) {
             'ph_ec' => 'mdi-flask',
+            'ph' => 'mdi-flask-outline',
+            'ec' => 'mdi-flash-outline',
             'climate' => 'mdi-thermometer',
             'relay' => 'mdi-electric-switch',
             'water' => 'mdi-water',
@@ -120,11 +122,12 @@ class Node extends Model
             return 'grey';
         }
 
+        $timeout = config('hydro.node_offline_timeout', 45);
         $seconds = $this->last_seen_at->diffInSeconds(now());
         
-        if ($seconds < 20) return 'green';  // Онлайн: < 20 секунд
-        if ($seconds < 40) return 'orange'; // Предупреждение: 20-40 секунд
-        return 'red';                        // Офлайн: > 40 секунд
+        if ($seconds < ($timeout * 0.5)) return 'green';  // Онлайн: < 50% таймаута
+        if ($seconds < $timeout) return 'orange';          // Предупреждение: 50-100% таймаута
+        return 'red';                                       // Офлайн: > таймаута
     }
 
     /**

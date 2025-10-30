@@ -27,5 +27,8 @@ app.provide('echo', echo)
 app.use(router)
 app.use(vuetify)
 
+// Export app instance for global error handlers
+window.appInstance = app
+
 app.mount('#app')
 

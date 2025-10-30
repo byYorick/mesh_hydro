@@ -329,11 +329,30 @@ const showVolumeInput = ref({})
 
 // Вычисляемые значения
 const currentPh = computed(() => {
-  return props.node.last_telemetry?.data?.ph?.toFixed(2) || 'N/A'
+  console.log('🔍 PhNode currentPh computed:', {
+    'node.node_id': props.node.node_id,
+    'last_telemetry': props.node.last_telemetry,
+    'lastTelemetry': props.node.lastTelemetry,
+    'telemetry[0]': props.node.telemetry?.[0],
+    'full_node': props.node
+  })
+  
+  const ph = props.node.last_telemetry?.data?.ph 
+    || props.node.lastTelemetry?.data?.ph
+    || props.node.telemetry?.[0]?.data?.ph
+  
+  console.log('📊 PH value found:', ph)
+  
+  return ph?.toFixed(2) || 'N/A'
 })
 
 const targetPh = computed(() => {
-  return props.node.config?.ph_target?.toFixed(2) || 'N/A'
+  // Проверяем несколько возможных путей к конфигу
+  const ph_target = props.node.config?.ph_target
+    || props.node.last_telemetry?.data?.ph_target
+    || props.node.lastTelemetry?.data?.ph_target
+  
+  return ph_target?.toFixed(2) || 'N/A'
 })
 
 const phRange = computed(() => {
@@ -704,6 +723,12 @@ const formatDate = (timestamp) => {
 
 // При монтировании загрузить калибровки
 onMounted(() => {
+  console.log('🔍 PhNode mounted with props.node:', props.node)
+  console.log('🔍 PhNode node.online:', props.node?.online)
+  console.log('🔍 PhNode node.node_type:', props.node?.node_type)
+  console.log('🔍 PhNode node.last_telemetry:', props.node?.last_telemetry)
+  console.log('🔍 PhNode node.lastTelemetry:', props.node?.lastTelemetry)
+  console.log('🔍 PhNode currentPh.value:', currentPh.value)
   loadCalibrations()
 })
 

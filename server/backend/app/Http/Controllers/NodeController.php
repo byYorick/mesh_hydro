@@ -58,6 +58,7 @@ class NodeController extends Controller
             'telemetry' => function ($query) {
                 $query->latest('received_at')->limit(100);
             },
+            'lastTelemetry',
             'events' => function ($query) {
                 $query->latest()->limit(50);
             },
@@ -72,6 +73,9 @@ class NodeController extends Controller
         $node->online = $node->isOnline();
         $node->status_color = $node->status_color;
         $node->icon = $node->icon;
+        
+        // Добавляем last_telemetry для совместимости со старым форматом
+        $node->last_telemetry = $node->lastTelemetry;
 
         return response()->json($node);
     }

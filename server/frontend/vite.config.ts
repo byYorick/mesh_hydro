@@ -42,66 +42,66 @@ export default defineConfig(({ mode }) => ({
         'src/utils'
       ],
       vueTemplate: true
-    }),
-
-    // PWA
-    VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\./,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10,
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              }
-            }
-          }
-        ],
-        skipWaiting: true,
-        clientsClaim: true
-      },
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
-      manifest: {
-        name: 'Mesh Hydro System',
-        short_name: 'Hydro System',
-        description: 'Mesh Hydro System Dashboard',
-        theme_color: '#1976d2',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      }
     })
+
+    // PWA - DISABLED (no caching)
+    // ...(mode === 'development' ? [] : [VitePWA({
+    //   registerType: 'autoUpdate',
+    //   injectRegister: 'auto',
+    //   workbox: {
+    //     globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+    //     runtimeCaching: [
+    //       {
+    //         urlPattern: /^https:\/\/api\./,
+    //         handler: 'NetworkFirst',
+    //         options: {
+    //           cacheName: 'api-cache',
+    //           networkTimeoutSeconds: 10,
+    //           cacheableResponse: {
+    //             statuses: [0, 200]
+    //           }
+    //         }
+    //       },
+    //       {
+    //         urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
+    //         handler: 'CacheFirst',
+    //         options: {
+    //           cacheName: 'images-cache',
+    //           expiration: {
+    //             maxEntries: 100,
+    //             maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+    //           }
+    //         }
+    //       }
+    //     ],
+    //     skipWaiting: true,
+    //     clientsClaim: true
+    //   },
+    //   includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'masked-icon.svg'],
+    //   manifest: {
+    //     name: 'Mesh Hydro System',
+    //     short_name: 'Hydro System',
+    //     description: 'Mesh Hydro System Dashboard',
+    //     theme_color: '#1976d2',
+    //     background_color: '#ffffff',
+    //     display: 'standalone',
+    //     orientation: 'portrait',
+    //     scope: '/',
+    //     start_url: '/',
+    //     icons: [
+    //       {
+    //         src: 'pwa-192x192.png',
+    //         sizes: '192x192',
+    //         type: 'image/png'
+    //       },
+    //       {
+    //         src: 'pwa-512x512.png',
+    //         sizes: '512x512',
+    //         type: 'image/png'
+    //       }
+    //     ]
+    //   }
+    // })]).filter(Boolean)
   ],
 
   resolve: {
@@ -141,9 +141,10 @@ export default defineConfig(({ mode }) => ({
           'vendor-utils': ['axios', 'date-fns', '@vueuse/core'],
           'vendor-realtime': ['laravel-echo', 'pusher-js', 'socket.io-client']
         },
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        // Полное отключение hash - предотвращает кеширование
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     },
     chunkSizeWarningLimit: 1000,

@@ -20,12 +20,14 @@ return [
     */
     
     // Таймаут офлайн узла (секунды)
-    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 20),
+    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 45), // 45 сек (больше интервала телеметрии 30 сек)
     
     // Поддерживаемые типы узлов
     'node_types' => [
         'root' => 'Root Node',
         'ph_ec' => 'pH/EC Sensor',
+        'ph' => 'pH Sensor',
+        'ec' => 'EC Sensor',
         'climate' => 'Climate Sensor',
         'relay' => 'Relay Controller',
         'water' => 'Water Level Sensor',

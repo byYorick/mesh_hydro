@@ -47,6 +47,7 @@ static void send_discovery(void);
 static void send_telemetry(void);
 static void send_heartbeat(void);
 static void send_event(mesh_event_level_t level, const char *message, float value);
+static void send_event_with_metadata(mesh_event_level_t level, const char *message, float ph, float output, float error, pid_zone_t zone, pump_id_t pump_id);
 static int8_t get_rssi_to_parent(void);
 static void read_sensor(void);
 static void control_ph(void);
@@ -198,7 +199,7 @@ static void heartbeat_task(void *arg) {
     ESP_LOGI(TAG, "Heartbeat task started");
     
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(60000)); // Каждую минуту
+        vTaskDelay(pdMS_TO_TICKS(15000)); // Каждые 15 секунд
         send_heartbeat();
     }
 }
@@ -367,8 +368,23 @@ static void control_ph(void) {
             
             // Получение данных PID для события
             pump_event_pid_data_t pid_data;
-            pump_events_get_pid_data(&s_pid_ph_up.pid, s_current_ph, &pid_data);
-            pid_data.output = output; // Устанавливаем реальный выход
+            // Заполняем данные PID вручную из adaptive_pid_t
+            pid_data.kp = (zone == ZONE_DEAD) ? s_pid_ph_up.coeffs_dead.kp : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_up.coeffs_close.kp : 
+                          s_pid_ph_up.coeffs_far.kp;
+            pid_data.ki = (zone == ZONE_DEAD) ? s_pid_ph_up.coeffs_dead.ki : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_up.coeffs_close.ki : 
+                          s_pid_ph_up.coeffs_far.ki;
+            pid_data.kd = (zone == ZONE_DEAD) ? s_pid_ph_up.coeffs_dead.kd : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_up.coeffs_close.kd : 
+                          s_pid_ph_up.coeffs_far.kd;
+            pid_data.setpoint = s_pid_ph_up.setpoint;
+            pid_data.current_value = s_current_ph;
+            pid_data.error = s_pid_ph_up.setpoint - s_current_ph;
+            pid_data.output = output;
+            pid_data.integral = s_pid_ph_up.integral;
+            pid_data.derivative = s_pid_ph_up.prev_error;
+            pid_data.enabled = true;
             
             // Отправка события включения насоса pH UP
             pump_events_send_start_event(
@@ -386,7 +402,9 @@ static void control_ph(void) {
             
             // Отправка события при коррекции в FAR зоне
             if (zone == ZONE_FAR) {
-                send_event(MESH_EVENT_WARNING, "pH far from target, aggressive correction", s_current_ph);
+                float error = s_config->ph_target - s_current_ph;
+                send_event_with_metadata(MESH_EVENT_WARNING, "pH far from target, aggressive correction", 
+                                        s_current_ph, output, error, zone, PUMP_PH_UP);
             }
         }
     }
@@ -401,8 +419,23 @@ static void control_ph(void) {
             
             // Получение данных PID для события
             pump_event_pid_data_t pid_data;
-            pump_events_get_pid_data(&s_pid_ph_down.pid, s_current_ph, &pid_data);
-            pid_data.output = output; // Устанавливаем реальный выход
+            // Заполняем данные PID вручную из adaptive_pid_t
+            pid_data.kp = (zone == ZONE_DEAD) ? s_pid_ph_down.coeffs_dead.kp : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_down.coeffs_close.kp : 
+                          s_pid_ph_down.coeffs_far.kp;
+            pid_data.ki = (zone == ZONE_DEAD) ? s_pid_ph_down.coeffs_dead.ki : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_down.coeffs_close.ki : 
+                          s_pid_ph_down.coeffs_far.ki;
+            pid_data.kd = (zone == ZONE_DEAD) ? s_pid_ph_down.coeffs_dead.kd : 
+                          (zone == ZONE_CLOSE) ? s_pid_ph_down.coeffs_close.kd : 
+                          s_pid_ph_down.coeffs_far.kd;
+            pid_data.setpoint = s_pid_ph_down.setpoint;
+            pid_data.current_value = s_current_ph;
+            pid_data.error = s_pid_ph_down.setpoint - s_current_ph;
+            pid_data.output = output;
+            pid_data.integral = s_pid_ph_down.integral;
+            pid_data.derivative = s_pid_ph_down.prev_error;
+            pid_data.enabled = true;
             
             // Отправка события включения насоса pH DOWN
             pump_events_send_start_event(
@@ -420,13 +453,15 @@ static void control_ph(void) {
             
             // Отправка события при коррекции в FAR зоне
             if (zone == ZONE_FAR) {
-                send_event(MESH_EVENT_WARNING, "pH far from target, aggressive correction", s_current_ph);
+                float error = s_current_ph - s_config->ph_target;
+                send_event_with_metadata(MESH_EVENT_WARNING, "pH far from target, aggressive correction", 
+                                        s_current_ph, output, error, zone, PUMP_PH_DOWN);
             }
         }
     }
 }
 
-// Отправка event сообщения
+// Отправка event сообщения с полными метаданными
 static void send_event(mesh_event_level_t level, const char *message, float value) {
     if (!mesh_manager_is_connected()) {
         return;  // Нельзя отправить если offline
@@ -444,17 +479,149 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
     cJSON_AddStringToObject(root, "message", message);
     cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
     
+    // Полные метаданные для любого события
     cJSON *data = cJSON_CreateObject();
+    
+    // Основные параметры pH
     cJSON_AddNumberToObject(data, "ph", value);
     cJSON_AddNumberToObject(data, "ph_target", s_config->ph_target);
     cJSON_AddNumberToObject(data, "ph_min", s_config->ph_min);
     cJSON_AddNumberToObject(data, "ph_max", s_config->ph_max);
+    cJSON_AddNumberToObject(data, "ph_emergency_low", s_config->ph_emergency_low);
+    cJSON_AddNumberToObject(data, "ph_emergency_high", s_config->ph_emergency_high);
+    
+    // Текущее состояние PID контроллеров
+    cJSON *pid_up = cJSON_CreateObject();
+    cJSON_AddNumberToObject(pid_up, "setpoint", s_pid_ph_up.setpoint);
+    cJSON_AddNumberToObject(pid_up, "integral", s_pid_ph_up.integral);
+    cJSON_AddNumberToObject(pid_up, "prev_error", s_pid_ph_up.prev_error);
+    cJSON_AddStringToObject(pid_up, "zone", adaptive_pid_zone_to_str(s_pid_ph_up.current_zone));
+    cJSON_AddItemToObject(data, "pid_up", pid_up);
+    
+    cJSON *pid_down = cJSON_CreateObject();
+    cJSON_AddNumberToObject(pid_down, "setpoint", s_pid_ph_down.setpoint);
+    cJSON_AddNumberToObject(pid_down, "integral", s_pid_ph_down.integral);
+    cJSON_AddNumberToObject(pid_down, "prev_error", s_pid_ph_down.prev_error);
+    cJSON_AddStringToObject(pid_down, "zone", adaptive_pid_zone_to_str(s_pid_ph_down.current_zone));
+    cJSON_AddItemToObject(data, "pid_down", pid_down);
+    
+    // Состояние системы
+    cJSON_AddBoolToObject(data, "autonomous_mode", s_autonomous_mode);
+    cJSON_AddBoolToObject(data, "emergency_mode", s_emergency_mode);
+    
+    // Конфигурация безопасности
+    cJSON_AddNumberToObject(data, "max_pump_time_ms", s_config->max_pump_time_ms);
+    cJSON_AddNumberToObject(data, "cooldown_ms", s_config->cooldown_ms);
+    cJSON_AddNumberToObject(data, "max_daily_volume_ml", s_config->max_daily_volume_ml);
+    
+    // Калибровка насосов
+    cJSON *pump_cal = cJSON_CreateArray();
+    for (int i = 0; i < 2; i++) {
+        cJSON *cal = cJSON_CreateObject();
+        cJSON_AddNumberToObject(cal, "pump_id", i);
+        cJSON_AddNumberToObject(cal, "ml_per_second", s_config->pump_calibration[i].ml_per_second);
+        cJSON_AddBoolToObject(cal, "is_calibrated", s_config->pump_calibration[i].is_calibrated);
+        cJSON_AddItemToArray(pump_cal, cal);
+    }
+    cJSON_AddItemToObject(data, "pump_calibration", pump_cal);
+    
+    // Метаданные узла
+    cJSON_AddNumberToObject(data, "uptime_sec", (uint32_t)((time(NULL) - s_boot_time)));
+    cJSON_AddNumberToObject(data, "free_heap", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(data, "rssi", get_rssi_to_parent());
+    
+    // Информация о mesh
+    wifi_ap_record_t ap_info;
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        cJSON_AddNumberToObject(data, "wifi_rssi", ap_info.rssi);
+        char bssid_str[18];
+        snprintf(bssid_str, sizeof(bssid_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
+                 ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
+        cJSON_AddStringToObject(data, "parent_bssid", bssid_str);
+    }
+    
     cJSON_AddItemToObject(root, "data", data);
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
         mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
-        ESP_LOGI(TAG, "Event sent: %s - %s", mesh_protocol_event_level_to_str(level), message);
+        ESP_LOGI(TAG, "Event sent: %s - %s (pH=%.2f)", mesh_protocol_event_level_to_str(level), message, value);
+        free(json_str);
+    }
+    
+    cJSON_Delete(root);
+}
+
+// Отправка события с расширенными метаданными (для агрессивных коррекций)
+static void send_event_with_metadata(mesh_event_level_t level, const char *message, 
+                                     float ph, float output, float error, 
+                                     pid_zone_t zone, pump_id_t pump_id) {
+    if (!mesh_manager_is_connected()) {
+        return;
+    }
+    
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return;
+    }
+    
+    cJSON_AddStringToObject(root, "type", "event");
+    cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
+    cJSON_AddStringToObject(root, "node_type", "ph");
+    cJSON_AddStringToObject(root, "level", mesh_protocol_event_level_to_str(level));
+    cJSON_AddStringToObject(root, "message", message);
+    cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+    
+    // Расширенные данные события
+    cJSON *data = cJSON_CreateObject();
+    
+    // Основные параметры pH
+    cJSON_AddNumberToObject(data, "ph", ph);
+    cJSON_AddNumberToObject(data, "ph_target", s_config->ph_target);
+    cJSON_AddNumberToObject(data, "ph_min", s_config->ph_min);
+    cJSON_AddNumberToObject(data, "ph_max", s_config->ph_max);
+    cJSON_AddNumberToObject(data, "ph_emergency_low", s_config->ph_emergency_low);
+    cJSON_AddNumberToObject(data, "ph_emergency_high", s_config->ph_emergency_high);
+    
+    // Параметры коррекции
+    cJSON_AddNumberToObject(data, "error", error);
+    cJSON_AddNumberToObject(data, "correction_ml", output);
+    cJSON_AddStringToObject(data, "zone", adaptive_pid_zone_to_str(zone));
+    cJSON_AddNumberToObject(data, "pump_id", pump_id);
+    cJSON_AddStringToObject(data, "pump_name", pump_id == PUMP_PH_UP ? "pH UP" : "pH DOWN");
+    
+    // PID коэффициенты активной зоны
+    adaptive_pid_t *pid = (pump_id == PUMP_PH_UP) ? &s_pid_ph_up : &s_pid_ph_down;
+    pid_coeffs_t *coeffs = (zone == ZONE_DEAD) ? &pid->coeffs_dead :
+                           (zone == ZONE_CLOSE) ? &pid->coeffs_close :
+                           &pid->coeffs_far;
+    
+    cJSON *pid_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(pid_obj, "kp", coeffs->kp);
+    cJSON_AddNumberToObject(pid_obj, "ki", coeffs->ki);
+    cJSON_AddNumberToObject(pid_obj, "kd", coeffs->kd);
+    cJSON_AddNumberToObject(pid_obj, "integral", pid->integral);
+    cJSON_AddNumberToObject(pid_obj, "prev_error", pid->prev_error);
+    cJSON_AddItemToObject(data, "pid", pid_obj);
+    
+    // Состояние системы
+    cJSON_AddBoolToObject(data, "autonomous_mode", s_autonomous_mode);
+    cJSON_AddBoolToObject(data, "emergency_mode", s_emergency_mode);
+    
+    // Метаданные узла
+    cJSON_AddNumberToObject(data, "uptime_sec", (uint32_t)((time(NULL) - s_boot_time)));
+    cJSON_AddNumberToObject(data, "free_heap", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(data, "rssi", get_rssi_to_parent());
+    
+    cJSON_AddItemToObject(root, "data", data);
+    
+    char *json_str = cJSON_PrintUnformatted(root);
+    if (json_str) {
+        mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        ESP_LOGI(TAG, "Event with metadata sent: %s - %s [zone=%s, pump=%d, output=%.2f ml, error=%.2f]", 
+                 mesh_protocol_event_level_to_str(level), message, 
+                 adaptive_pid_zone_to_str(zone), pump_id, output, error);
         free(json_str);
     }
     

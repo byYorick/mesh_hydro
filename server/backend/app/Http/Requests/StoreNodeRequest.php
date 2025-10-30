@@ -21,7 +21,7 @@ class StoreNodeRequest extends FormRequest
     {
         return [
             'node_id' => ['required', 'string', 'max:50', 'unique:nodes,node_id', 'regex:/^[a-z0-9_]+$/'],
-            'node_type' => ['required', 'string', 'in:ph_ec,climate,relay,water,display,root'],
+            'node_type' => ['required', 'string', 'in:ph_ec,ph,ec,climate,relay,water,display,root'],
             'zone' => ['nullable', 'string', 'max:100'],
             'mac_address' => ['nullable', 'string', 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/'],
             'config' => ['nullable', 'array'],

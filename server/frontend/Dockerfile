@@ -16,15 +16,20 @@ RUN npm install --legacy-peer-deps
 # Копирование исходников
 COPY . .
 
-# Аргументы сборки
+# Аргументы сборки (build-time configuration)
+# Примечание: VITE_PUSHER_KEY - это публичный идентификатор приложения,
+# не секретный ключ. Он всегда виден в frontend коде.
 ARG VITE_API_URL=http://localhost:8000
 ARG VITE_WS_HOST=localhost
 ARG VITE_WS_PORT=8080
+# hadolint ignore=DL3059
 ARG VITE_PUSHER_KEY=hydro-app-key
 
+# Переменные окружения для Vite сборки
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_HOST=$VITE_WS_HOST
 ENV VITE_WS_PORT=$VITE_WS_PORT
+# hadolint ignore=DL3059
 ENV VITE_PUSHER_KEY=$VITE_PUSHER_KEY
 
 # Сборка production (console.log удаляется через Vite Terser minification)
