@@ -21,6 +21,11 @@ IoT система управления гидропонной установк�
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Установка и настройка
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Быстрая справка
 
+### ⭐ НОВОЕ: Зонирование & Growth Planner
+- **[ZONING_AND_GROWTH_PLANNER_SUMMARY.md](ZONING_AND_GROWTH_PLANNER_SUMMARY.md)** - 📋 РЕЗЮМЕ (начать здесь!)
+- **[ZONING_ARCHITECTURE_PLAN.md](ZONING_ARCHITECTURE_PLAN.md)** - Архитектура зонирования (множественные Root Nodes)
+- **[GROWTH_PLANNER_IMPLEMENTATION_PLAN.md](GROWTH_PLANNER_IMPLEMENTATION_PLAN.md)** - Планировщик циклов роста растений
+
 ### 📊 Отчеты
 - **[PRODUCTION_CHANGES_LOG.md](PRODUCTION_CHANGES_LOG.md)** - История изменений
 - **[CODE_AUDIT_REPORT.md](CODE_AUDIT_REPORT.md)** - Аудит кода
@@ -45,12 +50,21 @@ idf.py build flash
 
 ## 🌐 Основные возможности
 
+### Текущие возможности:
 - 🌿 Управление гидропоникой (pH, EC, температура, влажность)
 - 🌐 Mesh сеть (ESP32 Mesh)
 - 📊 Real-time мониторинг (WebSocket + MQTT)
 - 🎛️ PID контроль (адаптивный)
 - 📱 Web Dashboard (Vue 3 + Vuetify)
 - 🔄 Real-time события (Laravel Echo + Reverb)
+
+### ⭐ В РАЗРАБОТКЕ (см. документы выше):
+- 🏗️ **Зонирование:** Множественные Root Nodes, отдельные mesh сети для каждой зоны
+- 🌱 **Growth Planner:** Автоматизированное планирование циклов роста растений
+  - Пресеты для культур (Салат, Клубника, Томаты, Огурцы)
+  - Автоматическая смена стадий роста
+  - Параллельные циклы в разных зонах
+  - Расширенная аналитика и отчеты
 
 ## 🏗️ Архитектура
 

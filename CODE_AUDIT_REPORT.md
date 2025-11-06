@@ -119,9 +119,9 @@ I2C пины захардкожены в каждом узле - это **ПРА
 #define MESH_NETWORK_CHANNEL    7
 
 // MQTT брокер
-#define MQTT_BROKER_HOST        "192.168.0.167"
+#define MQTT_BROKER_HOST        "192.168.1.100"
 #define MQTT_BROKER_PORT        1883
-#define MQTT_BROKER_URI         "mqtt://192.168.0.167:1883"
+#define MQTT_BROKER_URI         "mqtt://192.168.1.100:1883"
 
 // Интервалы
 #define MESH_NODE_TIMEOUT_MS    10000
@@ -170,18 +170,7 @@ I2C пины захардкожены в каждом узле - это **ПРА
 
 ## ⚠️ Минорные замечания
 
-### 1. Устаревшие IP в документации
-
-**Файлы с устаревшими примерами:**
-- `node_climate/README.md` - примеры с `192.168.1.100`
-- `node_climate/AI_INSTRUCTIONS.md` - примеры с `192.168.1.100`
-- `node_ph_ec/AI_INSTRUCTIONS.md` - примеры с `192.168.1.100`
-- `root_node/README.md` - ✅ УЖЕ ИСПРАВЛЕНО на `192.168.0.167`
-
-**Статус:** ⚠️ **Некритично** (это только документация)  
-**Рекомендация:** Обновить при случае
-
-### 2. node_water и node_relay
+### 1. node_water и node_relay
 
 **Статус:** Не реализованы (заглушки)  
 **Действие:** При реализации добавить `#include "mesh_config.h"`
