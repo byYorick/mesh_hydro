@@ -41,7 +41,7 @@ static const char *TAG = "DISPLAY";
 
 // Таймеры
 #define REQUEST_INTERVAL_MS    5000   // Запрос данных каждые 5 сек
-#define HEARTBEAT_INTERVAL_MS  10000  // Heartbeat каждые 10 сек
+// HEARTBEAT_INTERVAL_MS теперь берется из mesh_config.h (10 сек стандарт)
 
 // ════════════════════════════════════════════════════════
 // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ

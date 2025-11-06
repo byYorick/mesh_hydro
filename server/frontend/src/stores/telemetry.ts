@@ -30,7 +30,9 @@ export const useTelemetryStore = defineStore('telemetry', {
       
       try {
         const response = await api.getTelemetry(params)
-        this.telemetry = response
+        // API возвращает {count, data}, нужно извлечь data
+        const telemetryArray = Array.isArray(response) ? response : (response?.data || [])
+        this.telemetry = telemetryArray
         return this.telemetry
       } catch (error: any) {
         this.error = error.message

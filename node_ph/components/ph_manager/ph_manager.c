@@ -11,6 +11,7 @@
 #include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
+#include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -66,6 +67,11 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     s_autonomous_mode = false;
     
     // Инициализация адаптивных PID контроллеров
+    ESP_LOGI(TAG, "[INIT] Initializing pH UP PID: target=%.2f, Kp=%.2f, Ki=%.2f, Kd=%.2f",
+             s_config->ph_target,
+             s_config->pump_pid[PUMP_PH_UP].kp,
+             s_config->pump_pid[PUMP_PH_UP].ki,
+             s_config->pump_pid[PUMP_PH_UP].kd);
     adaptive_pid_init(&s_pid_ph_up, s_config->ph_target,
                      s_config->pump_pid[PUMP_PH_UP].kp, 
                      s_config->pump_pid[PUMP_PH_UP].ki, 
@@ -74,21 +80,29 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     // Настройка зон для pH (dead=0.1, close=0.3, far=1.0)
     adaptive_pid_set_zones(&s_pid_ph_up, 0.1f, 0.3f, 1.0f);
     
-    // Safety: макс 5 мл за раз, минимум 60 сек между дозами
-    adaptive_pid_set_safety(&s_pid_ph_up, 5.0f, 60000);
+    // Safety: макс 5 мл за раз, минимум 5 сек между дозами (из конфигурации)
+    uint32_t min_interval = s_config->cooldown_ms > 0 ? s_config->cooldown_ms : 5000;
+    adaptive_pid_set_safety(&s_pid_ph_up, 5.0f, min_interval);
     
     // Лимиты выхода
     adaptive_pid_set_output_limits(&s_pid_ph_up, 0.0f, 5.0f);
+    ESP_LOGI(TAG, "[INIT] pH UP PID: zones=(0.1, 0.3, 1.0), safety=(5ml, %lums), output_limits=(0-5ml)", min_interval);
     
     // pH DOWN контроллер
+    ESP_LOGI(TAG, "[INIT] Initializing pH DOWN PID: target=%.2f, Kp=%.2f, Ki=%.2f, Kd=%.2f",
+             s_config->ph_target,
+             s_config->pump_pid[PUMP_PH_DOWN].kp,
+             s_config->pump_pid[PUMP_PH_DOWN].ki,
+             s_config->pump_pid[PUMP_PH_DOWN].kd);
     adaptive_pid_init(&s_pid_ph_down, s_config->ph_target,
                      s_config->pump_pid[PUMP_PH_DOWN].kp,
                      s_config->pump_pid[PUMP_PH_DOWN].ki,
                      s_config->pump_pid[PUMP_PH_DOWN].kd);
     
     adaptive_pid_set_zones(&s_pid_ph_down, 0.1f, 0.3f, 1.0f);
-    adaptive_pid_set_safety(&s_pid_ph_down, 5.0f, 60000);
+    adaptive_pid_set_safety(&s_pid_ph_down, 5.0f, min_interval);
     adaptive_pid_set_output_limits(&s_pid_ph_down, 0.0f, 5.0f);
+    ESP_LOGI(TAG, "[INIT] pH DOWN PID: zones=(0.1, 0.3, 1.0), safety=(5ml, %lums), output_limits=(0-5ml)", min_interval);
     
     ESP_LOGI(TAG, "pH Manager initialized");
     ESP_LOGI(TAG, "Node ID: %s, pH target: %.2f", 
@@ -196,11 +210,18 @@ static void main_task(void *arg) {
 
 // Heartbeat задача
 static void heartbeat_task(void *arg) {
-    ESP_LOGI(TAG, "Heartbeat task started");
+    ESP_LOGI(TAG, "Heartbeat task started (interval: %d ms)", HEARTBEAT_INTERVAL_MS);
+    
+    // Начальная задержка перед первым heartbeat
+    vTaskDelay(pdMS_TO_TICKS(5000));
     
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(15000)); // Каждые 15 секунд
-        send_heartbeat();
+        if (mesh_manager_is_connected()) {
+            send_heartbeat();
+        }
+        
+        // Используем единый интервал из mesh_config.h
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
     }
 }
 
@@ -247,7 +268,7 @@ static void send_discovery(void) {
     char mac_str[18];
     snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    cJSON_AddStringToObject(root, "mac", mac_str);
+    cJSON_AddStringToObject(root, "mac_address", mac_str);  // Изменено с "mac" на "mac_address"
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
@@ -273,9 +294,17 @@ static void send_telemetry(void) {
         return;
     }
     
+    // Получение MAC адреса
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
     cJSON_AddStringToObject(root, "type", "telemetry");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "ph");  // ВАЖНО: тип узла для backend
+    cJSON_AddStringToObject(root, "mac_address", mac_str);  // Добавляем MAC адрес
     
     cJSON *data = cJSON_CreateObject();
     if (!data) {
@@ -314,11 +343,20 @@ static void send_heartbeat(void) {
         return;
     }
     
+    // Получение MAC адреса
+    uint8_t mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, mac);
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
     cJSON_AddStringToObject(root, "type", "heartbeat");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "ph");  // ВАЖНО: тип узла для backend
+    cJSON_AddStringToObject(root, "mac_address", mac_str);  // Добавляем MAC адрес
     cJSON_AddNumberToObject(root, "uptime", (uint32_t)time(NULL) - s_boot_time);
     cJSON_AddNumberToObject(root, "heap_free", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(root, "rssi_to_parent", get_rssi_to_parent());
     cJSON_AddBoolToObject(root, "autonomous", s_autonomous_mode);
     
     char *json_str = cJSON_PrintUnformatted(root);
@@ -353,13 +391,24 @@ static void read_sensor(void) {
 
 // Управление pH
 static void control_ph(void) {
+    if (s_config == NULL) {
+        ESP_LOGW(TAG, "[CONTROL] Config not initialized, skipping");
+        return;
+    }
+    
     float output = 0.0f;
     esp_err_t err;
     int8_t rssi = get_rssi_to_parent();
+    float error = s_current_ph - s_config->ph_target;
+    
+    ESP_LOGI(TAG, "[CONTROL] pH=%.2f, target=%.2f, error=%.2f, emergency=%d", 
+             s_current_ph, s_config->ph_target, error, s_emergency_mode);
     
     // Если pH < target - нужно повысить (pH UP)
     if (s_current_ph < s_config->ph_target) {
+        ESP_LOGI(TAG, "[CONTROL] pH < target, computing pH UP correction");
         err = adaptive_pid_compute(&s_pid_ph_up, s_current_ph, 10.0f, &output);
+        ESP_LOGI(TAG, "[CONTROL] pH UP PID result: err=%d, output=%.3f", err, output);
         
         if (err == ESP_OK && output > 0.0f) {
             pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_up);
@@ -400,17 +449,37 @@ static void control_ph(void) {
             
             pump_controller_run_dose(PUMP_PH_UP, output);
             
+            // Обновление mock значения pH при дозировании
+            ph_sensor_update_mock_for_dosing(PUMP_PH_UP, output);
+            
             // Отправка события при коррекции в FAR зоне
             if (zone == ZONE_FAR) {
                 float error = s_config->ph_target - s_current_ph;
                 send_event_with_metadata(MESH_EVENT_WARNING, "pH far from target, aggressive correction", 
                                         s_current_ph, output, error, zone, PUMP_PH_UP);
             }
+        } else {
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "[CONTROL] pH UP PID error: %s", esp_err_to_name(err));
+            } else if (output <= 0.0f) {
+                ESP_LOGI(TAG, "[CONTROL] pH UP output <= 0 (%.3f), no correction needed", output);
+            }
         }
     }
     // Если pH > target - нужно понизить (pH DOWN)
+    // ВАЖНО: для pH DOWN ошибка будет отрицательной (setpoint - current < 0)
+    // adaptive_pid вычисляет error = setpoint - current = 6.50 - 6.86 = -0.36
+    // Это даст отрицательный output, который обрежется до output_min = 0
+    // Решение: инвертируем setpoint и current местами для получения положительной ошибки
     else if (s_current_ph > s_config->ph_target) {
-        err = adaptive_pid_compute(&s_pid_ph_down, s_current_ph, 10.0f, &output);
+        ESP_LOGI(TAG, "[CONTROL] pH > target, computing pH DOWN correction");
+        // Временно изменяем setpoint на current для получения положительной ошибки
+        // error = new_setpoint - new_current = current - target = 6.86 - 6.50 = +0.36
+        float orig_setpoint = s_pid_ph_down.setpoint;
+        s_pid_ph_down.setpoint = s_current_ph;  // Временно устанавливаем setpoint = current
+        err = adaptive_pid_compute(&s_pid_ph_down, s_config->ph_target, 10.0f, &output);
+        s_pid_ph_down.setpoint = orig_setpoint;  // Восстанавливаем исходный setpoint
+        ESP_LOGI(TAG, "[CONTROL] pH DOWN PID result: err=%d, output=%.3f", err, output);
         
         if (err == ESP_OK && output > 0.0f) {
             pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_down);
@@ -451,24 +520,56 @@ static void control_ph(void) {
             
             pump_controller_run_dose(PUMP_PH_DOWN, output);
             
+            // Обновление mock значения pH при дозировании
+            ph_sensor_update_mock_for_dosing(PUMP_PH_DOWN, output);
+            
             // Отправка события при коррекции в FAR зоне
             if (zone == ZONE_FAR) {
                 float error = s_current_ph - s_config->ph_target;
                 send_event_with_metadata(MESH_EVENT_WARNING, "pH far from target, aggressive correction", 
                                         s_current_ph, output, error, zone, PUMP_PH_DOWN);
             }
+        } else {
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "[CONTROL] pH DOWN PID error: %s", esp_err_to_name(err));
+            } else if (output <= 0.0f) {
+                ESP_LOGI(TAG, "[CONTROL] pH DOWN output <= 0 (%.3f), no correction needed", output);
+            }
         }
+    } else {
+        ESP_LOGI(TAG, "[CONTROL] pH in range (%.2f = %.2f), no correction needed", s_current_ph, s_config->ph_target);
     }
 }
 
 // Отправка event сообщения с полными метаданными
 static void send_event(mesh_event_level_t level, const char *message, float value) {
+    // Логирование события всегда (даже если mesh не подключен)
+    if (s_config == NULL) {
+        ESP_LOGE(TAG, "[EVENT] %s (pH=%.2f) - config not initialized!", message, value);
+        return;
+    }
+    
+    const char *level_str = mesh_protocol_event_level_to_str(level);
+    if (level_str == NULL) {
+        level_str = "UNKNOWN";
+    }
+    
+    if (level == MESH_EVENT_CRITICAL || level == MESH_EVENT_EMERGENCY) {
+        ESP_LOGE(TAG, "[EVENT %s] %s (pH=%.2f, target=%.2f)", level_str, message, value, s_config->ph_target);
+    } else if (level == MESH_EVENT_WARNING) {
+        ESP_LOGW(TAG, "[EVENT %s] %s (pH=%.2f, target=%.2f)", level_str, message, value, s_config->ph_target);
+    } else {
+        ESP_LOGI(TAG, "[EVENT %s] %s (pH=%.2f, target=%.2f)", level_str, message, value, s_config->ph_target);
+    }
+    
     if (!mesh_manager_is_connected()) {
+        ESP_LOGW(TAG, "   [WARNING] Event not sent - mesh offline");
         return;  // Нельзя отправить если offline
     }
     
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
+        ESP_LOGE(TAG, "   [ERROR] Failed to create JSON root");
         return;
     }
     
@@ -545,9 +646,15 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
-        mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
-        ESP_LOGI(TAG, "Event sent: %s - %s (pH=%.2f)", mesh_protocol_event_level_to_str(level), message, value);
+        esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "   [OK] Event sent to ROOT (%d bytes)", (int)strlen(json_str));
+        } else {
+            ESP_LOGW(TAG, "   [ERROR] Failed to send event: %s", esp_err_to_name(err));
+        }
         free(json_str);
+    } else {
+        ESP_LOGE(TAG, "   [ERROR] Failed to serialize JSON");
     }
     
     cJSON_Delete(root);
@@ -557,12 +664,28 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
 static void send_event_with_metadata(mesh_event_level_t level, const char *message, 
                                      float ph, float output, float error, 
                                      pid_zone_t zone, pump_id_t pump_id) {
+    // Логирование события всегда (даже если mesh не подключен)
+    if (s_config == NULL) {
+        ESP_LOGE(TAG, "[EVENT] %s (pH=%.2f) - config not initialized!", message, ph);
+        return;
+    }
+    
+    const char *level_str = mesh_protocol_event_level_to_str(level);
+    if (level_str == NULL) {
+        level_str = "UNKNOWN";
+    }
+    const char *pump_name = (pump_id == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
+    ESP_LOGW(TAG, "[EVENT %s] %s [pH=%.2f, error=%.2f, zone=%s, pump=%s, output=%.2f ml]", 
+             level_str, message, ph, error, adaptive_pid_zone_to_str(zone), pump_name, output);
+    
     if (!mesh_manager_is_connected()) {
+        ESP_LOGW(TAG, "   [WARNING] Event not sent - mesh offline");
         return;
     }
     
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
+        ESP_LOGE(TAG, "   [ERROR] Failed to create JSON root");
         return;
     }
     
@@ -618,11 +741,15 @@ static void send_event_with_metadata(mesh_event_level_t level, const char *messa
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
-        mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
-        ESP_LOGI(TAG, "Event with metadata sent: %s - %s [zone=%s, pump=%d, output=%.2f ml, error=%.2f]", 
-                 mesh_protocol_event_level_to_str(level), message, 
-                 adaptive_pid_zone_to_str(zone), pump_id, output, error);
+        esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "   [OK] Event sent to ROOT (%d bytes)", (int)strlen(json_str));
+        } else {
+            ESP_LOGW(TAG, "   [ERROR] Failed to send event: %s", esp_err_to_name(err));
+        }
         free(json_str);
+    } else {
+        ESP_LOGE(TAG, "   [ERROR] Failed to serialize JSON");
     }
     
     cJSON_Delete(root);
@@ -731,6 +858,28 @@ void ph_manager_handle_command(const char *command, cJSON *params) {
             bool mock_enable = cJSON_IsTrue(enable);
             ph_sensor_force_mock_mode(mock_enable);
             ESP_LOGI(TAG, "Mock mode %s", mock_enable ? "enabled" : "disabled");
+        }
+    }
+    else if (strcmp(command, "set_sensor_mode") == 0) {
+        cJSON *mode = cJSON_GetObjectItem(params, "mode");
+        if (cJSON_IsNumber(mode)) {
+            uint8_t new_mode = (uint8_t)mode->valueint;
+            if (new_mode <= 2) {
+                s_config->sensor_mode = new_mode;
+                ph_sensor_set_mode((ph_sensor_mode_t)new_mode);
+                
+                // Сохраняем в NVS
+                esp_err_t err = node_config_save(s_config, sizeof(ph_node_config_t), "ph_ns");
+                if (err == ESP_OK) {
+                    const char *mode_str = (new_mode == 0) ? "REAL" : 
+                                          (new_mode == 1) ? "MOCK REACTIVE" : "MOCK NON-REACTIVE";
+                    ESP_LOGI(TAG, "Sensor mode set to %s (%d) and saved to NVS", mode_str, new_mode);
+                } else {
+                    ESP_LOGE(TAG, "Failed to save sensor mode to NVS");
+                }
+            } else {
+                ESP_LOGW(TAG, "Invalid sensor mode: %d (must be 0-2)", new_mode);
+            }
         }
     }
     else if (strcmp(command, "get_sensor_status") == 0) {

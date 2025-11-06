@@ -19,7 +19,8 @@ extern "C" {
 #endif
 
 #define MAX_NODES 20
-#define NODE_TIMEOUT_MS 40000  // 40 секунд (больше чем интервал телеметрии 30 сек)
+// Таймаут должен совпадать с backend (30 сек) и MESH_NODE_TIMEOUT_MS из mesh_config.h
+#define NODE_TIMEOUT_MS 30000  // 30 секунд (3x heartbeat интервал 10 сек)
 
 /**
  * @brief Информация об узле

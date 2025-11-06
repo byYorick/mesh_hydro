@@ -93,19 +93,23 @@ extern "C" {
 /**
  * @brief Таймаут для определения офлайн узла (мс)
  * 
- * ⚠️ ВАЖНО: Должен совпадать с backend таймаутом (20 сек)
+ * ⚠️ ВАЖНО: Должен совпадать с backend таймаутом (30 сек)
+ * Формула: timeout >= heartbeat_interval * 3 для надежности
  */
-#define MESH_NODE_TIMEOUT_MS    20000          // 20 секунд
+#define MESH_NODE_TIMEOUT_MS    30000          // 30 секунд (3x heartbeat интервал)
 
 /**
  * @brief Интервал отправки telemetry (мс)
  */
-#define TELEMETRY_INTERVAL_MS   5000           // 5 секунд (DEBUG!)
+#define TELEMETRY_INTERVAL_MS   30000          // 30 секунд
 
 /**
  * @brief Интервал отправки heartbeat (мс)
+ * 
+ * ⚠️ ВАЖНО: Все узлы должны использовать одинаковый интервал (10 сек)
+ * Backend timeout = 30 сек (3x heartbeat для надежности)
  */
-#define HEARTBEAT_INTERVAL_MS   5000           // 5 секунд (DEBUG!)
+#define HEARTBEAT_INTERVAL_MS   10000          // 10 секунд (стандарт для всех узлов)
 
 /**
  * @brief Интервал мониторинга системы (мс)

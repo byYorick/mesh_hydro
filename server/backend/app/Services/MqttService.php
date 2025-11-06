@@ -194,14 +194,20 @@ class MqttService
             if (isset($data['hardware'])) {
                 $metadata['hardware'] = $data['hardware'];
             }
-            if (isset($data['mac_address'])) {
-                $metadata['mac_from_mqtt'] = $data['mac_address'];
+            // Обновляем MAC адрес (если пришёл в telemetry)
+            if (isset($data['mac_address']) || isset($data['mac'])) {
+                $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'];
             }
             
             // Создание или обновление узла
             $updateData = [
                 'last_seen_at' => now(),
             ];
+            
+            // Обновляем поле mac_address в таблице nodes (если пришло)
+            if (isset($data['mac_address']) || isset($data['mac'])) {
+                $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
+            }
             
             // Только для новых узлов или если node_type = 'unknown'
             if ($isNewNode) {
@@ -229,25 +235,47 @@ class MqttService
                 ['node_id' => $data['node_id']],
                 $updateData
             );
+            
+            // Перезагружаем узел чтобы обновить last_seen_at в памяти
+            $node->refresh();
 
-            // Обновляем online статус на основе isOnline()
+            // Обновляем online статус на основе isOnline() после обновления last_seen_at
             $wasOnline = $node->online;
             $isOnline = $node->isOnline();
             
             if ($wasOnline !== $isOnline) {
                 $node->update(['online' => $isOnline]);
+                event(new \App\Events\NodeStatusChanged($node, $wasOnline, $isOnline));
+                
+                // Создаём событие в БД при переходе в офлайн
+                if ($wasOnline && !$isOnline) {
+                    $statusEvent = Event::create([
+                        'node_id' => $node->node_id,
+                        'level' => Event::LEVEL_WARNING,
+                        'message' => "Узел {$node->node_id} перешёл в офлайн",
+                        'data' => [
+                            'last_seen' => $node->last_seen_at?->toDateTimeString(),
+                            'node_type' => $node->node_type,
+                            'zone' => $node->zone,
+                        ],
+                    ]);
+                    
+                    // Broadcast событие через WebSocket
+                    event(new \App\Events\EventCreated($statusEvent));
+                }
+            } else {
+                // Даже если статус не изменился, отправляем обновление для UI
+                event(new \App\Events\NodeStatusUpdate($node));
             }
 
             // Broadcast status change если изменился или новый узел
-            if ($wasOnline !== true) {
-                event(new \App\Events\NodeStatusChanged($node, $wasOnline, true));
+            if ($isNewNode) {
+                event(new \App\Events\NodeDiscovered($node));
                 
-                if ($isNewNode) {
-                    Log::info("New node auto-registered via MQTT", [
-                        'node_id' => $node->node_id,
-                        'node_type' => $node->node_type,
-                    ]);
-                }
+                Log::info("New node auto-registered via MQTT", [
+                    'node_id' => $node->node_id,
+                    'node_type' => $node->node_type,
+                ]);
             }
 
             Log::debug("Telemetry saved", [
@@ -283,10 +311,84 @@ class MqttService
             $message = $this->translateEventMessage($data['message'] ?? 'Unknown event');
             $level = $data['level'] ?? Event::LEVEL_INFO;
             
+            // Получаем узел для определения типа и получения метаданных
+            $node = Node::where('node_id', $data['node_id'])->first();
+            $nodeType = $node ? $node->node_type : ($data['node_type'] ?? 'unknown');
+            
+            // Подготовка данных события с добавлением node_type
+            $eventData = $data['data'] ?? [];
+            $eventData['node_type'] = $nodeType;
+            
             // Если это событие насоса, создаем специальное сообщение
-            if (isset($data['data']['event_type']) && strpos($data['data']['event_type'], 'pump_') === 0) {
-                $message = $this->translatePumpEventMessage($data['data']);
-                $level = $this->getPumpEventLevel($data['data']);
+            // Проверяем по event_type или по наличию pump_id в данных
+            $isPumpEvent = (isset($eventData['event_type']) && strpos($eventData['event_type'], 'pump_') === 0)
+                || (isset($eventData['pump_id']) && (strpos($message, 'Насос') !== false || strpos($message, 'насос') !== false));
+            
+            if ($isPumpEvent) {
+                // Если event_type не задан, определяем по сообщению
+                if (!isset($eventData['event_type'])) {
+                    if (strpos($message, 'запущен') !== false || strpos($message, 'start') !== false) {
+                        $eventData['event_type'] = 'pump_start';
+                    } elseif (strpos($message, 'остановлен') !== false || strpos($message, 'stop') !== false) {
+                        $eventData['event_type'] = 'pump_stop';
+                    } else {
+                        $eventData['event_type'] = 'pump_start'; // По умолчанию
+                    }
+                }
+                
+                // ВАЖНО: Обязательно перезаписываем сообщение для событий насосов
+                $message = $this->translatePumpEventMessage($eventData);
+                $level = $this->getPumpEventLevel($eventData);
+                
+                Log::debug("Pump event message reformatted", [
+                    'node_id' => $data['node_id'],
+                    'node_type' => $nodeType,
+                    'pump_id' => $eventData['pump_id'] ?? 'unknown',
+                    'event_type' => $eventData['event_type'] ?? 'unknown',
+                    'old_message' => $data['message'] ?? 'none',
+                    'new_message' => $message,
+                ]);
+                
+                // Сохраняем все метаданные из события насоса
+                // Метаданные уже в $eventData из $data['data'], но нормализуем структуру
+                if (isset($eventData['pid_data'])) {
+                    // Преобразуем pid_data в удобную структуру
+                    $pidData = $eventData['pid_data'];
+                    if (is_array($pidData)) {
+                        // Определяем тип насоса и сохраняем в соответствующее поле
+                        $pumpId = $eventData['pump_id'] ?? 0;
+                        if ($pumpId === 0) {
+                            $eventData['pid_up'] = $pidData;
+                        } elseif ($pumpId === 1) {
+                            $eventData['pid_down'] = $pidData;
+                        }
+                    }
+                }
+                
+                // Нормализуем ph поля
+                if (isset($eventData['current_ph']) && !isset($eventData['ph'])) {
+                    $eventData['ph'] = $eventData['current_ph'];
+                }
+                if (isset($eventData['ph_target']) && !isset($eventData['target'])) {
+                    $eventData['target'] = $eventData['ph_target'];
+                }
+                
+                // Добавляем метаданные из последней телеметрии если их нет в событии
+                if ($node && (!isset($eventData['ph']) || !isset($eventData['pid_up']) || !isset($eventData['pid_down']))) {
+                    $lastTelemetry = $node->telemetry()->orderBy('received_at', 'desc')->first();
+                    if ($lastTelemetry && $lastTelemetry->data) {
+                        $telemetryData = $lastTelemetry->data ?? [];
+                        if (!isset($eventData['ph']) && isset($telemetryData['ph'])) {
+                            $eventData['ph'] = $telemetryData['ph'];
+                        }
+                        if (!isset($eventData['pid_up']) && isset($telemetryData['pid_up'])) {
+                            $eventData['pid_up'] = $telemetryData['pid_up'];
+                        }
+                        if (!isset($eventData['pid_down']) && isset($telemetryData['pid_down'])) {
+                            $eventData['pid_down'] = $telemetryData['pid_down'];
+                        }
+                    }
+                }
             }
             
             // Сохранение события в БД
@@ -294,7 +396,7 @@ class MqttService
                 'node_id' => $data['node_id'],
                 'level' => $level,
                 'message' => $message,
-                'data' => $data['data'] ?? [],
+                'data' => $eventData,
             ]);
 
             Log::info("Event saved", [
@@ -344,9 +446,8 @@ class MqttService
                     'node_id' => $nodeId,
                     'node_type' => $nodeType,
                     'zone' => 'Auto-discovered',
-                    'online' => true,
                     'last_seen_at' => now(),
-                    'mac_address' => $data['mac'] ?? null,
+                    'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
                     'metadata' => [
                         'discovered_at' => now()->toIso8601String(),
                         'discovered_via' => 'heartbeat',
@@ -356,8 +457,16 @@ class MqttService
                         'heap_free' => $data['heap_free'] ?? null,
                         'rssi_to_parent' => $data['rssi_to_parent'] ?? null,
                         'uptime' => $data['uptime'] ?? null,
+                        // Сохраняем MAC адрес в метаданных
+                        'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
                     ],
                 ]);
+                
+                // Перезагружаем узел для корректного isOnline()
+                $node->refresh();
+                
+                // Устанавливаем online на основе isOnline()
+                $node->update(['online' => $node->isOnline()]);
 
                 Log::info("🔍 AUTO-DISCOVERY: New node found via heartbeat", [
                     'node_id' => $nodeId,
@@ -366,12 +475,15 @@ class MqttService
                 ]);
 
                 // Создаём событие об обнаружении нового узла
-                Event::create([
+                $discoveryEvent = Event::create([
                     'node_id' => $nodeId,
                     'level' => Event::LEVEL_INFO,
                     'message' => "New node auto-discovered: {$nodeId}",
                     'data' => ['node_type' => $nodeType],
                 ]);
+
+                // Broadcast событие об обнаружении через WebSocket
+                event(new \App\Events\EventCreated($discoveryEvent));
 
                 // Broadcast новый узел на фронтенд
                 event(new \App\Events\NodeDiscovered($node));
@@ -400,7 +512,6 @@ class MqttService
                 }
                 
                 $updateData = [
-                    'online' => true,
                     'last_seen_at' => now(),
                     'metadata' => $metadata,
                 ];
@@ -411,6 +522,38 @@ class MqttService
                 }
                 
                 $node->update($updateData);
+                
+                // Перезагружаем узел чтобы обновить last_seen_at в памяти
+                $node->refresh();
+                
+                // Обновляем online статус на основе isOnline() после обновления last_seen_at
+                $wasOnline = $node->online;
+                $isOnline = $node->isOnline();
+                
+                if ($wasOnline !== $isOnline) {
+                    $node->update(['online' => $isOnline]);
+                    event(new \App\Events\NodeStatusChanged($node, $wasOnline, $isOnline));
+                    
+                    // Создаём событие в БД при переходе в офлайн
+                    if ($wasOnline && !$isOnline) {
+                        $statusEvent = Event::create([
+                            'node_id' => $node->node_id,
+                            'level' => Event::LEVEL_WARNING,
+                            'message' => "Узел {$node->node_id} перешёл в офлайн",
+                            'data' => [
+                                'last_seen' => $node->last_seen_at?->toDateTimeString(),
+                                'node_type' => $node->node_type,
+                                'zone' => $node->zone,
+                            ],
+                        ]);
+                        
+                        // Broadcast событие через WebSocket
+                        event(new \App\Events\EventCreated($statusEvent));
+                    }
+                } else {
+                    // Даже если статус не изменился, отправляем обновление для UI
+                    event(new \App\Events\NodeStatusUpdate($node));
+                }
             }
 
             Log::debug("Heartbeat received", ['node_id' => $nodeId]);
@@ -492,6 +635,23 @@ class MqttService
                 if ($wasOnline !== $isOnline) {
                     $existingNode->update(['online' => $isOnline]);
                     event(new \App\Events\NodeStatusChanged($existingNode, $wasOnline, $isOnline));
+                    
+                    // Создаём событие в БД при переходе в офлайн
+                    if ($wasOnline && !$isOnline) {
+                        $statusEvent = Event::create([
+                            'node_id' => $existingNode->node_id,
+                            'level' => Event::LEVEL_WARNING,
+                            'message' => "Узел {$existingNode->node_id} перешёл в офлайн",
+                            'data' => [
+                                'last_seen' => $existingNode->last_seen_at?->toDateTimeString(),
+                                'node_type' => $existingNode->node_type,
+                                'zone' => $existingNode->zone,
+                            ],
+                        ]);
+                        
+                        // Broadcast событие через WebSocket
+                        event(new \App\Events\EventCreated($statusEvent));
+                    }
                 }
                 
                 return;
@@ -505,7 +665,6 @@ class MqttService
                 'node_id' => $nodeId,
                 'node_type' => $nodeType,
                 'zone' => $data['zone'] ?? 'Auto-discovered',
-                'online' => true,
                 'last_seen_at' => now(),
                 'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
                 'metadata' => [
@@ -529,6 +688,12 @@ class MqttService
                     'mesh_nodes' => $data['mesh_nodes'] ?? 0,
                 ],
             ]);
+            
+            // Перезагружаем узел для корректного isOnline()
+            $node->refresh();
+            
+            // Устанавливаем online на основе isOnline()
+            $node->update(['online' => $node->isOnline()]);
 
             Log::info("🔍 AUTO-DISCOVERY: New node registered", [
                 'node_id' => $nodeId,
@@ -538,7 +703,7 @@ class MqttService
             ]);
 
             // Создаём событие об обнаружении
-            Event::create([
+            $discoveryEvent = Event::create([
                 'node_id' => $nodeId,
                 'level' => Event::LEVEL_INFO,
                 'message' => "New node auto-discovered and registered: {$nodeId}",
@@ -548,6 +713,9 @@ class MqttService
                     'hardware' => $data['hardware'] ?? null,
                 ],
             ]);
+
+            // Broadcast событие об обнаружении через WebSocket
+            event(new \App\Events\EventCreated($discoveryEvent));
 
             // Broadcast новый узел на фронтенд
             event(new \App\Events\NodeDiscovered($node));
@@ -722,7 +890,7 @@ class MqttService
             }
 
             // Telegram уведомление
-            if (config('telegram.enabled', true)) {
+            if (config('telegram.enabled', false)) {
                 app(TelegramService::class)->sendAlert($event);
             }
 
@@ -794,7 +962,7 @@ class MqttService
 
             // Создание события для критичных ошибок
             if ($error->isCritical()) {
-                Event::create([
+                $errorEvent = Event::create([
                     'node_id' => $error->node_id,
                     'level' => Event::LEVEL_CRITICAL,
                     'message' => "Critical error: {$error->message}",
@@ -805,8 +973,11 @@ class MqttService
                     ],
                 ]);
 
+                // Broadcast событие через WebSocket
+                event(new \App\Events\EventCreated($errorEvent));
+
                 // Отправка уведомлений для критичных ошибок
-                $this->sendNotifications($error);
+                $this->sendNotifications($errorEvent);
             }
 
             // Broadcast error to frontend
@@ -1022,24 +1193,32 @@ class MqttService
         $dose = $data['dose_ml'] ?? 0;
         $duration = $data['duration_ms'] ?? 0;
         
-        // Определяем название насоса
+        // Округляем дозу до 1 знака после точки
+        $doseFormatted = number_format($dose, 1, '.', '');
+        
+        // Определяем название насоса (pH down/pH up вместо #1)
         $pumpName = $this->getPumpName($pumpId, $data);
+        
+        // Для pH нод: "насос pH down/pH up", для других: "Насос {название}"
+        $pumpLabel = ($data['node_type'] === 'ph' && ($pumpId === 0 || $pumpId === 1)) 
+            ? "насос {$pumpName}" 
+            : "Насос {$pumpName}";
         
         switch ($eventType) {
             case 'pump_start':
-                return "🚰 Насос {$pumpName} запущен: {$dose} мл ({$duration} мс)";
+                return "🚰 {$pumpLabel} запущен: {$doseFormatted} мл ({$duration} мс)";
             case 'pump_stop':
-                return "🛑 Насос {$pumpName} остановлен: {$dose} мл ({$duration} мс)";
+                return "🛑 {$pumpLabel} остановлен: {$doseFormatted} мл ({$duration} мс)";
             case 'pump_emergency_stop':
-                return "🚨 Аварийная остановка насоса {$pumpName}";
+                return "🚨 Аварийная остановка {$pumpLabel}";
             case 'pump_timeout':
-                return "⏰ Таймаут насоса {$pumpName}";
+                return "⏰ Таймаут {$pumpLabel}";
             case 'pump_calibration_start':
-                return "🔧 Начало калибровки насоса {$pumpName}";
+                return "🔧 Начало калибровки {$pumpLabel}";
             case 'pump_calibration_end':
-                return "✅ Калибровка насоса {$pumpName} завершена";
+                return "✅ Калибровка {$pumpLabel} завершена";
             default:
-                return "🔧 Событие насоса {$pumpName}: {$eventType}";
+                return "🔧 Событие {$pumpLabel}: {$eventType}";
         }
     }
 
@@ -1075,9 +1254,9 @@ class MqttService
         if ($nodeType === 'ph') {
             switch ($pumpId) {
                 case 0:
-                    return 'pH UP';
+                    return 'pH up';
                 case 1:
-                    return 'pH DOWN';
+                    return 'pH down';
                 default:
                     return "pH #{$pumpId}";
             }
@@ -1101,9 +1280,9 @@ class MqttService
         if ($nodeType === 'ph_ec') {
             switch ($pumpId) {
                 case 0:
-                    return 'pH UP';
+                    return 'pH up';
                 case 1:
-                    return 'pH DOWN';
+                    return 'pH down';
                 case 2:
                     return 'EC A';
                 case 3:
@@ -1111,11 +1290,12 @@ class MqttService
                 case 4:
                     return 'EC C';
                 default:
-                    return "Pump #{$pumpId}";
+                    return "#{$pumpId}";
             }
         }
         
-        return "Насос #{$pumpId}";
+        // Для неизвестных типов узлов - возвращаем только номер
+        return "#{$pumpId}";
     }
 }
 

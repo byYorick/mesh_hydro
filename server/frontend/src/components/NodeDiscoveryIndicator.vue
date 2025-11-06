@@ -1,54 +1,16 @@
 <template>
-  <v-snackbar
-    v-model="show"
-    :timeout="8000"
-    location="top right"
-    color="success"
-    variant="elevated"
-  >
-    <div class="d-flex align-center">
-      <v-icon size="24" class="mr-3">mdi-radar</v-icon>
-      <div>
-        <div class="text-subtitle-1 font-weight-bold">
-          🔍 Новый узел обнаружен!
-        </div>
-        <div class="text-body-2">
-          {{ discoveredNode?.node_id }} ({{ nodeTypeLabel }})
-        </div>
-        <div class="text-caption">
-          {{ discoveredNode?.zone }} • 
-          {{ discoveredNode?.discovered_via === 'heartbeat' ? 'Heartbeat' : 'Discovery Topic' }}
-        </div>
-      </div>
-    </div>
-
-    <template v-slot:actions>
-      <v-btn
-        variant="text"
-        size="small"
-        @click="goToNode"
-      >
-        Открыть
-      </v-btn>
-      <v-btn
-        icon="mdi-close"
-        variant="text"
-        size="small"
-        @click="show = false"
-      />
-    </template>
-  </v-snackbar>
+  <!-- Компонент-обертка для обнаружения узлов -->
+  <!-- Уведомления отображаются через систему usePopup в UniversalPopup -->
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { usePopup } from '@/composables/usePopup'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const show = ref(false)
-const discoveredNode = ref(null)
+const popup = usePopup()
 
-const nodeTypeLabel = computed(() => {
+const nodeTypeLabel = (nodeType) => {
   const types = {
     root: 'Root Node',
     climate: 'Климат-сенсор',
@@ -56,22 +18,30 @@ const nodeTypeLabel = computed(() => {
     relay: 'Реле',
     water: 'Датчик воды',
     display: 'Дисплей',
+    ph: 'pH сенсор',
+    ec: 'EC сенсор',
     unknown: 'Неизвестный тип'
   }
-  return types[discoveredNode.value?.node_type] || 'Неизвестный'
-})
-
-const goToNode = () => {
-  if (discoveredNode.value?.node_id) {
-    router.push(`/nodes/${discoveredNode.value.node_id}`)
-  }
-  show.value = false
+  return types[nodeType] || 'Неизвестный'
 }
 
 const handleNodeDiscovered = (data) => {
   console.log('🔍 Node discovered event:', data)
-  discoveredNode.value = data.node
-  show.value = true
+  const node = data.node || data
+  
+  if (!node?.node_id) return
+  
+  // Используем новую систему usePopup
+  popup.toast.add({
+    level: 'info',
+    message: `🔍 Новый узел обнаружен: ${node.node_id} (${nodeTypeLabel(node.node_type)})`,
+    nodeId: node.node_id,
+    data: {
+      node_type: node.node_type,
+      zone: node.zone,
+      discovered_via: node.discovered_via || data.discovered_via || 'unknown'
+    }
+  })
   
   // Воспроизводим звук (опционально)
   playDiscoverySound()
@@ -79,7 +49,7 @@ const handleNodeDiscovered = (data) => {
 
 const playDiscoverySound = () => {
   try {
-    const audio = new Audio('/discovery-sound.mp3') // Опционально: добавить звук
+    const audio = new Audio('/discovery-sound.mp3')
     audio.volume = 0.3
     audio.play().catch(() => {
       // Ignore if sound fails
@@ -89,28 +59,10 @@ const playDiscoverySound = () => {
   }
 }
 
-// Подключаемся к WebSocket для real-time уведомлений
-onMounted(() => {
-  // TODO: Подключение к Laravel Echo для real-time
-  // Echo.channel('hydro-system')
-  //   .listen('.node.discovered', handleNodeDiscovered)
-  
-  // Временно: эмулируем событие для демонстрации
-  window.addEventListener('node-discovered', (event) => {
-    handleNodeDiscovered(event.detail)
-  })
-})
-
-// Экспортируем метод для ручного вызова
+// Экспортируем метод для ручного вызова (для совместимости)
 defineExpose({
   showDiscovery: handleNodeDiscovered
 })
 </script>
-
-<style scoped>
-.v-snackbar {
-  min-width: 400px;
-}
-</style>
 
 

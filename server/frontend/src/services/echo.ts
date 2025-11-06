@@ -21,20 +21,44 @@ export function initializeEcho(): any {
   // Reverb (Pusher protocol) settings
   window.Pusher = Pusher
   
-  // Правильное определение хоста для Docker окружения
-  const wsHost = import.meta.env.VITE_WS_HOST || (window.location.hostname === 'localhost' ? 'localhost' : 'reverb')
-  const wsPort = Number(import.meta.env.VITE_WS_PORT || 8080) // Laravel Reverb runs on 8080
+  // В dev режиме используем прокси Vite для WebSocket (через /app)
+  // Прокси Vite автоматически перенаправляет WebSocket запросы на reverb:8080
+  const isDev = import.meta.env.DEV
   const key = import.meta.env.VITE_PUSHER_KEY || 'hydro-app-key'
+  
+  // В dev режиме подключаемся через прокси Vite на localhost:5173/app
+  // В production подключаемся напрямую к Reverb серверу
+  let wsHost: string
+  let wsPort: number | string
+  let wsPath: string
+  
+  if (isDev) {
+    // Используем прокси Vite - подключаемся к localhost:5173, прокси перенаправит на reverb:8080
+    // Pusher автоматически добавляет /app перед ключом при использовании Laravel Reverb
+    // Поэтому wsPath должен быть пустым, чтобы Pusher создал путь /app/{key}
+    // Прокси Vite настроен на /app -> http://reverb:8080, поэтому путь /app/{key} будет проксирован правильно
+    wsHost = window.location.hostname
+    wsPort = window.location.port || 5173
+    wsPath = ''  // Пустой - Pusher сам добавит /app/{key}
+  } else {
+    // Production - прямое подключение к Reverb
+    wsHost = import.meta.env.VITE_WS_HOST || 'localhost'
+    wsPort = Number(import.meta.env.VITE_WS_PORT || 8080)
+    wsPath = ''
+  }
 
   // Debug: показываем конфигурацию
   console.log('🔧 Echo configuration:', {
     wsHost,
     wsPort,
+    wsPath,
     key,
+    isDev,
     env: {
       VITE_WS_HOST: import.meta.env.VITE_WS_HOST,
       VITE_WS_PORT: import.meta.env.VITE_WS_PORT,
       VITE_PUSHER_KEY: import.meta.env.VITE_PUSHER_KEY,
+      DEV: import.meta.env.DEV,
     }
   })
 
@@ -56,7 +80,8 @@ export function initializeEcho(): any {
         },
       },
       // Дополнительные настройки для Reverb
-      wsPath: '',
+      // wsPath не используется для Laravel Reverb - Pusher автоматически добавляет /app
+      // Прокси Vite настроен на /app -> http://reverb:8080
       activityTimeout: 30000,
       pongTimeout: 6000,
     })
@@ -107,7 +132,7 @@ export function initializeEcho(): any {
       if (!echoInstance.connector.socket) {
         console.log('🔧 Creating socket manually')
         try {
-          // Исправляем URL - используем правильный путь для Reverb
+          // Исправляем URL - Pusher автоматически добавляет /app, поэтому путь: /app/{key}
           const socketUrl = `ws://${wsHost}:${wsPort}/app/${key}?protocol=7&client=js&version=8.4.0&flash=false`
           console.log('🔍 Manual socket URL:', socketUrl)
           const manualSocket = new WebSocket(socketUrl)
@@ -393,11 +418,11 @@ function startFallbackPolling(): any {
   console.log('🔄 Starting fallback polling mode')
   fallbackMode = true
   
-  // Polling каждые 10 секунд (уменьшаем нагрузку на API)
+  // Polling каждые 3 секунды для мгновенного обновления в dev режиме
   fallbackInterval = setInterval(async () => {
     try {
       // Импортируем API сервис динамически чтобы избежать циклических зависимостей
-      const { default: api } = await import('./api.js')
+      const { default: api } = await import('./api')
       
       // Получаем свежие данные используя методы API
       const [nodesResponse, eventsResponse] = await Promise.allSettled([
@@ -428,7 +453,7 @@ function startFallbackPolling(): any {
     } catch (error: any) {
       console.warn('Fallback polling error:', error)
     }
-  }, 10000)
+  }, 3000)
 }
 
 function stopFallbackPolling(): any {

@@ -217,7 +217,16 @@ export const useEventsStore = defineStore('events', {
 
     // Add event in real-time (from WebSocket)
     addEventRealtime(event) {
-      this.events.unshift(event)
+      // Проверяем, нет ли уже такого события (по ID)
+      const existingIndex = this.events.findIndex(e => e.id === event.id)
+      
+      if (existingIndex >= 0) {
+        // Обновляем существующее событие
+        this.events[existingIndex] = event
+      } else {
+        // Добавляем новое событие в начало списка
+        this.events.unshift(event)
+      }
       
       // Keep only last 500 events
       if (this.events.length > 500) {

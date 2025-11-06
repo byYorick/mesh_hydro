@@ -117,7 +117,7 @@
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
 import { useNodeConfigStore } from '@/stores/nodeConfig'
-import { useSnackbar } from '@/composables/useSnackbar'
+import { usePopup } from '@/composables/usePopup'
 
 const props = defineProps({
   nodeId: {
@@ -142,7 +142,7 @@ const props = defineProps({
 const emit = defineEmits(['pump-started', 'pump-stopped'])
 
 const configStore = useNodeConfigStore()
-const { showSuccess, showError } = useSnackbar()
+const popup = usePopup()
 
 const selectedPump = ref(null)
 const duration = ref(5)
@@ -176,7 +176,7 @@ async function startPump() {
       duration_sec: duration.value
     })
 
-    showSuccess(`Насос ${selectedPump.value} запущен на ${duration.value} сек`)
+    popup.toast.success(`Насос ${selectedPump.value} запущен на ${duration.value} сек`)
 
     // Start countdown
     timer = setInterval(() => {
@@ -193,7 +193,7 @@ async function startPump() {
       duration: duration.value
     })
   } catch (err) {
-    showError('Не удалось запустить насос')
+    popup.toast.error('Не удалось запустить насос')
     stopPumpCountdown()
   } finally {
     running.value = false

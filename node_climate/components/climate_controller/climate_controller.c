@@ -10,6 +10,7 @@
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 #include "node_config.h"
+#include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
 
 #include "esp_log.h"
 #include "esp_wifi.h"
@@ -162,11 +163,11 @@ static void climate_main_task(void *arg) {
     }
 }
 
-// Задача heartbeat (каждые 5 секунд для DEBUG)
+// Задача heartbeat - использует единый интервал из mesh_config.h
 static void heartbeat_task(void *arg) {
-    ESP_LOGI(TAG, "Heartbeat task running (every 5 sec - DEBUG mode)");
+    ESP_LOGI(TAG, "Heartbeat task running (interval: %d ms)", HEARTBEAT_INTERVAL_MS);
     
-    // Начальная задержка
+    // Начальная задержка перед первым heartbeat
     vTaskDelay(pdMS_TO_TICKS(5000));
 
     while (1) {
@@ -174,7 +175,8 @@ static void heartbeat_task(void *arg) {
             send_heartbeat();
         }
         
-        vTaskDelay(pdMS_TO_TICKS(5000));  // Каждые 5 секунд (DEBUG)
+        // Используем единый интервал из mesh_config.h (10 сек)
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
     }
 }
 

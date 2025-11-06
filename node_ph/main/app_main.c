@@ -74,14 +74,48 @@ void app_main(void)
         ESP_LOGW(TAG, "Config not found, using defaults");
         init_default_config();
         node_config_save(&s_node_config, sizeof(ph_node_config_t), "ph_ns");
+    } else {
+        // Валидация emergency limits - если они не инициализированы (равны 0), установить значения по умолчанию
+        if (s_node_config.ph_emergency_low <= 0.0f || s_node_config.ph_emergency_high <= 0.0f ||
+            s_node_config.ph_emergency_low >= s_node_config.ph_emergency_high) {
+            ESP_LOGW(TAG, "Invalid emergency limits (%.2f-%.2f), setting defaults", 
+                     s_node_config.ph_emergency_low, s_node_config.ph_emergency_high);
+            s_node_config.ph_emergency_low = 4.0f;   // Критично низкий pH
+            s_node_config.ph_emergency_high = 9.0f;   // Критично высокий pH
+            node_config_save(&s_node_config, sizeof(ph_node_config_t), "ph_ns");
+            ESP_LOGI(TAG, "Emergency limits set to: %.2f-%.2f", 
+                     s_node_config.ph_emergency_low, s_node_config.ph_emergency_high);
+        }
     }
     
     // Установка глобального node_id для pump_events
     g_node_id = s_node_config.base.node_id;
     
     ESP_LOGI(TAG, "  Node ID: %s", s_node_config.base.node_id);
-    ESP_LOGI(TAG, "  pH target: %.2f (%.2f-%.2f)", 
+    ESP_LOGI(TAG, "  pH target: %.2f (range: %.2f-%.2f)", 
              s_node_config.ph_target, s_node_config.ph_min, s_node_config.ph_max);
+    
+    // Установка режима работы датчика pH
+    const char *sensor_mode_str;
+    switch (s_node_config.sensor_mode) {
+        case 0:
+            sensor_mode_str = "REAL";
+            break;
+        case 1:
+            sensor_mode_str = "MOCK REACTIVE";
+            break;
+        case 2:
+            sensor_mode_str = "MOCK NON-REACTIVE";
+            break;
+        default:
+            sensor_mode_str = "UNKNOWN";
+            s_node_config.sensor_mode = PH_SENSOR_MODE_MOCK_REACTIVE;  // Установка по умолчанию
+            break;
+    }
+    ph_sensor_set_mode((ph_sensor_mode_t)s_node_config.sensor_mode);
+    ESP_LOGI(TAG, "  Sensor mode: %s (%d)", sensor_mode_str, s_node_config.sensor_mode);
+    ESP_LOGI(TAG, "  Emergency limits: %.2f-%.2f", 
+             s_node_config.ph_emergency_low, s_node_config.ph_emergency_high);
     
     // [Step 3/8] I2C init
     ESP_LOGI(TAG, "[Step 3/8] I2C init...");
@@ -218,6 +252,9 @@ static void init_default_config(void) {
     
     // Калибровка датчика pH (дефолт)
     s_node_config.ph_cal_offset = 0.0f;
+    
+    // Режим работы датчика pH (0=реальный, 1=mock с реакцией, 2=mock без реакции)
+    s_node_config.sensor_mode = PH_SENSOR_MODE_MOCK_REACTIVE;  // По умолчанию mock с реакцией
     
     ESP_LOGI(TAG, "Default config initialized: %s", s_node_config.base.node_id);
 }

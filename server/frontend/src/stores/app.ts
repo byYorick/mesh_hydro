@@ -19,7 +19,8 @@ export const useAppStore = defineStore('app', {
     // Loading states
     loading: false,
     
-    // Snackbar
+    // Snackbar (deprecated - теперь используется новая система usePopup)
+    // Оставляем для обратной совместимости, но значения не используются
     snackbar: {
       show: false,
       message: '',
@@ -49,19 +50,26 @@ export const useAppStore = defineStore('app', {
       this.drawer = !this.drawer
     },
 
-    // Show snackbar
+    // Show snackbar (использует новую систему usePopup)
     showSnackbar(message, color = 'info', timeout = 3000) {
-      this.snackbar = {
-        show: true,
-        message,
-        color,
-        timeout,
-      }
+      // Импортируем динамически, чтобы избежать циклических зависимостей
+      import('@/composables/usePopup').then(({ popupManager }) => {
+        // Преобразуем цвет в level для новой системы
+        if (color === 'success') {
+          popupManager.toast.success(message)
+        } else if (color === 'error') {
+          popupManager.toast.error(message)
+        } else if (color === 'warning') {
+          popupManager.toast.warning(message)
+        } else {
+          popupManager.toast.info(message)
+        }
+      })
     },
 
-    // Hide snackbar
+    // Hide snackbar (больше не используется, но оставляем для совместимости)
     hideSnackbar() {
-      this.snackbar.show = false
+      // Больше не нужно - уведомления управляются автоматически
     },
 
     // Fetch system status

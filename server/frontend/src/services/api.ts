@@ -4,7 +4,7 @@ import axios from 'axios'
 // Create axios instance
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
-  timeout: 10000,
+  timeout: 15000, // 15 seconds - увеличен для медленных запросов (status, dashboard)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -17,6 +17,14 @@ api.interceptors.request.use(
     const token = localStorage.getItem('auth_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    // Отключить кеш для dev режима
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    config.headers['Pragma'] = 'no-cache'
+    config.headers['Expires'] = '0'
+    // Добавляем timestamp для предотвращения кеширования
+    if (config.method === 'get') {
+      config.params = { ...config.params, _t: Date.now() }
     }
     return config
   },
@@ -123,6 +131,11 @@ export default {
   // System status
   getStatus() {
     return api.get('/status')
+  },
+
+  // Status thresholds configuration
+  getStatusThresholds() {
+    return api.get('/status/thresholds')
   },
 
   // Dashboard

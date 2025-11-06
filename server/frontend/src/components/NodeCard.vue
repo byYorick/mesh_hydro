@@ -1,179 +1,188 @@
 <template>
   <v-card
-    :color="statusColor"
-    variant="tonal"
-    :class="['node-card', { 'node-card-online': isOnline }]"
+    :class="['node-card-modern', { 'online': isOnline, 'offline': !isOnline }]"
+    :elevation="isOnline ? 2 : 0"
+    hover
+    style="border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); transition: all 0.2s ease;"
   >
-    <v-card-title class="d-flex align-center" :class="{ 'py-2': mobileLayout }">
-      <v-icon :icon="nodeIcon" :class="mobileLayout ? 'mr-2' : 'mr-2'" :size="mobileLayout ? 32 : 24"></v-icon>
-      
-      <div :class="{ 'flex-grow-1': mobileLayout }">
-        <div :class="mobileLayout ? 'text-subtitle-1' : ''">{{ node.node_id }}</div>
-        <div v-if="mobileLayout" class="text-caption text-medium-emphasis">{{ nodeTypeText }}</div>
+    <!-- Status indicator bar -->
+    <div 
+      :class="['status-bar', statusColor]"
+      :style="{ height: '4px', width: '100%' }"
+    ></div>
+
+    <!-- Header -->
+    <v-card-title class="d-flex align-center justify-space-between pa-4 pb-2">
+      <div class="d-flex align-center flex-grow-1">
+        <div>
+          <div class="text-h6 font-weight-medium">{{ node.node_id }}</div>
+          <div class="d-flex align-center mt-1">
+            <div class="text-caption text-medium-emphasis mr-2">{{ nodeTypeText }}</div>
+            <v-chip
+              size="x-small"
+              :color="statusColor"
+              variant="flat"
+              class="text-none"
+            >
+              {{ statusText }}
+            </v-chip>
+          </div>
+        </div>
       </div>
       
-      <v-spacer v-if="!mobileLayout"></v-spacer>
-      
-      <!-- Error Badge -->
+      <!-- Error indicator -->
       <v-badge
         v-if="errorCount > 0"
         :content="errorCount"
         :color="errorCount > 5 ? 'error' : 'warning'"
-        offset-x="-5"
-        offset-y="5"
-        class="mr-2"
+        overlap
+        offset-x="8"
+        offset-y="8"
       >
-        <v-icon icon="mdi-alert-circle" :color="errorCount > 5 ? 'error' : 'warning'"></v-icon>
+        <v-btn
+          icon
+          size="small"
+          variant="text"
+          :color="errorCount > 5 ? 'error' : 'warning'"
+        >
+          <v-icon>mdi-alert-circle</v-icon>
+        </v-btn>
       </v-badge>
-      
-      <v-chip
-        :color="statusColor"
-        size="small"
-        variant="flat"
-      >
-        <v-icon :icon="statusIcon" start></v-icon>
-        {{ mobileLayout ? '' : statusText }}
-      </v-chip>
     </v-card-title>
 
-    <v-card-subtitle v-if="!mobileLayout">
-      {{ nodeTypeText }} • {{ node.zone || 'Без зоны' }}
-    </v-card-subtitle>
-
-    <v-card-text :class="{ 'pa-2': mobileLayout }">
-      <!-- Mobile: Horizontal scroll для метрик -->
-      <div v-if="mobileLayout && lastData" class="metrics-scroll mb-2">
-        <v-chip
-          v-for="metric in visibleMetrics"
-          :key="metric.key"
-          class="metric-chip"
-          size="small"
-          variant="outlined"
-        >
-          <v-icon :icon="metric.icon" start size="small"></v-icon>
-          {{ metric.value }}
-        </v-chip>
-      </div>
-
-      <!-- Desktop: Node-specific data -->
-      <div v-else-if="(node.node_type === 'ph_ec' || node.node_type === 'ph') && lastData">
-        <v-row dense>
-          <v-col cols="6">
-            <div class="text-h4 font-weight-bold">
-              {{ lastData.ph?.toFixed(2) || '-' }}
+    <v-card-text class="pa-4 pt-2">
+      <!-- Main Metrics -->
+      <div v-if="lastData" class="main-metrics mb-4">
+        <!-- pH/EC Node Metrics -->
+        <div v-if="(node.node_type === 'ph_ec' || node.node_type === 'ph') && lastData" class="metrics-layout">
+          <div class="primary-metric">
+            <div class="metric-header">
+              <v-icon icon="mdi-flask" size="20" class="mr-2" color="primary"></v-icon>
+              <span class="text-caption text-medium-emphasis">pH</span>
             </div>
-            <div class="text-caption">pH</div>
-          </v-col>
-          <v-col cols="6">
-            <div class="text-h4 font-weight-bold">
-              {{ lastData.temp?.toFixed(1) || '-' }}°C
+            <div class="metric-value-large">{{ lastData.ph?.toFixed(2) || '-' }}</div>
+            <div v-if="lastData.ph_target" class="metric-target text-caption">
+              Цель: {{ lastData.ph_target.toFixed(2) }}
             </div>
-            <div class="text-caption">Температура</div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <div v-else-if="node.node_type === 'ec' && lastData">
-        <v-row dense>
-          <v-col cols="6">
-            <div class="text-h4 font-weight-bold">
-              {{ lastData.ec?.toFixed(2) || '-' }}
-            </div>
-            <div class="text-caption">EC (mS/cm)</div>
-          </v-col>
-          <v-col cols="6">
-            <div class="text-h4 font-weight-bold">
-              {{ lastData.temp?.toFixed(1) || '-' }}°C
-            </div>
-            <div class="text-caption">Температура</div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <div v-else-if="node.node_type === 'climate' && lastData">
-        <v-row dense>
-          <v-col cols="4">
-            <div class="text-h5">{{ lastData.temperature?.toFixed(1) || '-' }}°C</div>
-            <div class="text-caption">Температура</div>
-          </v-col>
-          <v-col cols="4">
-            <div class="text-h5">{{ lastData.humidity?.toFixed(0) || '-' }}%</div>
-            <div class="text-caption">Влажность</div>
-          </v-col>
-          <v-col cols="4">
-            <div class="text-h5">{{ lastData.co2 || '-' }}</div>
-            <div class="text-caption">CO₂ ppm</div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <div v-else-if="node.node_type === 'water' && lastData">
-        <v-row dense>
-          <v-col cols="6">
-            <div class="text-h5">{{ lastData.level?.toFixed(0) || '-' }}%</div>
-            <div class="text-caption">Уровень</div>
-          </v-col>
-          <v-col cols="6">
-            <div class="text-h5">{{ lastData.temp?.toFixed(1) || '-' }}°C</div>
-            <div class="text-caption">Температура</div>
-          </v-col>
-        </v-row>
-      </div>
-
-      <div v-else class="text-caption text-disabled">
-        Нет данных
-      </div>
-
-      <!-- Memory Usage (compact) -->
-      <v-divider class="my-2"></v-divider>
-      <div v-if="hasMemoryInfo" class="mb-2">
-        <div class="d-flex justify-space-between mb-1">
-          <span class="text-caption">
-            <v-icon icon="mdi-memory" size="x-small" class="mr-1"></v-icon>
-            RAM
-          </span>
-          <span class="text-caption">{{ heapPercent.toFixed(0) }}%</span>
+          </div>
+          <div class="secondary-metric">
+            <v-icon icon="mdi-thermometer" size="18" class="mr-1" color="orange"></v-icon>
+            <span class="text-h6 font-weight-medium">{{ lastData.temp?.toFixed(1) || '-' }}°</span>
+          </div>
         </div>
-        <v-progress-linear
-          :model-value="heapPercent"
-          :color="getMemoryColor(heapPercent)"
-          height="6"
-          rounded
-        ></v-progress-linear>
-      </div>
 
-      <!-- WiFi Signal (RSSI) -->
-      <div v-if="hasRssi" class="mb-2">
-        <div class="d-flex justify-space-between mb-1">
-          <span class="text-caption">
-            <v-icon :icon="rssiIcon" size="x-small" class="mr-1"></v-icon>
-            WiFi
-          </span>
-          <span class="text-caption">{{ rssiValue }} dBm</span>
+        <!-- EC Node Metrics -->
+        <div v-else-if="node.node_type === 'ec' && lastData" class="metrics-layout">
+          <div class="primary-metric">
+            <div class="metric-header">
+              <v-icon icon="mdi-flash" size="20" class="mr-2" color="warning"></v-icon>
+              <span class="text-caption text-medium-emphasis">EC</span>
+            </div>
+            <div class="metric-value-large">{{ lastData.ec?.toFixed(2) || '-' }}</div>
+            <div class="text-caption">mS/cm</div>
+          </div>
+          <div class="secondary-metric">
+            <v-icon icon="mdi-thermometer" size="18" class="mr-1" color="orange"></v-icon>
+            <span class="text-h6 font-weight-medium">{{ lastData.temp?.toFixed(1) || '-' }}°</span>
+          </div>
         </div>
-        <v-progress-linear
-          :model-value="rssiPercent"
-          :color="getRssiColor(rssiPercent)"
-          height="6"
-          rounded
-        ></v-progress-linear>
+
+        <!-- Climate Node Metrics -->
+        <div v-else-if="node.node_type === 'climate' && lastData" class="metrics-layout-climate">
+          <div class="metric-item">
+            <v-icon icon="mdi-thermometer" size="18" color="orange"></v-icon>
+            <div class="metric-value-small">{{ lastData.temperature?.toFixed(1) || '-' }}°</div>
+            <div class="text-caption">Темп</div>
+          </div>
+          <div class="metric-item">
+            <v-icon icon="mdi-water-percent" size="18" color="blue"></v-icon>
+            <div class="metric-value-small">{{ lastData.humidity?.toFixed(0) || '-' }}%</div>
+            <div class="text-caption">Влаж</div>
+          </div>
+          <div class="metric-item">
+            <v-icon icon="mdi-molecule-co2" size="18" color="green"></v-icon>
+            <div class="metric-value-small">{{ lastData.co2 || '-' }}</div>
+            <div class="text-caption">CO₂</div>
+          </div>
+        </div>
+
+        <!-- Water Node Metrics -->
+        <div v-else-if="node.node_type === 'water' && lastData" class="metrics-layout">
+          <div class="primary-metric">
+            <div class="metric-header">
+              <v-icon icon="mdi-waves" size="20" class="mr-2" color="blue"></v-icon>
+              <span class="text-caption text-medium-emphasis">Уровень</span>
+            </div>
+            <div class="metric-value-large">{{ lastData.level?.toFixed(0) || '-' }}%</div>
+          </div>
+          <div class="secondary-metric">
+            <v-icon icon="mdi-thermometer" size="18" class="mr-1" color="orange"></v-icon>
+            <span class="text-h6 font-weight-medium">{{ lastData.temp?.toFixed(1) || '-' }}°</span>
+          </div>
+        </div>
+
+        <!-- Mobile: Horizontal scroll -->
+        <div v-else-if="mobileLayout && visibleMetrics.length > 0" class="metrics-scroll">
+          <v-chip
+            v-for="metric in visibleMetrics"
+            :key="metric.key"
+            class="metric-chip mr-2"
+            size="small"
+            variant="tonal"
+          >
+            <v-icon :icon="metric.icon" start size="small"></v-icon>
+            {{ metric.value }}
+          </v-chip>
+        </div>
       </div>
 
-      <!-- Last seen -->
-      <div class="text-caption text-disabled">
-        <v-icon icon="mdi-clock-outline" size="small" class="mr-1"></v-icon>
-        {{ lastSeenText }}
+      <!-- No data -->
+      <div v-else class="no-data text-center py-6">
+        <v-icon icon="mdi-database-off" size="40" color="grey-lighten-1" class="mb-2"></v-icon>
+        <div class="text-caption text-disabled">Нет данных</div>
+      </div>
+
+      <!-- Footer Info -->
+      <v-divider class="my-3"></v-divider>
+      
+      <div class="footer-info">
+        <!-- System stats inline -->
+        <div class="d-flex align-center justify-space-between mb-2">
+          <div v-if="hasMemoryInfo" class="d-flex align-center">
+            <v-icon icon="mdi-memory" size="14" :color="getMemoryColor(heapPercent)" class="mr-1"></v-icon>
+            <span class="text-caption">{{ heapPercent.toFixed(0) }}%</span>
+          </div>
+          
+          <div v-if="hasRssi" class="d-flex align-center ml-3">
+            <v-icon :icon="rssiIcon" size="14" :color="getRssiColor(rssiPercent)" class="mr-1"></v-icon>
+            <span class="text-caption">{{ rssiValue }} dBm</span>
+          </div>
+          
+          <v-spacer></v-spacer>
+          
+          <div class="text-caption text-disabled">
+            <v-icon icon="mdi-clock-outline" size="14" class="mr-1"></v-icon>
+            {{ lastSeenText }}
+          </div>
+        </div>
+        
+        <!-- Zone -->
+        <div v-if="node.zone" class="text-caption text-medium-emphasis">
+          <v-icon icon="mdi-map-marker-outline" size="14" class="mr-1"></v-icon>
+          {{ node.zone }}
+        </div>
       </div>
     </v-card-text>
 
-    <v-card-actions>
+    <v-card-actions class="pa-3 pt-0">
       <v-btn
         size="small"
         variant="text"
         :to="{ name: 'NodeDetail', params: { nodeId: node.node_id } }"
-        prepend-icon="mdi-eye"
+        class="text-none"
       >
         Детали
+        <v-icon icon="mdi-chevron-right" size="small" class="ml-1"></v-icon>
       </v-btn>
 
       <v-spacer></v-spacer>
@@ -268,24 +277,6 @@
           </template>
         </ConfigViewDialog>
 
-        <!-- Command Dialog (all nodes) -->
-        <CommandDialog :node="node" @command-sent="handleCommand">
-          <template v-slot:activator="{ props: dialogProps }">
-            <v-btn
-              size="large"
-              color="secondary"
-              variant="elevated"
-              v-bind="dialogProps"
-              prepend-icon="mdi-send"
-              class="text-none font-weight-medium"
-            >
-              <div class="d-flex flex-column align-center">
-                <span>Команды</span>
-                <span class="text-caption">Отправить команду</span>
-              </div>
-            </v-btn>
-          </template>
-        </CommandDialog>
       </template>
 
       <v-chip v-else size="small" color="error">
@@ -298,8 +289,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useNodeStatus } from '@/composables/useNodeStatus'
-import CommandDialog from './CommandDialog.vue'
+import { useNodeStatusV2 } from '@/composables/useNodeStatusV2'
 import ConfigViewDialog from './ConfigViewDialog.vue'
 
 const props = defineProps({
@@ -326,11 +316,8 @@ function quickPump(pump) {
   })
 }
 
-function handleCommand({ command, params }) {
-  emit('command', { command, params })
-}
-
 // Централизованная система статусов
+const nodeRef = computed(() => props.node)
 const {
   isOnline,
   isPumpRunning,
@@ -340,15 +327,12 @@ const {
   lastSeenText,
   canPerformActions,
   canRunPumps
-} = useNodeStatus({ value: () => props.node })
+} = useNodeStatusV2(nodeRef)
 
 // Удалены дублирующиеся computed свойства - теперь используются из useNodeStatus
 
 // Node type icon
 const nodeIcon = computed(() => {
-  console.log('🔍 NodeCard: nodeIcon computed called')
-  console.log('🔍 NodeCard: props.node?.node_type:', props.node?.node_type)
-  
   const icons = {
     'ph_ec': 'mdi-flask',
     'ph': 'mdi-flask-outline',
@@ -359,9 +343,7 @@ const nodeIcon = computed(() => {
     'display': 'mdi-monitor',
     'root': 'mdi-server-network',
   }
-  const result = icons[props.node.node_type] || 'mdi-chip'
-  console.log('🔍 NodeCard: nodeIcon result:', result)
-  return result
+  return icons[props.node.node_type] || 'mdi-chip'
 })
 
 // Node type text
@@ -498,14 +480,7 @@ const processNodeMetrics = (nodeType, data) => {
 
 // Visible metrics для mobile layout
 const visibleMetrics = computed(() => {
-  console.log('🔍 NodeCard: visibleMetrics computed called')
-  console.log('🔍 NodeCard: props.node:', props.node)
-  console.log('🔍 NodeCard: props.node.node_type:', props.node?.node_type)
-  console.log('🔍 NodeCard: lastData.value:', lastData.value)
-  
-  const result = processNodeMetrics(props.node.node_type, lastData.value)
-  console.log('🔍 NodeCard: visibleMetrics result:', result)
-  return result
+  return processNodeMetrics(props.node.node_type, lastData.value)
 })
 
 // Config dialog state
@@ -513,8 +488,175 @@ const showConfigDialog = ref(false)
 </script>
 
 <style scoped>
-.node-card {
+.node-card-modern {
   height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.node-card-modern:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+}
+
+.status-bar.success {
+  background: rgb(var(--v-theme-success));
+}
+
+.status-bar.error {
+  background: rgb(var(--v-theme-error));
+}
+
+.status-bar.warning {
+  background: rgb(var(--v-theme-warning));
+}
+
+.status-bar.grey {
+  background: rgb(var(--v-theme-grey));
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.success {
+  background: rgb(var(--v-theme-success));
+  box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.4);
+}
+
+.status-dot.error {
+  background: rgb(var(--v-theme-error));
+}
+
+.status-dot.warning {
+  background: rgb(var(--v-theme-warning));
+}
+
+.status-dot.grey {
+  background: rgb(var(--v-theme-grey));
+}
+
+.status-dot.pulsing {
+  animation: statusPulse 2s infinite;
+}
+
+@keyframes statusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(var(--v-theme-success), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0);
+  }
+}
+
+.main-metrics {
+  min-height: 100px;
+}
+
+.metrics-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.primary-metric {
+  flex: 1;
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.metric-value-large {
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1;
+  margin: 4px 0;
+}
+
+.metric-target {
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.secondary-metric {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(var(--v-theme-surface), 0.5);
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.metrics-layout-climate {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.metric-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: rgba(var(--v-theme-surface), 0.3);
+  border-radius: 6px;
+}
+
+.metric-value-small {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.metrics-scroll {
+  display: flex;
+  overflow-x: auto;
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.metric-chip {
+  flex-shrink: 0;
+}
+
+.no-data {
+  opacity: 0.5;
+}
+
+.footer-info {
+  padding-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .metrics-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .secondary-metric {
+    margin-top: 0;
+  }
+  
+  .metric-value-large {
+    font-size: 2rem;
+  }
 }
 </style>
 

@@ -63,16 +63,18 @@ class Node extends Model
 
     /**
      * Получить последнюю телеметрию
+     * Оптимизировано для использования индексов
      */
     public function lastTelemetry()
     {
         return $this->hasOne(Telemetry::class, 'node_id', 'node_id')
-            ->latest('received_at');
+            ->orderBy('received_at', 'desc')
+            ->limit(1);
     }
 
     /**
      * Проверка: узел онлайн?
-     * Считается онлайн если last_seen_at < 20 секунд назад
+     * Использует единый таймаут из конфигурации
      */
     public function isOnline(): bool
     {
@@ -80,7 +82,7 @@ class Node extends Model
             return false;
         }
         
-        $timeout = config('hydro.node_offline_timeout', 20); // секунд
+        $timeout = config('hydro.node_offline_timeout', 30); // секунд
         return $this->last_seen_at->diffInSeconds(now()) < $timeout;
     }
 
@@ -90,9 +92,14 @@ class Node extends Model
     public function updateLastSeen(): void
     {
         $this->update([
-            'online' => true,
             'last_seen_at' => now(),
         ]);
+        
+        // Перезагружаем чтобы обновить last_seen_at в памяти
+        $this->refresh();
+        
+        // Устанавливаем online на основе isOnline()
+        $this->update(['online' => $this->isOnline()]);
     }
 
     /**
@@ -122,12 +129,14 @@ class Node extends Model
             return 'grey';
         }
 
-        $timeout = config('hydro.node_offline_timeout', 45);
+        $timeout = config('hydro.node_offline_timeout', 30);
+        $heartbeatInterval = config('hydro.heartbeat_interval', 10);
         $seconds = $this->last_seen_at->diffInSeconds(now());
         
-        if ($seconds < ($timeout * 0.5)) return 'green';  // Онлайн: < 50% таймаута
-        if ($seconds < $timeout) return 'orange';          // Предупреждение: 50-100% таймаута
-        return 'red';                                       // Офлайн: > таймаута
+        if ($seconds < $heartbeatInterval) return 'success';      // Онлайн: < интервала heartbeat
+        if ($seconds < ($timeout * 0.7)) return 'success';         // Онлайн: < 70% таймаута
+        if ($seconds < $timeout) return 'warning';                 // Предупреждение: 70-100% таймаута
+        return 'error';                                             // Офлайн: > таймаута
     }
 
     /**
@@ -135,7 +144,7 @@ class Node extends Model
      */
     public function scopeOnline($query)
     {
-        $timeout = config('hydro.node_offline_timeout', 20);
+        $timeout = config('hydro.node_offline_timeout', 30);
         return $query->where('last_seen_at', '>', now()->subSeconds($timeout));
     }
 
@@ -144,7 +153,7 @@ class Node extends Model
      */
     public function scopeOffline($query)
     {
-        $timeout = config('hydro.node_offline_timeout', 20);
+        $timeout = config('hydro.node_offline_timeout', 30);
         return $query->where(function($q) use ($timeout) {
             $q->whereNull('last_seen_at')
               ->orWhere('last_seen_at', '<=', now()->subSeconds($timeout));

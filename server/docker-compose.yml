@@ -1,5 +1,5 @@
 # ========================================
-# MESH HYDRO V2 - DOCKER COMPOSE
+# MESH HYDRO V2 - DOCKER COMPOSE (PRODUCTION)
 # ========================================
 # 
 # ⚠️ ВАЖНО: Только СЕРВЕРНЫЕ компоненты!
@@ -19,8 +19,13 @@
 #
 # 📡 Подключение ESP32:
 #   - ESP32 подключается к MQTT брокеру по IP хоста и порту 1883
+#   - ЖЕСТКО ПРОПИСАНО: mqtt://192.168.1.100:1883 (см. common/mesh_config/mesh_config.h)
 #   - Внутри Docker сервисы общаются по именам (mosquitto, backend, postgres)
-#   - Порт 1883 проброшен на хост для доступа ESP32
+#   - Порт 1883 проброшен на хост для доступа ESP32 (0.0.0.0:1883->1883/tcp)
+#
+# 🔧 Режимы работы:
+#   - Production: docker-compose.yml (стабильная сборка)
+#   - Development: docker-compose.dev.yml (hot reload)
 # ========================================
 
 services:
@@ -103,7 +108,7 @@ services:
       - REVERB_SERVER_HOST=0.0.0.0
       - REVERB_SERVER_PORT=8080
     volumes:
-      # Монтирование локального кода (только для разработки)
+      # Монтирование локального кода (отключено для стабильности)
       # - ./backend:/var/www/html
       - backend_storage:/var/www/html/storage
     depends_on:
@@ -149,9 +154,10 @@ services:
       - REVERB_SCHEME=http
       - REVERB_SERVER_HOST=0.0.0.0
       - REVERB_SERVER_PORT=8080
-    # volumes:
-      # Монтирование локального кода (только для разработки)
+    volumes:
+      # Монтирование локального кода (отключено для стабильности)
       # - ./backend:/var/www/html
+      - backend_storage:/var/www/html/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -190,6 +196,10 @@ services:
       - REVERB_HOST=reverb
       - REVERB_PORT=8080
       - REVERB_SCHEME=http
+    volumes:
+      # Монтирование локального кода (отключено для стабильности)
+      # - ./backend:/var/www/html
+      - backend_storage:/var/www/html/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -218,6 +228,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    # Примечание: production сборка (статический nginx)
+    # Для hot reload используйте docker-compose.dev.yml
     depends_on:
       - backend
     networks:

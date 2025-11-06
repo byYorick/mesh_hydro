@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\Node;
 use App\Models\Event;
 use App\Services\TelegramService;
+use Illuminate\Support\Facades\Log;
 
 class CheckNodesStatusCommand extends Command
 {
@@ -27,7 +28,7 @@ class CheckNodesStatusCommand extends Command
     {
         $this->info('Checking nodes status...');
         
-        $timeout = config('hydro.node_offline_timeout', 20);
+        $timeout = config('hydro.node_offline_timeout', 30);
         $offlineThreshold = now()->subSeconds($timeout);
         
         $nodes = Node::all();

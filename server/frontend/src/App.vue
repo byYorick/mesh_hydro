@@ -120,39 +120,6 @@
       </v-container>
     </v-main>
 
-    <!-- Snackbar -->
-    <v-snackbar
-      v-model="appStore.snackbar.show"
-      :color="appStore.snackbar.color"
-      :timeout="appStore.snackbar.timeout"
-      location="top right"
-    >
-      {{ appStore.snackbar.message }}
-      
-      <template v-slot:actions>
-        <v-btn
-          variant="text"
-          @click="appStore.hideSnackbar()"
-        >
-          Закрыть
-        </v-btn>
-      </template>
-    </v-snackbar>
-
-    <!-- Status Bar -->
-    <StatusBar
-      :visible="statusBarStore.isVisible"
-      :message="statusBarStore.message"
-      :node-id="statusBarStore.nodeId"
-      :level="statusBarStore.level"
-      :timestamp="statusBarStore.timestamp"
-      :pump-details="statusBarStore.pumpDetails"
-      :pid-params="statusBarStore.pidParams"
-      :additional-params="statusBarStore.additionalParams"
-      :progress="statusBarStore.progress"
-      @close="statusBarStore.hide"
-      @toggle="statusBarStore.toggleExpanded"
-    />
 
     <!-- Node Auto-Discovery Indicator -->
     <NodeDiscoveryIndicator ref="discoveryIndicator" />
@@ -220,8 +187,8 @@
       </v-card>
     </v-dialog>
 
-    <!-- Universal Dialog System -->
-    <UniversalDialog />
+    <!-- Universal Popup System -->
+    <UniversalPopup />
   </v-app>
 </template>
 
@@ -230,29 +197,29 @@ import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
-import { useStatusBarStore } from '@/stores/statusBar'
 import { useEventsStore } from '@/stores/events'
 import { useErrorsStore } from '@/stores/errors'
 import { useSettingsStore } from '@/stores/settings'
 import { useTelemetryStore } from '@/stores/telemetry'
 import { useResponsive } from '@/composables/useResponsive'
 import { useOfflineMode } from '@/composables/useOfflineMode'
+import { usePopup } from '@/composables/usePopup'
 import NodeDiscoveryIndicator from '@/components/NodeDiscoveryIndicator.vue'
-import StatusBar from '@/components/StatusBar.vue'
-import UniversalDialog from '@/components/ui/UniversalDialog.vue'
+import UniversalPopup from '@/components/ui/UniversalPopup.vue'
 import { getConnectionStatus } from '@/services/echo'
+import { nodeStatusManager } from '@/services/NodeStatusManager'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
-const statusBarStore = useStatusBarStore()
 const eventsStore = useEventsStore()
 const errorsStore = useErrorsStore()
 const settingsStore = useSettingsStore()
 const telemetryStore = useTelemetryStore()
 const { isMobile } = useResponsive()
 const { isOnline, isOfflineMode } = useOfflineMode()
+const popup = usePopup()
 
 const echo = inject('echo')
 const rail = ref(false)
@@ -287,14 +254,22 @@ const goToEvents = () => {
 const refreshData = async () => {
   appStore.loading = true
   try {
-    await Promise.all([
-      nodesStore.fetchNodes(),
-      eventsStore.fetchEvents({ status: 'active' }),
-      appStore.fetchSystemStatus(),
-    ])
-    appStore.showSnackbar('Данные обновлены', 'success')
+    // Последовательная загрузка с небольшими задержками для избежания throttling
+    await nodesStore.fetchNodes()
+    await new Promise(resolve => setTimeout(resolve, 100)) // 100ms задержка
+    
+    await eventsStore.fetchEvents({ status: 'active' })
+    await new Promise(resolve => setTimeout(resolve, 100)) // 100ms задержка
+    
+    await appStore.fetchSystemStatus()
+    
+    popup.toast.success('Данные обновлены')
   } catch (error) {
-    appStore.showSnackbar('Ошибка обновления данных', 'error')
+    console.error('Error refreshing data:', error)
+    // Не показываем ошибку для throttling, это нормально при перезагрузке
+    if (!error?.response || error.response.status !== 429) {
+      popup.toast.error('Ошибка обновления данных')
+    }
   } finally {
     appStore.loading = false
   }
@@ -314,11 +289,7 @@ onMounted(async () => {
       })
       
       // Show error notification
-      appStore.showSnackbar(
-        `Критическая ошибка: ${err?.message || 'Неизвестная ошибка'}`,
-        'error',
-        8000
-      )
+      popup.toast.error(`Критическая ошибка: ${err?.message || 'Неизвестная ошибка'}`)
     }
 
     // Vue warn handler
@@ -332,31 +303,29 @@ onMounted(async () => {
     }
   }
   
+  // Загрузить конфигурацию статусов перед остальной инициализацией
+  await nodeStatusManager.loadConfig()
+  
   // Continue with mounted logic
   // Initial data load
   await refreshData()
 
+  // Setup fallback listeners FIRST (they work even if WebSocket fails)
+  setupFallbackListeners()
+  
   // Setup WebSocket listeners for real-time updates
   setupWebSocketListeners()
   
   // Catch unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
     console.error('🔴 UNHANDLED PROMISE REJECTION:', event.reason)
-    appStore.showSnackbar(
-      `Необработанная ошибка: ${event.reason?.message || 'Неизвестная ошибка'}`,
-      'error',
-      8000
-    )
+    popup.toast.error(`Необработанная ошибка: ${event.reason?.message || 'Неизвестная ошибка'}`)
   })
   
   // Catch uncaught errors
   window.addEventListener('error', (event) => {
     console.error('🔴 UNCAUGHT ERROR:', event.error)
-    appStore.showSnackbar(
-      `Системная ошибка: ${event.error?.message || 'Неизвестная ошибка'}`,
-      'error',
-      8000
-    )
+    popup.toast.error(`Системная ошибка: ${event.error?.message || 'Неизвестная ошибка'}`)
   })
 })
 
@@ -401,16 +370,33 @@ function setupWebSocketListeners() {
     
     // Show notification if node went offline
     if (!data.online) {
-      appStore.showSnackbar(`Узел ${data.node_id} офлайн`, 'warning')
+      popup.toast.warning(`Узел ${data.node_id} офлайн`)
     }
   })
 
-  // Listen for new nodes discovered
+  // Listen for periodic node status updates (every heartbeat)
+  channel.listen('.node.status.update', (data) => {
+    console.log('🔄 Node status update:', data.node_id)
+    
+    // Обновить в store
+    nodesStore.updateNodeRealtime({
+      node_id: data.node_id,
+      online: data.online,
+      last_seen_at: data.last_seen_at,
+      status_color: data.status_color,
+      icon: data.icon,
+      metadata: data.metadata,
+    })
+    
+    // Менеджер автоматически уведомит подписчиков через updateNodeRealtime
+  })
+
+    // Listen for new nodes discovered
   channel.listen('.node.discovered', (data) => {
     console.log('🔍 New node discovered:', data)
     nodesStore.updateNodeRealtime(data.node)
     
-    // Show discovery notification
+    // Show discovery notification через новую систему usePopup
     if (discoveryIndicator.value) {
       discoveryIndicator.value.showDiscovery(data)
     }
@@ -418,55 +404,42 @@ function setupWebSocketListeners() {
 
   // Listen for new events
   channel.listen('.event.created', (data) => {
-    console.log('🔔 New event:', data)
+    console.log('🔔 New event received:', data)
+    
+    // Добавляем событие в store (автоматически обновит все компоненты)
     eventsStore.addEventRealtime(data)
     
-    // Show status bar for events with pump or PID details
-    if (data.data && (data.data.pump_id || data.data.kp || data.data.current_value)) {
-      statusBarStore.showForEvent(data)
+    // Обновляем события узла в nodesStore, если узел открыт
+    if (data.node_id) {
+      const node = nodesStore.nodes.find(n => n.node_id === data.node_id)
+      if (node) {
+        // Инициализируем events если его нет
+        if (!node.events) {
+          node.events = []
+        }
+        // Проверяем, нет ли уже такого события (по ID)
+        const existingIndex = node.events.findIndex(e => e.id === data.id)
+        if (existingIndex >= 0) {
+          // Обновляем существующее событие
+          node.events[existingIndex] = data
+        } else {
+          // Добавляем новое событие в начало списка
+          node.events.unshift(data)
+        }
+        // Ограничиваем количество событий (последние 100)
+        if (node.events.length > 100) {
+          node.events = node.events.slice(0, 100)
+        }
+      }
     }
     
-    // Показываем popup для всех событий в зависимости от уровня
-    try {
-      if (data && data.level && typeof data.level === 'string') {
-        const eventLevelMap = {
-          'emergency': { type: 'error', icon: '🚨', duration: 15000 },
-          'critical': { type: 'error', icon: '⚠️', duration: 10000 },
-          'error': { type: 'error', icon: '❌', duration: 8000 },
-          'warning': { type: 'warning', icon: '⚡', duration: 6000 },
-          'info': { type: 'info', icon: 'ℹ️', duration: 4000 },
-          'success': { type: 'success', icon: '✅', duration: 3000 }
-        }
-        
-        const eventConfig = eventLevelMap[data.level] || { type: 'info', icon: '📢', duration: 4000 }
-        
-        // Формируем сообщение с деталями
-        let message = `${eventConfig.icon} ${data.message}`
-        
-        // Добавляем node_id если есть
-        if (data.node_id) {
-          message = `[${data.node_id}] ${message}`
-        }
-        
-        // Добавляем детали из data если есть
-        if (data.data) {
-          if (data.data.pump_id !== undefined) {
-            message += ` | Насос ${data.data.pump_id}`
-          }
-          if (data.data.volume_ml !== undefined) {
-            message += ` | ${data.data.volume_ml.toFixed(1)} мл`
-          }
-          if (data.data.duration_ms !== undefined) {
-            message += ` | ${(data.data.duration_ms / 1000).toFixed(1)}с`
-          }
-        }
-        
-        appStore.showSnackbar(message, eventConfig.type, eventConfig.duration)
-      }
-    } catch (error) {
-      console.error('App.vue: event notification - Error:', error)
-      console.error('App.vue: event notification - data:', data)
-    }
+    // Показываем уведомление через систему usePopup
+    popup.toast.add({
+      level: data.level || 'info',
+      message: data.message,
+      nodeId: data.node_id,
+      data: data.data
+    })
   })
 
   // Listen for node errors
@@ -476,14 +449,39 @@ function setupWebSocketListeners() {
     
     // Show notification for critical errors
     if (data.severity === 'critical') {
-      appStore.showSnackbar(
-        `🚨 Критичная ошибка: ${data.message}`,
-        'error',
-        10000
-      )
+      popup.toast.error(`🚨 Критичная ошибка: ${data.message}`)
     }
   })
 
+}
+
+// Setup fallback listeners for polling mode
+function setupFallbackListeners() {
+  console.log('🔧 Setting up fallback listeners for polling mode')
+  
+  // Listen for fallback polling events
+  window.addEventListener('echo:fallback', (event) => {
+    const { channel, event: eventName, data } = event.detail || {}
+    
+    if (channel === 'hydro.nodes' && eventName === 'NodeStatusChanged') {
+      // data is an array of all nodes from polling
+      if (Array.isArray(data)) {
+        // Update all nodes from polling response
+        nodesStore.fetchNodes().then(() => {
+          console.log('🔄 Nodes updated via fallback polling')
+        })
+      }
+    }
+    
+    if (channel === 'hydro.events' && eventName === 'EventCreated') {
+      // data is an array of recent events
+      if (Array.isArray(data)) {
+        eventsStore.fetchEvents({ status: 'active' }).then(() => {
+          console.log('🔄 Events updated via fallback polling')
+        })
+      }
+    }
+  })
 }
 </script>
 

@@ -18,13 +18,6 @@ extern bool g_emergency_mode;
 extern bool g_autonomous_mode;
 
 /**
- * @brief Получение RSSI к родительскому узлу
- */
-static int8_t get_rssi_to_parent(void) {
-    return mesh_manager_get_parent_rssi();
-}
-
-/**
  * @brief Создание JSON сообщения события pH
  */
 static esp_err_t create_event_json(const pump_event_t *event, char *json_buf, size_t buf_size) {
@@ -76,7 +69,9 @@ static esp_err_t create_event_json(const pump_event_t *event, char *json_buf, si
     cJSON_AddStringToObject(event_data, "event_type", event_type_str);
 
     // Данные насоса pH
+    const char *pump_name = (event->pump_id == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
     cJSON_AddNumberToObject(event_data, "pump_id", event->pump_id);
+    cJSON_AddStringToObject(event_data, "pump_name", pump_name);
     cJSON_AddNumberToObject(event_data, "duration_ms", event->duration_ms);
     cJSON_AddNumberToObject(event_data, "dose_ml", event->dose_ml);
     cJSON_AddNumberToObject(event_data, "ml_per_second", event->ml_per_second);
@@ -106,6 +101,40 @@ static esp_err_t create_event_json(const pump_event_t *event, char *json_buf, si
 
     cJSON_AddItemToObject(root, "data", event_data);
 
+    // Создание детального сообщения на русском языке
+    char message[256];
+    
+    switch (event->type) {
+        case PUMP_EVENT_START:
+            snprintf(message, sizeof(message), "Насос %s запущен: %.1f мл (%lu мс)", 
+                     pump_name, event->dose_ml, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_STOP:
+            snprintf(message, sizeof(message), "Насос %s остановлен: %.1f мл (%lu мс)", 
+                     pump_name, event->dose_ml, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_EMERGENCY_STOP:
+            snprintf(message, sizeof(message), "Насос %s АВАРИЙНАЯ ОСТАНОВКА (%lu мс)", 
+                     pump_name, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_TIMEOUT:
+            snprintf(message, sizeof(message), "Насос %s ТАЙМАУТ (%lu мс)", 
+                     pump_name, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_CALIBRATION_START:
+            snprintf(message, sizeof(message), "Насос %s калибровка начата", pump_name);
+            break;
+        case PUMP_EVENT_CALIBRATION_END:
+            snprintf(message, sizeof(message), "Насос %s калибровка завершена: %.1f мл/с", 
+                     pump_name, event->ml_per_second);
+            break;
+        default:
+            snprintf(message, sizeof(message), "Насос %s неизвестное событие", pump_name);
+            break;
+    }
+    
+    cJSON_AddStringToObject(root, "message", message);
+
     // Создание сообщения
     char *json_string = cJSON_PrintUnformatted(root);
     if (!json_string) {
@@ -131,25 +160,56 @@ static esp_err_t create_event_json(const pump_event_t *event, char *json_buf, si
  * @brief Отправка события на сервер
  */
 static esp_err_t send_event_to_server(const pump_event_t *event) {
+    // Логирование события всегда (даже если mesh не подключен)
+    const char *pump_name = (event->pump_id == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
+    const char *event_type_str;
+    switch (event->type) {
+        case PUMP_EVENT_START:
+            event_type_str = "START";
+            ESP_LOGI(TAG, "[PUMP EVENT %s] насос %s запущен: %.1f мл (%lu мс), pH=%.2f, target=%.2f", 
+                     event_type_str, pump_name, event->dose_ml, (unsigned long)event->duration_ms, 
+                     event->current_ph, event->ph_target);
+            break;
+        case PUMP_EVENT_STOP:
+            event_type_str = "STOP";
+            ESP_LOGI(TAG, "[PUMP EVENT %s] насос %s остановлен: %.1f мл (%lu мс)", 
+                     event_type_str, pump_name, event->dose_ml, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_EMERGENCY_STOP:
+            event_type_str = "EMERGENCY_STOP";
+            ESP_LOGE(TAG, "[PUMP EVENT %s] pump %s EMERGENCY STOP [duration=%lu ms]", 
+                     event_type_str, pump_name, (unsigned long)event->duration_ms);
+            break;
+        case PUMP_EVENT_TIMEOUT:
+            event_type_str = "TIMEOUT";
+            ESP_LOGW(TAG, "[PUMP EVENT %s] pump %s TIMEOUT [duration=%lu ms]", 
+                     event_type_str, pump_name, (unsigned long)event->duration_ms);
+            break;
+        default:
+            event_type_str = "UNKNOWN";
+            ESP_LOGW(TAG, "[PUMP EVENT %s] pump %s unknown event type %d", 
+                     event_type_str, pump_name, event->type);
+            break;
+    }
+    
     if (!mesh_manager_is_connected()) {
-        ESP_LOGW(TAG, "Mesh offline, event skipped");
+        ESP_LOGW(TAG, "   [WARNING] Event not sent - mesh offline");
         return ESP_FAIL;
     }
 
     char json_buf[1024];
     esp_err_t err = create_event_json(event, json_buf, sizeof(json_buf));
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create event JSON");
+        ESP_LOGE(TAG, "   [ERROR] Failed to create event JSON");
         return err;
     }
 
     // Отправка через mesh
     err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "📤 pH Pump event sent: %s (pump %d)", 
-                 event->type == PUMP_EVENT_START ? "START" : "STOP", event->pump_id);
+        ESP_LOGI(TAG, "   [OK] Pump event sent to ROOT (%d bytes)", (int)strlen(json_buf));
     } else {
-        ESP_LOGW(TAG, "Failed to send pH pump event: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "   [ERROR] Failed to send pump event: %s", esp_err_to_name(err));
     }
 
     return err;

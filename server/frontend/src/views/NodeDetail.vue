@@ -40,6 +40,9 @@
         <!-- EC Node Detail -->
         <EcNode v-else-if="node.node_type === 'ec'" :node="node" />
         
+        <!-- Root Node Detail -->
+        <RootDetail v-else-if="node.node_type === 'root'" :node="node" />
+        
         <!-- Fallback for other types -->
         <v-card v-else>
           <v-card-text>
@@ -108,13 +111,43 @@
           <v-card-text>
             <v-data-table
               :headers="eventHeaders"
-              :items="node.events || []"
+              :items="nodeEvents"
               :items-per-page="10"
             >
               <template v-slot:item.level="{ item }">
                 <v-chip :color="getLevelColor(item.level)" size="small">
                   {{ item.level }}
                 </v-chip>
+              </template>
+              <template v-slot:item.message="{ item }">
+                <div>
+                  <div>{{ item.message }}</div>
+                  <div v-if="item.data && hasEventMetadata(item.data)" class="mt-2">
+                    <v-chip-group>
+                      <!-- pH метаданные -->
+                      <v-chip v-if="getPhValue(item.data) !== null" size="x-small" variant="outlined">
+                        pH: {{ getPhValue(item.data).toFixed(2) }}
+                        <span v-if="getTargetValue(item.data) !== null"> (target: {{ getTargetValue(item.data).toFixed(2) }})</span>
+                      </v-chip>
+                      <!-- Zone -->
+                      <v-chip v-if="item.data.zone || item.data.pid_data?.zone" size="x-small" variant="outlined">
+                        Zone: {{ item.data.zone || item.data.pid_data?.zone || 'N/A' }}
+                      </v-chip>
+                      <!-- Error -->
+                      <v-chip v-if="getErrorValue(item.data) !== null" size="x-small" variant="outlined">
+                        Error: {{ getErrorValue(item.data).toFixed(3) }}
+                      </v-chip>
+                      <!-- PID параметры -->
+                      <v-chip v-if="item.data.pid_up || item.data.pid_down || item.data.pid_data" size="x-small" variant="outlined">
+                        PID: {{ formatPidParams(item.data) }}
+                      </v-chip>
+                      <!-- Emergency mode -->
+                      <v-chip v-if="item.data.emergency_mode" size="x-small" color="error" variant="outlined">
+                        Emergency
+                      </v-chip>
+                    </v-chip-group>
+                  </div>
+                </div>
               </template>
               <template v-slot:item.created_at="{ item }">
                 {{ formatDateTime(item.created_at) }}
@@ -151,8 +184,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNodesStore } from '@/stores/nodes'
 import { useTelemetryStore } from '@/stores/telemetry'
 import { useErrorsStore } from '@/stores/errors'
+import { useEventsStore } from '@/stores/events'
 import { useAppStore } from '@/stores/app'
-import { useNodeStatus } from '@/composables/useNodeStatus'
+import { useNodeStatusV2 } from '@/composables/useNodeStatusV2'
 import AdvancedChart from '@/components/AdvancedChart.vue'
 import NodeManagementCard from '@/components/NodeManagementCard.vue'
 import NodeMemoryCard from '@/components/NodeMemoryCard.vue'
@@ -163,13 +197,16 @@ import ErrorDetailsDialog from '@/components/ErrorDetailsDialog.vue'
 import PhNode from '@/components/PhNode.vue'
 import EcNode from '@/components/EcNode.vue'
 import PhDetail from '@/components/detail/PhDetail.vue'
+import RootDetail from '@/components/detail/RootDetail.vue'
 import { formatDateTime } from '@/utils/time'
+import api from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
 const nodesStore = useNodesStore()
 const telemetryStore = useTelemetryStore()
 const errorsStore = useErrorsStore()
+const eventsStore = useEventsStore()
 const appStore = useAppStore()
 
 const node = ref(null)
@@ -188,6 +225,7 @@ const eventHeaders = [
 ]
 
 // Централизованная система статусов
+const nodeRef = computed(() => node.value)
 const {
   isOnline,
   isPumpRunning,
@@ -197,7 +235,7 @@ const {
   lastSeenText,
   canPerformActions,
   canRunPumps
-} = useNodeStatus(node)
+} = useNodeStatusV2(nodeRef)
 
 const telemetryFields = computed(() => {
   if (!node.value) return []
@@ -205,6 +243,10 @@ const telemetryFields = computed(() => {
   switch (node.value.node_type) {
     case 'ph_ec':
       return ['ph', 'ec', 'temp']
+    case 'ph':
+      return ['ph', 'temp']
+    case 'ec':
+      return ['ec', 'temp']
     case 'climate':
       return ['temp', 'humidity', 'co2']
     case 'water':
@@ -212,6 +254,28 @@ const telemetryFields = computed(() => {
     default:
       return []
   }
+})
+
+// События узла из eventsStore (обновляются в реальном времени через WebSocket)
+const nodeEvents = computed(() => {
+  if (!node.value?.node_id) return []
+  
+  const nodeId = node.value.node_id
+  
+  // ВАЖНО: Обращаемся напрямую к eventsStore.events для реактивности
+  // Computed property автоматически отслеживает изменения в eventsStore.events
+  const allEvents = eventsStore.events
+    .filter(e => e && e.node_id === nodeId)
+    .slice() // Создаем копию для сортировки
+  
+  // Сортируем по дате создания (новые сверху)
+  allEvents.sort((a, b) => {
+    const dateA = new Date(a.created_at || 0).getTime()
+    const dateB = new Date(b.created_at || 0).getTime()
+    return dateB - dateA
+  })
+  
+  return allEvents
 })
 
 async function loadNodeErrors() {
@@ -297,6 +361,8 @@ async function updateConfig(config) {
 function getNodeIcon(type) {
   const icons = {
     'ph_ec': 'mdi-flask',
+    'ph': 'mdi-flask-outline',
+    'ec': 'mdi-flash',
     'climate': 'mdi-thermometer',
     'relay': 'mdi-electric-switch',
     'water': 'mdi-water',
@@ -329,6 +395,54 @@ function getLevelColor(level) {
     emergency: 'purple',
   }
   return colors[level] || 'grey'
+}
+
+function formatPid(pid) {
+  if (!pid || typeof pid !== 'object') return 'N/A'
+  const setpoint = pid.setpoint !== undefined ? pid.setpoint.toFixed(2) : 'N/A'
+  const integral = pid.integral !== undefined ? pid.integral.toFixed(2) : 'N/A'
+  const zone = pid.zone || 'N/A'
+  return `${setpoint} (${integral}, ${zone})`
+}
+
+function hasEventMetadata(data) {
+  return data && (
+    data.ph !== undefined || 
+    data.current_ph !== undefined ||
+    data.target !== undefined ||
+    data.ph_target !== undefined ||
+    data.pid_up !== undefined ||
+    data.pid_down !== undefined ||
+    data.pid_data !== undefined ||
+    data.zone !== undefined ||
+    data.error !== undefined ||
+    data.emergency_mode !== undefined
+  )
+}
+
+function getPhValue(data) {
+  return data?.ph ?? data?.current_ph ?? null
+}
+
+function getTargetValue(data) {
+  return data?.target ?? data?.ph_target ?? null
+}
+
+function getErrorValue(data) {
+  return data?.error ?? data?.pid_data?.error ?? null
+}
+
+function formatPidParams(data) {
+  const pidData = data?.pid_data || data?.pid_up || data?.pid_down
+  if (!pidData || typeof pidData !== 'object') return 'N/A'
+  
+  const kp = pidData.kp !== undefined ? pidData.kp.toFixed(4) : 'N/A'
+  const ki = pidData.ki !== undefined ? pidData.ki.toFixed(4) : 'N/A'
+  const kd = pidData.kd !== undefined ? pidData.kd.toFixed(4) : 'N/A'
+  const setpoint = pidData.setpoint !== undefined ? pidData.setpoint.toFixed(2) : 'N/A'
+  const output = pidData.output !== undefined ? pidData.output.toFixed(2) : 'N/A'
+  
+  return `P:${kp} I:${ki} D:${kd} SP:${setpoint} Out:${output}`
 }
 
 async function handleNodeUpdate(updateData) {
@@ -366,6 +480,26 @@ onMounted(async () => {
   node.value = await nodesStore.fetchNode(nodeId)
   await loadTelemetry()
   await loadNodeErrors()
+  
+  // Загружаем события для узла, если их еще нет в store
+  try {
+    // Проверяем, есть ли события для этого узла в store
+    const existingEvents = eventsStore.events.filter(e => e.node_id === nodeId)
+    if (existingEvents.length === 0) {
+      // Загружаем события для конкретного узла через API
+      const newEvents = await api.getEvents({ node_id: nodeId })
+      
+      // Добавляем новые события в store, избегая дубликатов
+      const eventsMap = new Map(eventsStore.events.map(e => [e.id, e]))
+      newEvents.forEach(e => {
+        if (e.id && !eventsMap.has(e.id)) {
+          eventsStore.events.push(e)
+        }
+      })
+    }
+  } catch (error) {
+    console.warn('Failed to load events for node:', error)
+  }
 })
 </script>
 

@@ -157,7 +157,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { safeIncludes } from '@/utils/array-utils'
+import { safeIncludes } from '@/utils/array'
 
 const props = defineProps({
   node: {

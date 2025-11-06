@@ -1,24 +1,19 @@
-import { Ref, ComputedRef } from 'vue'
 import { defineStore } from 'pinia'
 import api from '@/services/api'
-import { useNodesStatus } from '@/composables/useNodeStatus'
+import { nodeStatusManager } from '@/services/NodeStatusManager'
+import type { Node } from '@/types/nodeStatus'
 
 export const useNodesStore = defineStore('nodes', {
   state: () => ({
-    nodes: [],
-    selectedNode: null,
+    nodes: [] as Node[],
+    selectedNode: null as Node | null,
     loading: false,
-    error: null,
+    error: null as string | null,
   }),
 
   getters: {
-    // Централизованная система статусов
-    status: (state) => {
-      return useNodesStatus({ value: state.nodes })
-    },
-
     // Get nodes by type
-    nodesByType: (state) => (type) => {
+    nodesByType: (state) => (type: string) => {
       return state.nodes.filter(node => node.node_type === type)
     },
 
@@ -33,17 +28,32 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     // Get node by ID
-    getNodeById: (state) => (nodeId) => {
+    getNodeById: (state) => (nodeId: string) => {
       return state.nodes.find(node => node.node_id === nodeId)
     },
 
     // Node count by type
     nodeCountByType: (state) => {
-      const counts: any = {}
+      const counts: Record<string, number> = {}
       state.nodes.forEach(node => {
         counts[node.node_type] = (counts[node.node_type] || 0) + 1
       })
       return counts
+    },
+
+    // Централизованная статистика через менеджер
+    statusStats: (state) => {
+      const stats = { online: 0, offline: 0, warning: 0, total: state.nodes.length }
+      state.nodes.forEach(node => {
+        const status = nodeStatusManager.calculateStatus(node)
+        if (status.isOnline) {
+          if (status.quality === 'poor') stats.warning++
+          else stats.online++
+        } else {
+          stats.offline++
+        }
+      })
+      return stats
     },
   },
 
@@ -54,6 +64,12 @@ export const useNodesStore = defineStore('nodes', {
       
       try {
         this.nodes = await api.getNodes(params)
+        
+        // Обновить статусы через менеджер
+        this.nodes.forEach(node => {
+          nodeStatusManager.updateNodeStatus(node.node_id, node)
+        })
+        
         return this.nodes
       } catch (error: any) {
         this.error = error.message
@@ -144,7 +160,7 @@ export const useNodesStore = defineStore('nodes', {
     },
 
     // Update node in real-time (from WebSocket or fallback polling)
-    updateNodeRealtime(nodeData) {
+    updateNodeRealtime(nodeData: Partial<Node>) {
       if (!nodeData || !nodeData.node_id) {
         console.warn('Invalid node data for real-time update:', nodeData)
         return
@@ -155,19 +171,28 @@ export const useNodesStore = defineStore('nodes', {
       if (index !== -1) {
         // Обновляем узел с данными из nodeData
         this.nodes[index] = {
-          ...(this as any).nodes[index],
-          ...(nodeData as any),
+          ...this.nodes[index],
+          ...nodeData,
         }
+        
+        // Уведомить менеджер об обновлении
+        nodeStatusManager.updateNodeStatus(
+          nodeData.node_id!,
+          this.nodes[index]
+        )
       } else {
         // Add new node
-        this.nodes.push(nodeData)
+        this.nodes.push(nodeData as Node)
+        if (nodeData.node_id) {
+          nodeStatusManager.updateNodeStatus(nodeData.node_id, nodeData as Node)
+        }
       }
       
       // Update selected node if it's the same
       if (this.selectedNode?.node_id === nodeData.node_id) {
         this.selectedNode = {
-          ...(this as any).selectedNode,
-          ...(nodeData as any),
+          ...this.selectedNode,
+          ...nodeData,
         }
       }
     },

@@ -1,12 +1,14 @@
 import { Ref, ComputedRef } from 'vue'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { usePopup } from './usePopup'
 
 /**
  * Composable для работы с офлайн режимом
  */
 export function useOfflineMode(): any {
   const appStore = useAppStore()
+  const popup = usePopup()
   const isOnline = ref<any>(navigator.onLine)
   const isOfflineMode = ref<any>(false)
   const offlineQueue = ref<any>([])
@@ -19,7 +21,7 @@ export function useOfflineMode(): any {
     isOfflineMode.value = false
     
     // Показываем уведомление о восстановлении связи
-    appStore.showSnackbar('Соединение восстановлено', 'success', 3000)
+    popup.toast.success('Соединение восстановлено')
     
     // Синхронизируем данные
     syncOfflineData()
@@ -31,7 +33,7 @@ export function useOfflineMode(): any {
     isOfflineMode.value = true
     
     // Показываем уведомление об офлайн режиме
-    appStore.showSnackbar('Работа в офлайн режиме', 'warning', 5000)
+    popup.toast.warning('Работа в офлайн режиме')
   }
 
   // Синхронизация офлайн данных
@@ -49,10 +51,10 @@ export function useOfflineMode(): any {
       
       // Очищаем очередь после успешной синхронизации
       offlineQueue.value = []
-      appStore.showSnackbar('Данные синхронизированы', 'success', 2000)
+      popup.toast.success('Данные синхронизированы')
     } catch (error: any) {
       console.error('❌ Sync failed:', error)
-      appStore.showSnackbar('Ошибка синхронизации', 'error', 3000)
+      popup.toast.error('Ошибка синхронизации')
     } finally {
       syncInProgress.value = false
     }

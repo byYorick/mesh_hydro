@@ -18,10 +18,12 @@ use Illuminate\Support\Facades\Schedule;
 // Scheduled Tasks (Планировщик задач)
 // ========================================
 
-// Проверка статуса узлов каждые 10 секунд
+// Проверка статуса узлов каждые 30 секунд (2x heartbeat интервал 10 сек)
+// Интервал увеличен чтобы не блокировать БД при частых запросах от фронтенда
 Schedule::command('nodes:check-status --notify')
-    ->everyTenSeconds()
-    ->withoutOverlapping();
+    ->everyThirtySeconds()
+    ->withoutOverlapping()
+    ->runInBackground(); // Запуск в фоне для неблокирующего выполнения
 
 // Очистка старых записей телеметрии раз в неделю
 Schedule::command('telemetry:cleanup --days=365')

@@ -10,8 +10,8 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
-    // Vue Devtools только в development режиме
-    mode === 'development' && VueDevtools(),
+    // Vue Devtools отключен из-за проблем с парсером
+    // mode === 'development' && VueDevtools(),
     vuetify({ autoImport: true }),
 
     // Auto-import components
@@ -119,10 +119,48 @@ export default defineConfig(({ mode }) => ({
   },
 
   server: {
-    port: 3000,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      host: 'localhost',
+      port: 5173,
+      clientPort: 5173
+    },
+    watch: {
+      usePolling: true, // Для лучшей работы на Windows
+      interval: 1000,
+      ignored: ['**/node_modules/**', '**/.git/**']
+    },
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'X-Accel-Buffering': 'no'
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: false,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.error('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying request:', req.method, req.url);
+          });
+        },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      },
+      '/app': {
+        target: 'http://reverb:8080',
+        ws: true,
         changeOrigin: true
       }
     }
@@ -130,7 +168,7 @@ export default defineConfig(({ mode }) => ({
 
   build: {
     target: 'esnext',
-    minify: false, // Отключить минификацию для development
+    minify: mode !== 'development', // Отключить минификацию для development
     sourcemap: true, // Включить source maps для отладки
     rollupOptions: {
       output: {
@@ -141,10 +179,16 @@ export default defineConfig(({ mode }) => ({
           'vendor-utils': ['axios', 'date-fns', '@vueuse/core'],
           'vendor-realtime': ['laravel-echo', 'pusher-js', 'socket.io-client']
         },
-        // Полное отключение hash - предотвращает кеширование
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        // Добавляем timestamp для предотвращения кеширования в development
+        ...(mode === 'development' ? {
+          entryFileNames: `assets/[name]-[hash].js`,
+          chunkFileNames: `assets/[name]-[hash].js`,
+          assetFileNames: `assets/[name]-[hash].[ext]`
+        } : {
+          entryFileNames: 'assets/[name].js',
+          chunkFileNames: 'assets/[name].js',
+          assetFileNames: 'assets/[name].[ext]'
+        })
       }
     },
     chunkSizeWarningLimit: 1000,
@@ -168,6 +212,18 @@ export default defineConfig(({ mode }) => ({
       'vue-chartjs',
       'date-fns',
       '@vueuse/core'
-    ]
-  }
+    ],
+    force: mode === 'development', // Принудительно пересобирать зависимости в development
+    esbuildOptions: {
+      // Отключить кеширование для development
+      ...(mode === 'development' && {
+        logOverride: { 'this-is-undefined-in-esm': 'silent' }
+      })
+    }
+  },
+
+  // Отключить кеширование для development - используем временную директорию
+  ...(mode === 'development' && {
+    cacheDir: '.vite-dev-cache' // Временная директория для кеша в development
+  })
 }))

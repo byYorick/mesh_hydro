@@ -25,6 +25,7 @@ Route::middleware('throttle:api')->group(function () {
     // Dashboard и система
     Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
     Route::get('/status', [DashboardController::class, 'status']);
+    Route::get('/status/thresholds', [\App\Http\Controllers\StatusController::class, 'thresholds']);
     Route::get('/health', function () {
         return response()->json([
             'status' => 'ok',

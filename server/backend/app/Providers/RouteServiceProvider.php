@@ -23,6 +23,13 @@ class RouteServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('api', function (Request $request) {
+            // Для dev окружения - очень большой лимит (почти без ограничений)
+            // Для production - нормальный лимит
+            if (app()->environment('local', 'dev', 'testing')) {
+                // 1000 запросов в минуту для dev (практически без ограничений)
+                return Limit::perMinute(1000)->by($request->ip());
+            }
+            // 60 запросов в минуту для production
             return Limit::perMinute(60)->by($request->ip());
         });
 

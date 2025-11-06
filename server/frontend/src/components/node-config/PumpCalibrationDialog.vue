@@ -170,7 +170,7 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useNodeConfigStore } from '@/stores/nodeConfig'
-import { useSnackbar } from '@/composables/useSnackbar'
+import { usePopup } from '@/composables/usePopup'
 
 const props = defineProps({
   modelValue: {
@@ -195,7 +195,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'calibrated'])
 
 const configStore = useNodeConfigStore()
-const { showSuccess, showError } = useSnackbar()
+const popup = usePopup()
 
 const dialog = computed({
   get: () => props.modelValue,
@@ -322,7 +322,7 @@ async function startCalibration() {
 
     calibrationResult.value = result
     const mlPerSec = result?.ml_per_second || result?.calibration?.ml_per_second || 0
-    showSuccess(`Насос откалиброван: ${Number(mlPerSec).toFixed(2)} мл/сек`)
+    popup.toast.success(`Насос откалиброван: ${Number(mlPerSec).toFixed(2)} мл/сек`)
     
     emit('calibrated', result)
   } catch (err) {
@@ -334,7 +334,7 @@ async function startCalibration() {
     
     error.value = err.message || 'Ошибка калибровки'
     isCalibrating.value = false
-    showError('Не удалось откалибровать насос')
+    popup.toast.error('Не удалось откалибровать насос')
   }
 }
 </script>

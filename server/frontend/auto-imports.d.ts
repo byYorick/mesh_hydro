@@ -37,12 +37,10 @@ declare global {
   const defineExpose: typeof import('vue')['defineExpose']
   const defineProps: typeof import('vue')['defineProps']
   const defineStore: typeof import('pinia')['defineStore']
-  const dialogManager: typeof import('./src/composables/useDialog')['dialogManager']
   const eagerComputed: typeof import('@vueuse/core')['eagerComputed']
   const effectScope: typeof import('vue')['effectScope']
   const errorHandler: typeof import('./src/utils/error-handler')['default']
   const extendRef: typeof import('@vueuse/core')['extendRef']
-  const first: typeof import('./src/utils/array-utils')['first']
   const formatDate: typeof import('./src/utils/time')['formatDate']
   const formatDateTime: typeof import('./src/utils/time')['formatDateTime']
   const formatDistanceToNow: typeof import('./src/utils/time')['formatDistanceToNow']
@@ -59,14 +57,11 @@ declare global {
   const injectLocal: typeof import('@vueuse/core')['injectLocal']
   const isArray: typeof import('./src/utils/array')['isArray']
   const isDefined: typeof import('@vueuse/core')['isDefined']
-  const isEmpty: typeof import('./src/utils/array-utils')['isEmpty']
   const isNonEmptyArray: typeof import('./src/utils/array')['isNonEmptyArray']
-  const isNotEmpty: typeof import('./src/utils/array-utils')['isNotEmpty']
   const isProxy: typeof import('vue')['isProxy']
   const isReactive: typeof import('vue')['isReactive']
   const isReadonly: typeof import('vue')['isReadonly']
   const isRef: typeof import('vue')['isRef']
-  const last: typeof import('./src/utils/array-utils')['last']
   const logApi: typeof import('./src/utils/logger')['logApi']
   const logComponent: typeof import('./src/utils/logger')['logComponent']
   const logDebug: typeof import('./src/utils/logger')['logDebug']
@@ -105,6 +100,7 @@ declare global {
   const onUpdated: typeof import('vue')['onUpdated']
   const onWatcherCleanup: typeof import('vue')['onWatcherCleanup']
   const pausableWatch: typeof import('@vueuse/core')['pausableWatch']
+  const popupManager: typeof import('./src/composables/usePopup')['popupManager']
   const provide: typeof import('vue')['provide']
   const provideLocal: typeof import('@vueuse/core')['provideLocal']
   const reactify: typeof import('@vueuse/core')['reactify']
@@ -127,7 +123,6 @@ declare global {
   const safeFilter: typeof import('./src/utils/array')['safeFilter']
   const safeFind: typeof import('./src/utils/array')['safeFind']
   const safeFirst: typeof import('./src/utils/array')['safeFirst']
-  const safeGet: typeof import('./src/utils/array-utils')['safeGet']
   const safeIncludes: typeof import('./src/utils/array')['safeIncludes']
   const safeIsEmpty: typeof import('./src/utils/array')['safeIsEmpty']
   const safeLast: typeof import('./src/utils/array')['safeLast']
@@ -205,7 +200,6 @@ declare global {
   const useDeviceOrientation: typeof import('@vueuse/core')['useDeviceOrientation']
   const useDevicePixelRatio: typeof import('@vueuse/core')['useDevicePixelRatio']
   const useDevicesList: typeof import('@vueuse/core')['useDevicesList']
-  const useDialog: typeof import('./src/composables/useDialog')['useDialog']
   const useDisplayMedia: typeof import('@vueuse/core')['useDisplayMedia']
   const useDocumentVisibility: typeof import('@vueuse/core')['useDocumentVisibility']
   const useDraggable: typeof import('@vueuse/core')['useDraggable']
@@ -257,8 +251,7 @@ declare global {
   const useNavigatorLanguage: typeof import('@vueuse/core')['useNavigatorLanguage']
   const useNetwork: typeof import('@vueuse/core')['useNetwork']
   const useNodeConfigStore: typeof import('./src/stores/nodeConfig.js')['useNodeConfigStore']
-  const useNodeStatus: typeof import('./src/composables/useNodeStatus')['useNodeStatus']
-  const useNodesStatus: typeof import('./src/composables/useNodeStatus')['useNodesStatus']
+  const useNodeStatusV2: typeof import('./src/composables/useNodeStatusV2')['useNodeStatusV2']
   const useNodesStore: typeof import('./src/stores/nodes')['useNodesStore']
   const useNow: typeof import('@vueuse/core')['useNow']
   const useObjectUrl: typeof import('@vueuse/core')['useObjectUrl']
@@ -273,6 +266,7 @@ declare global {
   const usePointer: typeof import('@vueuse/core')['usePointer']
   const usePointerLock: typeof import('@vueuse/core')['usePointerLock']
   const usePointerSwipe: typeof import('@vueuse/core')['usePointerSwipe']
+  const usePopup: typeof import('./src/composables/usePopup')['usePopup']
   const usePreferredColorScheme: typeof import('@vueuse/core')['usePreferredColorScheme']
   const usePreferredContrast: typeof import('@vueuse/core')['usePreferredContrast']
   const usePreferredDark: typeof import('@vueuse/core')['usePreferredDark']
@@ -295,7 +289,6 @@ declare global {
   const useSettingsStore: typeof import('./src/stores/settings.js')['useSettingsStore']
   const useShare: typeof import('@vueuse/core')['useShare']
   const useSlots: typeof import('vue')['useSlots']
-  const useSnackbar: typeof import('./src/composables/useSnackbar.js')['useSnackbar']
   const useSorted: typeof import('@vueuse/core')['useSorted']
   const useSpeechRecognition: typeof import('@vueuse/core')['useSpeechRecognition']
   const useSpeechSynthesis: typeof import('@vueuse/core')['useSpeechSynthesis']
@@ -403,12 +396,10 @@ declare module 'vue' {
     readonly defineExpose: UnwrapRef<typeof import('vue')['defineExpose']>
     readonly defineProps: UnwrapRef<typeof import('vue')['defineProps']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
-    readonly dialogManager: UnwrapRef<typeof import('./src/composables/useDialog')['dialogManager']>
     readonly eagerComputed: UnwrapRef<typeof import('@vueuse/core')['eagerComputed']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly errorHandler: UnwrapRef<typeof import('./src/utils/error-handler')['default']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
-    readonly first: UnwrapRef<typeof import('./src/utils/array-utils')['first']>
     readonly formatDate: UnwrapRef<typeof import('./src/utils/time')['formatDate']>
     readonly formatDateTime: UnwrapRef<typeof import('./src/utils/time')['formatDateTime']>
     readonly formatDistanceToNow: UnwrapRef<typeof import('./src/utils/time')['formatDistanceToNow']>
@@ -425,14 +416,11 @@ declare module 'vue' {
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
     readonly isArray: UnwrapRef<typeof import('./src/utils/array')['isArray']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
-    readonly isEmpty: UnwrapRef<typeof import('./src/utils/array-utils')['isEmpty']>
     readonly isNonEmptyArray: UnwrapRef<typeof import('./src/utils/array')['isNonEmptyArray']>
-    readonly isNotEmpty: UnwrapRef<typeof import('./src/utils/array-utils')['isNotEmpty']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
-    readonly last: UnwrapRef<typeof import('./src/utils/array-utils')['last']>
     readonly logApi: UnwrapRef<typeof import('./src/utils/logger')['logApi']>
     readonly logComponent: UnwrapRef<typeof import('./src/utils/logger')['logComponent']>
     readonly logDebug: UnwrapRef<typeof import('./src/utils/logger')['logDebug']>
@@ -471,6 +459,7 @@ declare module 'vue' {
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
+    readonly popupManager: UnwrapRef<typeof import('./src/composables/usePopup')['popupManager']>
     readonly provide: UnwrapRef<typeof import('vue')['provide']>
     readonly provideLocal: UnwrapRef<typeof import('@vueuse/core')['provideLocal']>
     readonly reactify: UnwrapRef<typeof import('@vueuse/core')['reactify']>
@@ -493,7 +482,6 @@ declare module 'vue' {
     readonly safeFilter: UnwrapRef<typeof import('./src/utils/array')['safeFilter']>
     readonly safeFind: UnwrapRef<typeof import('./src/utils/array')['safeFind']>
     readonly safeFirst: UnwrapRef<typeof import('./src/utils/array')['safeFirst']>
-    readonly safeGet: UnwrapRef<typeof import('./src/utils/array-utils')['safeGet']>
     readonly safeIncludes: UnwrapRef<typeof import('./src/utils/array')['safeIncludes']>
     readonly safeIsEmpty: UnwrapRef<typeof import('./src/utils/array')['safeIsEmpty']>
     readonly safeLast: UnwrapRef<typeof import('./src/utils/array')['safeLast']>
@@ -571,7 +559,6 @@ declare module 'vue' {
     readonly useDeviceOrientation: UnwrapRef<typeof import('@vueuse/core')['useDeviceOrientation']>
     readonly useDevicePixelRatio: UnwrapRef<typeof import('@vueuse/core')['useDevicePixelRatio']>
     readonly useDevicesList: UnwrapRef<typeof import('@vueuse/core')['useDevicesList']>
-    readonly useDialog: UnwrapRef<typeof import('./src/composables/useDialog')['useDialog']>
     readonly useDisplayMedia: UnwrapRef<typeof import('@vueuse/core')['useDisplayMedia']>
     readonly useDocumentVisibility: UnwrapRef<typeof import('@vueuse/core')['useDocumentVisibility']>
     readonly useDraggable: UnwrapRef<typeof import('@vueuse/core')['useDraggable']>
@@ -623,8 +610,7 @@ declare module 'vue' {
     readonly useNavigatorLanguage: UnwrapRef<typeof import('@vueuse/core')['useNavigatorLanguage']>
     readonly useNetwork: UnwrapRef<typeof import('@vueuse/core')['useNetwork']>
     readonly useNodeConfigStore: UnwrapRef<typeof import('./src/stores/nodeConfig.js')['useNodeConfigStore']>
-    readonly useNodeStatus: UnwrapRef<typeof import('./src/composables/useNodeStatus')['useNodeStatus']>
-    readonly useNodesStatus: UnwrapRef<typeof import('./src/composables/useNodeStatus')['useNodesStatus']>
+    readonly useNodeStatusV2: UnwrapRef<typeof import('./src/composables/useNodeStatusV2')['useNodeStatusV2']>
     readonly useNodesStore: UnwrapRef<typeof import('./src/stores/nodes')['useNodesStore']>
     readonly useNow: UnwrapRef<typeof import('@vueuse/core')['useNow']>
     readonly useObjectUrl: UnwrapRef<typeof import('@vueuse/core')['useObjectUrl']>
@@ -639,6 +625,7 @@ declare module 'vue' {
     readonly usePointer: UnwrapRef<typeof import('@vueuse/core')['usePointer']>
     readonly usePointerLock: UnwrapRef<typeof import('@vueuse/core')['usePointerLock']>
     readonly usePointerSwipe: UnwrapRef<typeof import('@vueuse/core')['usePointerSwipe']>
+    readonly usePopup: UnwrapRef<typeof import('./src/composables/usePopup')['usePopup']>
     readonly usePreferredColorScheme: UnwrapRef<typeof import('@vueuse/core')['usePreferredColorScheme']>
     readonly usePreferredContrast: UnwrapRef<typeof import('@vueuse/core')['usePreferredContrast']>
     readonly usePreferredDark: UnwrapRef<typeof import('@vueuse/core')['usePreferredDark']>
@@ -661,11 +648,9 @@ declare module 'vue' {
     readonly useSettingsStore: UnwrapRef<typeof import('./src/stores/settings.js')['useSettingsStore']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
-    readonly useSnackbar: UnwrapRef<typeof import('./src/composables/useSnackbar.js')['useSnackbar']>
     readonly useSorted: UnwrapRef<typeof import('@vueuse/core')['useSorted']>
     readonly useSpeechRecognition: UnwrapRef<typeof import('@vueuse/core')['useSpeechRecognition']>
     readonly useSpeechSynthesis: UnwrapRef<typeof import('@vueuse/core')['useSpeechSynthesis']>
-    readonly useStatusBarStore: UnwrapRef<typeof import('./src/stores/statusBar.js')['useStatusBarStore']>
     readonly useStepper: UnwrapRef<typeof import('@vueuse/core')['useStepper']>
     readonly useStorage: UnwrapRef<typeof import('@vueuse/core')['useStorage']>
     readonly useStorageAsync: UnwrapRef<typeof import('@vueuse/core')['useStorageAsync']>

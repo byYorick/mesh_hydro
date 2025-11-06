@@ -33,9 +33,12 @@ declare module 'vue' {
     NodeStatusIndicator: typeof import('./src/components/ui/NodeStatusIndicator.vue')['default']
     PhDetail: typeof import('./src/components/detail/PhDetail.vue')['default']
     PhNode: typeof import('./src/components/PhNode.vue')['default']
+    PopupDialog: typeof import('./src/components/ui/PopupDialog.vue')['default']
+    PopupToast: typeof import('./src/components/ui/PopupToast.vue')['default']
     PullToRefreshIndicator: typeof import('./src/components/ui/PullToRefreshIndicator.vue')['default']
     PumpCalibrationDialog: typeof import('./src/components/node-config/PumpCalibrationDialog.vue')['default']
     QuickAddNode: typeof import('./src/components/QuickAddNode.vue')['default']
+    RootDetail: typeof import('./src/components/detail/RootDetail.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScheduleManager: typeof import('./src/components/ScheduleManager.vue')['default']
@@ -45,6 +48,6 @@ declare module 'vue' {
     SystemStatusCard: typeof import('./src/components/SystemStatusCard.vue')['default']
     TelegramSetupGuide: typeof import('./src/components/TelegramSetupGuide.vue')['default']
     TelemetryChart: typeof import('./src/components/TelemetryChart.vue')['default']
-    UniversalDialog: typeof import('./src/components/ui/UniversalDialog.vue')['default']
+    UniversalPopup: typeof import('./src/components/ui/UniversalPopup.vue')['default']
   }
 }

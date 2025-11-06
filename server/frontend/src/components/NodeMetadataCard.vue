@@ -150,7 +150,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDateTime, formatDate } from '@/utils/time'
-import { safeIncludes } from '@/utils/array-utils'
+import { safeIncludes } from '@/utils/array'
 
 const props = defineProps({
   node: {

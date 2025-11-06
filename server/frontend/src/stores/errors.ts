@@ -72,7 +72,15 @@ export const useErrorsStore = defineStore('errors', {
       
       try {
         const response = await api.getNodeErrors(nodeId, params)
-        return response || []
+        // Бэкенд возвращает объект {node_id, count, errors} или массив напрямую
+        const errors = Array.isArray(response) ? response : (response?.errors || response || [])
+        
+        if (!Array.isArray(errors)) {
+          console.warn('⚠️ fetchNodeErrors: Expected array, got:', typeof errors, errors)
+          return []
+        }
+        
+        return errors
       } catch (error: any) {
         this.error = error.message
         console.error('Error fetching node errors:', error)

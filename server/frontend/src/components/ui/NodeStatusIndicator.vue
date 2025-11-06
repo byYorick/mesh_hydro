@@ -57,8 +57,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useNodeStatus } from '@/composables/useNodeStatus'
-import { ref } from 'vue'
+import { useNodeStatusV2 } from '@/composables/useNodeStatusV2'
 
 const props = defineProps({
   node: {
@@ -68,8 +67,8 @@ const props = defineProps({
 })
 
 // Используем composable для статуса
-const nodeRef = ref(props.node)
-const status = useNodeStatus(nodeRef)
+const nodeRef = computed(() => props.node)
+const status = useNodeStatusV2(nodeRef)
 
 // Деструктуризация статуса
 const {
@@ -104,7 +103,7 @@ const qualityText = computed(() => {
 
 // Процент времени до офлайна (для прогресс-бара)
 const timeUntilOfflinePercent = computed(() => {
-  const timeout = 20 // 20 секунд таймаут
+  const timeout = 30 // 30 секунд таймаут (синхронизировано с backend)
   return (timeUntilOffline.value / timeout) * 100
 })
 

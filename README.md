@@ -21,11 +21,9 @@ IoT система управления гидропонной установк�
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Установка и настройка
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Быстрая справка
 
-### 📊 Отчеты и логи
+### 📊 Отчеты
 - **[PRODUCTION_CHANGES_LOG.md](PRODUCTION_CHANGES_LOG.md)** - История изменений
 - **[CODE_AUDIT_REPORT.md](CODE_AUDIT_REPORT.md)** - Аудит кода
-- **[MQTT_FIX_LOG.md](MQTT_FIX_LOG.md)** - Исправления MQTT
-- **[GPIO_UPDATE_SUMMARY.md](GPIO_UPDATE_SUMMARY.md)** - Обновления GPIO
 
 ### 💡 Frontend
 - **[server/frontend/DIALOG_SYSTEM.md](server/frontend/DIALOG_SYSTEM.md)** - Система диалогов

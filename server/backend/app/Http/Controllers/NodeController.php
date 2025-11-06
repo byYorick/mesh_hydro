@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Node;
 use App\Models\Command;
+use App\Models\Telemetry;
 use App\Services\MqttService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,6 +12,7 @@ use App\Http\Requests\StoreNodeRequest;
 use App\Http\Requests\UpdateNodeRequest;
 use App\Http\Requests\SendCommandRequest;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class NodeController extends Controller
 {
@@ -35,8 +37,9 @@ class NodeController extends Controller
             }
         }
 
-        // Загрузка последней телеметрии с appends
-        $nodes = $query->with(['lastTelemetry'])->get();
+        // Оптимизированная загрузка узлов с последней телеметрией
+        // Используем eager loading для избежания N+1 запросов
+        $nodes = $query->with('lastTelemetry')->get();
 
         // Добавление вычисляемых полей для каждого узла
         $nodes->each(function ($node) {
@@ -44,6 +47,11 @@ class NodeController extends Controller
             $node->online = $node->isOnline();
             $node->status_color = $node->status_color;
             $node->icon = $node->icon;
+            
+            // Добавляем last_telemetry для совместимости со старым форматом
+            $node->last_telemetry = $node->lastTelemetry;
+            // Также добавляем last_data для обратной совместимости
+            $node->last_data = $node->lastTelemetry?->data;
         });
 
         return response()->json($nodes);

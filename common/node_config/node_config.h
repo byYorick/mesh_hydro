@@ -106,6 +106,9 @@ typedef struct {
     
     // Калибровка датчика pH
     float ph_cal_offset;
+    
+    // Режим работы датчика pH
+    uint8_t sensor_mode;  ///< 0=реальный, 1=mock с реакцией, 2=mock без реакции
 } ph_node_config_t;
 
 // Конфигурация EC узла (только EC, 3 насоса)

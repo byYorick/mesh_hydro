@@ -85,7 +85,7 @@
 import { computed, ref } from 'vue'
 import { formatDateTime, formatDistanceToNow } from '@/utils/time'
 import { useVirtualList } from '@/composables/useVirtualList'
-import { safeIncludes } from '@/utils/array-utils'
+import { safeIncludes } from '@/utils/array'
 
 const props = defineProps({
   events: {

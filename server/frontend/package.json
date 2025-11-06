@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --force",
+    "dev:clear": "rm -rf .vite-dev-cache node_modules/.vite && vite --force",
     "build": "vite build",
     "build:tsc": "vue-tsc && vite build",
     "preview": "vite preview",

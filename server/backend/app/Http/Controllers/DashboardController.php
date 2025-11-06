@@ -17,33 +17,56 @@ class DashboardController extends Controller
      */
     public function summary(): JsonResponse
     {
-        // Кэшируем данные на 10 секунд для производительности
-        $summary = Cache::remember('dashboard.summary', 10, function () {
-            // Статистика узлов
-            $totalNodes = Node::count();
-            $onlineNodes = Node::online()->count();
-            $offlineNodes = Node::offline()->count();
+        // Кэшируем данные на 15 секунд для производительности (больше чем scheduler интервал)
+        $summary = Cache::remember('dashboard.summary', 15, function () {
+            // Статистика узлов - оптимизированно через один запрос
+            $nodesStats = DB::table('nodes')
+                ->selectRaw('
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE last_seen_at > NOW() - INTERVAL \'30 seconds\') as online,
+                    COUNT(*) FILTER (WHERE last_seen_at IS NULL OR last_seen_at <= NOW() - INTERVAL \'30 seconds\') as offline
+                ')
+                ->first();
+            
+            $totalNodes = $nodesStats->total ?? 0;
+            $onlineNodes = $nodesStats->online ?? 0;
+            $offlineNodes = $nodesStats->offline ?? 0;
 
-            $nodesByType = Node::select('node_type', DB::raw('COUNT(*) as count'))
+            // Статистика по типам узлов - оптимизированный запрос
+            $nodesByType = DB::table('nodes')
+                ->select('node_type', DB::raw('COUNT(*) as count'))
                 ->groupBy('node_type')
                 ->pluck('count', 'node_type');
 
-            // Статистика событий
-            $activeEvents = Event::active()->count();
-            $criticalEvents = Event::active()->critical()->count();
+            // Статистика событий - оптимизированные запросы
+            $activeEvents = DB::table('events')
+                ->whereNull('resolved_at')
+                ->count();
+            
+            $criticalEvents = DB::table('events')
+                ->whereNull('resolved_at')
+                ->whereIn('level', ['critical', 'emergency'])
+                ->count();
 
-            // Оптимизировано: убрали map() - accessors работают автоматически
+            // Последние события - с eager loading для избежания N+1
             $recentEvents = Event::with('node')
                 ->latest()
                 ->limit(10)
                 ->get();
 
-            // Статистика команд за последние 24 часа
-            $commandsToday = Command::where('created_at', '>', now()->subDay())->count();
-            $commandsPending = Command::pending()->count();
+            // Статистика команд - оптимизированные запросы
+            $commandsToday = DB::table('commands')
+                ->where('created_at', '>', now()->subDay())
+                ->count();
+            
+            $commandsPending = DB::table('commands')
+                ->where('status', 'pending')
+                ->count();
 
-            // Телеметрия за последний час
-            $telemetryLastHour = Telemetry::where('received_at', '>', now()->subHour())->count();
+            // Телеметрия за последний час - оптимизированный запрос
+            $telemetryLastHour = DB::table('telemetry')
+                ->where('received_at', '>', now()->subHour())
+                ->count();
 
             // Последняя телеметрия от каждого узла
             $latestTelemetry = Node::with('lastTelemetry')
@@ -100,41 +123,27 @@ class DashboardController extends Controller
             $dbStatus = 'error: ' . $e->getMessage();
         }
 
-        // Проверка MQTT - через последнюю активность
+        // Проверка MQTT - через последнюю активность (быстро, без socket проверки)
         $mqttStatus = 'disconnected';
         try {
-            // Проверяем, есть ли телеметрия за последние 2 минуты
-            $recentTelemetry = Telemetry::where('received_at', '>', now()->subMinutes(2))->count();
+            // Проверяем, есть ли хотя бы одна телеметрия за последние 2 минуты (limit(1) быстрее чем count())
+            $recentTelemetry = Telemetry::where('received_at', '>', now()->subMinutes(2))->limit(1)->exists();
             
             // Если есть свежая телеметрия - MQTT работает
-            if ($recentTelemetry > 0) {
+            if ($recentTelemetry) {
                 $mqttStatus = 'connected';
-            } else {
-                // Проверяем через socket напрямую
-                $mqttHost = config('mqtt.host', '127.0.0.1');
-                $mqttPort = config('mqtt.port', 1883);
-                
-                $socket = @fsockopen($mqttHost, $mqttPort, $errno, $errstr, 1);
-                if ($socket) {
-                    $mqttStatus = 'connected';
-                    fclose($socket);
-                } else {
-                    $mqttStatus = 'disconnected';
-                }
             }
+            // Если нет свежей телеметрии - считаем disconnected (без медленной socket проверки)
         } catch (\Exception $e) {
             $mqttStatus = 'error';
         }
 
-        // Проверка Telegram
+        // Проверка Telegram (быстрая - только проверка конфигурации, без внешних запросов)
         $telegramStatus = 'disabled';
-        if (config('telegram.enabled', true)) {
-            try {
-                $telegram = app(\App\Services\TelegramService::class);
-                $telegramStatus = $telegram->checkConnection() ? 'ok' : 'error';
-            } catch (\Exception $e) {
-                $telegramStatus = 'error: ' . $e->getMessage();
-            }
+        if (config('telegram.enabled', false)) {
+            // Проверяем только наличие токена (быстро), без реальной проверки соединения
+            $telegramToken = config('telegram.bot_token');
+            $telegramStatus = !empty($telegramToken) ? 'configured' : 'not_configured';
         }
 
         // Информация о системе
@@ -161,13 +170,38 @@ class DashboardController extends Controller
     {
         if (PHP_OS_FAMILY === 'Linux') {
             try {
-                $uptime = shell_exec('uptime -p');
-                return trim($uptime);
+                // Читаем /proc/uptime напрямую (быстрее и надежнее для Alpine/BusyBox)
+                $uptimeFile = '/proc/uptime';
+                if (file_exists($uptimeFile)) {
+                    $content = file_get_contents($uptimeFile);
+                    if ($content !== false) {
+                        $uptimeSeconds = (float)explode(' ', trim($content))[0];
+                        return $this->formatUptime($uptimeSeconds);
+                    }
+                }
+                return null;
             } catch (\Exception $e) {
                 return null;
             }
         }
         return null;
+    }
+
+    /**
+     * Форматировать секунды в читаемый uptime
+     */
+    private function formatUptime(float $seconds): string
+    {
+        $days = floor($seconds / 86400);
+        $hours = floor(($seconds % 86400) / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        
+        $parts = [];
+        if ($days > 0) $parts[] = "{$days} day" . ($days > 1 ? 's' : '');
+        if ($hours > 0) $parts[] = "{$hours} hour" . ($hours > 1 ? 's' : '');
+        if ($minutes > 0 && $days === 0) $parts[] = "{$minutes} minute" . ($minutes > 1 ? 's' : '');
+        
+        return 'up ' . implode(', ', $parts);
     }
 }
 

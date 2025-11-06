@@ -20,7 +20,13 @@ return [
     */
     
     // Таймаут офлайн узла (секунды)
-    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 45), // 45 сек (больше интервала телеметрии 30 сек)
+    // ⚠️ ВАЖНО: Должен быть в 3 раза больше интервала heartbeat (10 сек)
+    // Формула: timeout >= heartbeat_interval * 3 для надежности
+    'node_offline_timeout' => env('NODE_OFFLINE_TIMEOUT', 30), // 30 сек (3x heartbeat интервал 10 сек)
+    
+    // Интервал heartbeat от ESP32 узлов (секунды)
+    // Используется для расчета таймаутов и проверок
+    'heartbeat_interval' => env('HEARTBEAT_INTERVAL', 10), // 10 секунд
     
     // Поддерживаемые типы узлов
     'node_types' => [

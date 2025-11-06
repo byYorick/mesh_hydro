@@ -9,6 +9,7 @@ idf_component_register(
         pump_events
         mesh_manager
         mesh_protocol
+        mesh_config
         node_config
         esp_wifi
         json

@@ -19,6 +19,13 @@ extern "C" {
 // I2C адрес Trema pH sensor
 #define PH_SENSOR_ADDR 0x4D
 
+// Режимы работы датчика pH
+typedef enum {
+    PH_SENSOR_MODE_REAL = 0,              ///< Реальный датчик
+    PH_SENSOR_MODE_MOCK_REACTIVE = 1,     ///< Mock с реакцией на дозирование
+    PH_SENSOR_MODE_MOCK_NON_REACTIVE = 2  ///< Mock без реакции (предопределенная последовательность)
+} ph_sensor_mode_t;
+
 /**
  * @brief Инициализация pH сенсора
  * 
@@ -71,6 +78,32 @@ bool ph_sensor_is_mock_mode(void);
  * @return ESP_OK при успехе
  */
 esp_err_t ph_sensor_force_mock_mode(bool enable);
+
+/**
+ * @brief Обновление mock значения pH на основе дозирования
+ * 
+ * Имитирует изменение pH при дозировании в mock режиме
+ * 
+ * @param pump_id ID насоса (PUMP_PH_UP или PUMP_PH_DOWN)
+ * @param dose_ml Доза в мл
+ * @return ESP_OK при успехе
+ */
+esp_err_t ph_sensor_update_mock_for_dosing(uint8_t pump_id, float dose_ml);
+
+/**
+ * @brief Установка режима работы датчика pH
+ * 
+ * @param mode Режим работы (PH_SENSOR_MODE_REAL, PH_SENSOR_MODE_MOCK_REACTIVE, PH_SENSOR_MODE_MOCK_NON_REACTIVE)
+ * @return ESP_OK при успехе
+ */
+esp_err_t ph_sensor_set_mode(ph_sensor_mode_t mode);
+
+/**
+ * @brief Получение текущего режима работы датчика pH
+ * 
+ * @return Текущий режим работы
+ */
+ph_sensor_mode_t ph_sensor_get_mode(void);
 
 #ifdef __cplusplus
 }

@@ -96,6 +96,10 @@ typedef struct {
     float adaptation_rate;              ///< Скорость адаптации (0.0-1.0)
     uint32_t stable_count;              ///< Счётчик стабильных итераций
     
+    // Защита от windup
+    uint32_t persistent_error_count;    ///< Счётчик длительных ошибок
+    float last_error_sign;              ///< Знак предыдущей ошибки
+    
     // Статистика
     pid_stats_t stats;
     

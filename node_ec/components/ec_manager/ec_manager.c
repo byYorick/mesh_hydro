@@ -11,6 +11,7 @@
 #include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
+#include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -183,11 +184,18 @@ static void main_task(void *arg) {
 
 // Heartbeat задача
 static void heartbeat_task(void *arg) {
-    ESP_LOGI(TAG, "Heartbeat task started");
+    ESP_LOGI(TAG, "Heartbeat task started (interval: %d ms)", HEARTBEAT_INTERVAL_MS);
+    
+    // Начальная задержка перед первым heartbeat
+    vTaskDelay(pdMS_TO_TICKS(5000));
     
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(60000)); // Каждую минуту
-        send_heartbeat();
+        if (mesh_manager_is_connected()) {
+            send_heartbeat();
+        }
+        
+        // Используем единый интервал из mesh_config.h (10 сек)
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
     }
 }
 

@@ -140,8 +140,9 @@ esp_err_t pump_controller_run_dose(pump_id_t pump, float dose_ml) {
         duration_ms = MAX_RUN_TIME_MS;
     }
     
-    ESP_LOGI(TAG, "Pump %d: dose %.2f ml = %lu ms", 
-             pump, dose_ml, (unsigned long)duration_ms);
+    const char *pump_name = (pump == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
+    ESP_LOGI(TAG, "Насос %s: %.1f мл (%lu мс)", 
+             pump_name, dose_ml, (unsigned long)duration_ms);
     
     return pump_start_internal(pump, duration_ms);
 }
@@ -221,7 +222,10 @@ static esp_err_t pump_start_internal(pump_id_t pump, uint32_t duration_ms) {
         return ESP_ERR_INVALID_STATE;
     }
     
-    ESP_LOGI(TAG, "Pump %d START (%lu ms) GPIO=%d duty=100%%", pump, (unsigned long)duration_ms, PUMP_GPIO[pump]);
+    const char *pump_name = (pump == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
+    ESP_LOGI(TAG, "Насос %s запущен: %.1f мл (%lu мс) GPIO=%d", 
+             pump_name, (float)duration_ms * s_pumps[pump].ml_per_sec / 1000.0f, 
+             (unsigned long)duration_ms, PUMP_GPIO[pump]);
     
     // Включение PWM (100% duty)
     ESP_ERROR_CHECK(ledc_set_duty(PWM_MODE, (ledc_channel_t)pump, PWM_MAX_DUTY));
@@ -263,8 +267,9 @@ static esp_err_t pump_stop_internal(pump_id_t pump) {
     float ml = (actual_time / 1000.0f) * s_pumps[pump].ml_per_sec;
     s_pumps[pump].stats.total_ml += ml;
     
-    ESP_LOGI(TAG, "Pump %d STOP (%.2f ml, %llu ms) GPIO=%d", 
-             pump, ml, (unsigned long long)actual_time, PUMP_GPIO[pump]);
+    const char *pump_name = (pump == PUMP_PH_UP) ? "pH UP" : "pH DOWN";
+    ESP_LOGI(TAG, "Насос %s остановлен: %.1f мл (%llu мс) GPIO=%d", 
+             pump_name, ml, (unsigned long long)actual_time, PUMP_GPIO[pump]);
     
     s_pumps[pump].is_running = false;
     

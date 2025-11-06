@@ -72,6 +72,11 @@ export default createVuetify({
       variant: 'outlined',
       density: 'comfortable',
       color: 'primary'
+    },
+    VSnackbar: {
+      location: 'bottom right',
+      // Убеждаемся, что все snackbar по умолчанию внизу справа
+      // Только event-notification будет использоваться
     }
   }
 })

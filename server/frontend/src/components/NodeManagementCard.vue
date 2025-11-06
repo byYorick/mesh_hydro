@@ -30,7 +30,7 @@
 
         <v-list-item>
           <v-list-item-title>MAC адрес</v-list-item-title>
-          <v-list-item-subtitle>{{ node.mac_address || 'Не указан' }}</v-list-item-subtitle>
+          <v-list-item-subtitle>{{ formatMac(getMacAddress()) }}</v-list-item-subtitle>
         </v-list-item>
 
         <v-list-item>
@@ -166,6 +166,35 @@ const nodeTypeNames = {
 
 function getNodeTypeName(type) {
   return nodeTypeNames[type] || type
+}
+
+function getMacAddress() {
+  return props.node.mac_address 
+    || props.node.metadata?.mac_address 
+    || props.node.metadata?.mac 
+    || props.node.metadata?.mac_from_mqtt 
+    || null
+}
+
+function formatMac(mac) {
+  if (!mac || typeof mac !== 'string') return 'Не указан'
+  
+  // Если уже форматировано с двоеточиями (00:4b:12:37:d5:a4)
+  if (mac.includes(':')) {
+    return mac.toUpperCase()
+  }
+  
+  // Если без разделителей (004b1237d5a4)
+  if (mac.length === 12) {
+    return mac.match(/.{1,2}/g).join(':').toUpperCase()
+  }
+  
+  // Если с дефисами (00-4b-12-37-d5-a4)
+  if (mac.includes('-')) {
+    return mac.replace(/-/g, ':').toUpperCase()
+  }
+  
+  return mac.toUpperCase()
 }
 
 function handleUpdate(updateData) {

@@ -181,7 +181,11 @@ esp_err_t adaptive_pid_compute(adaptive_pid_t *pid, float current, float dt, flo
     
     // Проверка safety интервала
     if (!check_safety_interval(pid)) {
-        ESP_LOGD(TAG, "Safety interval not elapsed");
+        uint64_t now = esp_timer_get_time();
+        uint64_t elapsed_us = now - pid->last_dose_time_us;
+        uint64_t min_interval_us = (uint64_t)pid->min_interval_ms * 1000;
+        ESP_LOGW(TAG, "Safety interval not elapsed: %llu/%llu us (%lu/%lu ms)", 
+                 elapsed_us, min_interval_us, (unsigned long)(elapsed_us/1000), pid->min_interval_ms);
         return ESP_OK;
     }
     
@@ -214,6 +218,7 @@ esp_err_t adaptive_pid_compute(adaptive_pid_t *pid, float current, float dt, flo
     
     // Если в мёртвой зоне - не корректируем
     if (pid->current_zone == ZONE_DEAD) {
+        ESP_LOGI(TAG, "In DEAD zone (error=%.3f), no correction", error);
         return ESP_OK;
     }
     
@@ -244,6 +249,37 @@ esp_err_t adaptive_pid_compute(adaptive_pid_t *pid, float current, float dt, flo
         pid->integral = -max_integral;
     }
     
+    // Дополнительная защита от windup: сброс интеграла при длительной ошибке без реакции
+    // Проверка: если ошибка сохраняется > 5 итераций и output = max, но нет реакции
+    float current_error_sign = (error > 0) ? 1.0f : -1.0f;
+    
+    // Вычисляем raw_output заранее для проверки windup
+    float i_term_preview = coeffs->ki * pid->integral;
+    float raw_output_preview = p_term + i_term_preview;
+    if (raw_output_preview > pid->max_dose_ml) {
+        raw_output_preview = pid->max_dose_ml;
+    }
+    
+    if (fabsf(error) > 0.1f && raw_output_preview >= pid->max_dose_ml * 0.95f) {
+        if ((error > 0 && pid->last_error_sign > 0) || (error < 0 && pid->last_error_sign < 0)) {
+            pid->persistent_error_count++;
+        } else {
+            pid->persistent_error_count = 0;  // Сброс при смене знака
+        }
+    } else {
+        pid->persistent_error_count = 0;  // Сброс при уменьшении ошибки
+    }
+    
+    // Если ошибка сохраняется > 5 итераций и output на максимуме - сброс интеграла
+    if (pid->persistent_error_count > 5) {
+        ESP_LOGW(TAG, "Windup detected: persistent error %d iterations, resetting integral", 
+                 pid->persistent_error_count);
+        pid->integral = 0.0f;  // Полный сброс интеграла
+        pid->persistent_error_count = 0;
+    }
+    
+    pid->last_error_sign = current_error_sign;
+    
     float i_term = coeffs->ki * pid->integral;
     
     // Дифференциальная составляющая
@@ -267,6 +303,7 @@ esp_err_t adaptive_pid_compute(adaptive_pid_t *pid, float current, float dt, flo
     
     // Если выход слишком мал - не дозируем (гистерезис)
     if (fabsf(raw_output) < 0.05f) {
+        ESP_LOGI(TAG, "Output too small (%.4f < 0.05), setting to 0", raw_output);
         raw_output = 0.0f;
     }
     
@@ -295,9 +332,9 @@ esp_err_t adaptive_pid_compute(adaptive_pid_t *pid, float current, float dt, flo
     
     *output = raw_output;
     
-    ESP_LOGD(TAG, "PID: error=%.3f, zone=%s, P=%.3f, I=%.3f, D=%.3f, out=%.3f ml",
+    ESP_LOGI(TAG, "PID compute: error=%.3f, zone=%s, P=%.4f, I=%.4f, D=%.4f, raw_out=%.4f, final_out=%.4f ml",
              error, adaptive_pid_zone_to_str(pid->current_zone),
-             p_term, i_term, d_term, raw_output);
+             p_term, i_term, d_term, raw_output, raw_output);
     
     return ESP_OK;
 }
