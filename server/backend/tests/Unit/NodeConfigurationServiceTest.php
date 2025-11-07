@@ -89,7 +89,7 @@ class NodeConfigurationServiceTest extends TestCase
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
         
         $confirmation = NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_123',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
@@ -102,7 +102,7 @@ class NodeConfigurationServiceTest extends TestCase
         
         $this->assertEquals('failed', $confirmation->status);
         $this->assertNotNull($confirmation->failed_at);
-        $this->assertEquals('Timeout', $confirmation->failure_reason);
+        $this->assertEquals('Timeout', $confirmation->error_message);  // error_message не failure_reason
     }
 
     /** @test */
@@ -112,7 +112,7 @@ class NodeConfigurationServiceTest extends TestCase
         
         // Создаем старое подтверждение (60 минут назад)
         $oldConfirmation = NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_old',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
@@ -121,7 +121,7 @@ class NodeConfigurationServiceTest extends TestCase
 
         // Создаем свежее подтверждение (5 минут назад)
         $newConfirmation = NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_new',
             'sent_config' => ['target_ec' => 1.5],
             'status' => 'pending',
@@ -145,7 +145,7 @@ class NodeConfigurationServiceTest extends TestCase
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
         
         NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_1',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
@@ -153,7 +153,7 @@ class NodeConfigurationServiceTest extends TestCase
         ]);
 
         NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_2',
             'sent_config' => ['target_ec' => 1.5],
             'status' => 'confirmed',
@@ -161,7 +161,7 @@ class NodeConfigurationServiceTest extends TestCase
             'confirmed_at' => now(),
         ]);
 
-        $pending = $this->service->getPendingConfirmations($node);
+        $pending = $this->service->getPendingConfirmations($node->node_id);  // Передаем node_id
 
         $this->assertCount(1, $pending);
         $this->assertEquals('pending', $pending->first()->status);

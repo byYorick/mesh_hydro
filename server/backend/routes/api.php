@@ -179,16 +179,24 @@ Route::middleware('throttle:api')->group(function () {
         Route::get('/{zone}', [\App\Http\Controllers\ZoneController::class, 'show']);
         Route::get('/{zone}/nodes', [\App\Http\Controllers\ZoneController::class, 'getNodes']);
         Route::get('/{zone}/root-node', [\App\Http\Controllers\ZoneController::class, 'getRootNode']);
+        Route::get('/{zone}/telemetry', [\App\Http\Controllers\ZoneController::class, 'getTelemetry']);
+        Route::get('/{zone}/statistics', [\App\Http\Controllers\ZoneController::class, 'getStatistics']);
+        Route::get('/{zone}/stats/aggregated', [\App\Http\Controllers\ZoneStatisticsController::class, 'getAggregatedStats']);
+        Route::get('/{zone}/stats/latest', [\App\Http\Controllers\ZoneStatisticsController::class, 'getLatestValues']);
         
         // Write operations
         Route::middleware('throttle:30,1')->group(function () {
             Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
             Route::put('/{zone}', [\App\Http\Controllers\ZoneController::class, 'update']);
+            Route::patch('/{zone}', [\App\Http\Controllers\ZoneController::class, 'update']);
             Route::delete('/{zone}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
             Route::post('/{zone}/command', [\App\Http\Controllers\ZoneController::class, 'sendCommand']);
             Route::post('/check-nodes-availability', [\App\Http\Controllers\ZoneController::class, 'checkNodeAvailability']);
         });
     });
+
+    // Сравнение зон
+    Route::post('/zones/compare', [\App\Http\Controllers\ZoneStatisticsController::class, 'compareZones']);
 });
 
 // ⭐ GROWTH PLANNER: Culture API
@@ -249,5 +257,34 @@ Route::middleware('throttle:api')->group(function () {
     // Сравнение циклов
     Route::prefix('growth/analytics')->group(function () {
         Route::post('/compare', [\App\Http\Controllers\GrowthAnalyticsController::class, 'compareCycles']);
+    });
+
+    // Рейтинги пресетов
+    Route::prefix('growth/presets/{preset}/ratings')->group(function () {
+        Route::get('/', [\App\Http\Controllers\PresetRatingController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\PresetRatingController::class, 'rate']);
+        Route::delete('/{rating}', [\App\Http\Controllers\PresetRatingController::class, 'destroy']);
+    });
+
+    // Заметки циклов
+    Route::prefix('growth/cycles/{cycle}/notes')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CycleNoteController::class, 'getNotes']);
+        Route::post('/', [\App\Http\Controllers\CycleNoteController::class, 'addNote']);
+    });
+
+    // Рекомендации переходов стадий
+    Route::prefix('growth/transitions')->group(function () {
+        Route::get('/', [\App\Http\Controllers\StageTransitionController::class, 'index']);
+        Route::get('/{recommendation}', [\App\Http\Controllers\StageTransitionController::class, 'show']);
+        Route::post('/{recommendation}/accept', [\App\Http\Controllers\StageTransitionController::class, 'accept']);
+        Route::post('/{recommendation}/reject', [\App\Http\Controllers\StageTransitionController::class, 'reject']);
+    });
+
+    // Уведомления
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [\App\Http\Controllers\NotificationController::class, 'index']);
+        Route::get('/unread', [\App\Http\Controllers\NotificationController::class, 'getUnread']);
+        Route::post('/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
+        Route::post('/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
     });
 });

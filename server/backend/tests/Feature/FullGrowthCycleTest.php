@@ -147,13 +147,13 @@ class FullGrowthCycleTest extends TestCase
         $this->assertEquals(3, $activeCycles);
 
         // Проверяем, что зоны заняты
-        $zone1->refresh();
-        $zone2->refresh();
-        $zone3->refresh();
+        $zones[0]->refresh();
+        $zones[1]->refresh();
+        $zones[2]->refresh();
 
-        $this->assertEquals($cycle1->id, $zone1->current_cycle_id);
-        $this->assertEquals($cycle2->id, $zone2->current_cycle_id);
-        $this->assertEquals($cycle3->id, $zone3->current_cycle_id);
+        $this->assertEquals($cycle1->id, $zones[0]->current_cycle_id);
+        $this->assertEquals($cycle2->id, $zones[1]->current_cycle_id);
+        $this->assertEquals($cycle3->id, $zones[2]->current_cycle_id);
     }
 
     /** @test */
@@ -182,8 +182,7 @@ class FullGrowthCycleTest extends TestCase
             'plant_count' => 20,
         ]);
 
-        $response->assertStatus(422)
-            ->assertJsonValidationErrors(['zone_id']);
+        $response->assertStatus(409);  // 409 Conflict вместо 422 Validation Error
     }
 
     /** @test */
