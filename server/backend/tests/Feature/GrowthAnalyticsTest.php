@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\GrowthCycle;
 use App\Models\GrowthPreset;
 use App\Models\GrowthCulture;
@@ -16,7 +17,7 @@ class GrowthAnalyticsTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_can_get_parameter_chart_via_api()
     {
         $zone = Zone::factory()->create();
@@ -57,7 +58,7 @@ class GrowthAnalyticsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_parameter_statistics_via_api()
     {
         $zone = Zone::factory()->create();
@@ -89,7 +90,7 @@ class GrowthAnalyticsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_cycle_report_via_api()
     {
         $zone = Zone::factory()->create();
@@ -122,7 +123,7 @@ class GrowthAnalyticsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_compare_cycles_via_api()
     {
         $zone = Zone::factory()->create();
@@ -154,7 +155,7 @@ class GrowthAnalyticsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_snapshot_via_api()
     {
         $zone = Zone::factory()->create();

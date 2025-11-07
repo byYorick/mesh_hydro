@@ -15,6 +15,10 @@ class GrowthPresetsSeeder extends Seeder
      */
     public function run(): void
     {
+        if (GrowthCulture::where('slug', 'salat-listovoy')->exists()) {
+            $this->command?->warn('⚠️ GrowthPresetsSeeder: данные уже существуют, пропуск сидера');
+            return;
+        }
         // ========= САЛАТ И ЗЕЛЕНЬ =========
         $saladCulture = GrowthCulture::create([
             'name' => 'Салат листовой',

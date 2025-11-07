@@ -2,7 +2,7 @@
 
 ## 📋 Обзор
 
-Фронтенд покрывается Vitest (happy-dom). Текущие тесты закрывают ключевые сценарии Growth Planner и Zone Management.
+Фронтенд покрывается Vitest (happy-dom). Текущие тесты закрывают ключевые сценарии Growth Planner, Zone Management, базовые store-операции и ряд утилит.
 
 ### Сводка покрытия (istanbul)
 
@@ -11,12 +11,16 @@
 | `src/components/growth` | 82.84% | 77.77% | 80.39% | 83.66% |
 | `src/components/EventLog.vue` | 84% | 89.28% | 72.72% | 82.6% |
 | `src/components/NodeCard.vue` | 62.93% | 37.8% | 65.38% | 70.58% |
-| `src/stores/nodes.ts` | 55% | 47.5% | 81.48% | 52.74% |
-| `src/stores/telemetry.ts` | 65.07% | 50% | 92.85% | 63.33% |
-| `src/stores/zones.ts` | 52.94% | 32.43% | 68.96% | 51.85% |
-| `src/services/NodeStatusManager.ts` | 53.08% | 67.74% | 40% | 53.24% |
+| `src/components/zones/ZoneCard.vue` | 84.09% | 70.68% | 77.27% | 87.5% |
+| `src/stores/app.ts` | 69.23% | 67.34% | 64.28% | 69.86% |
+| `src/stores/events.ts` | 55.38% | 66.66% | 57.69% | 56.19% |
+| `src/stores/settings.js` | 65.38% | 95.23% | 61.11% | 67.34% |
+| `src/composables/useOfflineMode.ts` | 57.5% | 68% | 42.85% | 58.97% |
+| `src/services/nodes-api.js` | 100% | 100% | 100% | 100% |
+| `src/utils/logger.ts` | 68.85% | 54.54% | 48.14% | 76% |
+| `src/utils/time.ts` | 95% | 90% | 100% | 100% |
 
-Пробелы: остальные stores (`app`, `events`, `settings`, `nodeConfig`), сервисы (`api.ts`, `echo.ts`, `nodes-api.ts`), утилиты и `views/*`.
+Пробелы: сервисы `api.ts`, `echo.ts`, сложные компоненты (Chart.js, node-config модальные), основные `views/*`, утилиты `usePopup`, `error-handler`, `useDebounce` и др.
 
 ## ✅ Имеющиеся тесты
 
@@ -26,13 +30,23 @@
 - `src/__tests__/stores/telemetry.test.js`
 - `src/__tests__/stores/zones.test.ts`
 - `src/__tests__/stores/errors.test.js`
+- `src/__tests__/stores/app.test.ts`
+- `src/__tests__/stores/events.test.ts`
+- `src/__tests__/stores/settings.test.ts`
+- `src/__tests__/stores/nodeConfig.test.ts`
 
-### Services
+### Services / Composables / Utils
 - `src/__tests__/services/api.test.js`
+- `src/__tests__/services/nodes-api.test.ts`
+- `src/__tests__/composables/useOfflineMode.test.ts`
+- `src/__tests__/utils/array.test.ts`
+- `src/__tests__/utils/logger.test.ts`
+- `src/__tests__/utils/time.test.ts`
 
-### Components
+### Components / Views
 - Growth: `CreateCycleDialog`, `CycleCard`, `GrowthPresetCard`, `StageTimeline`, `ZoneSelector`
 - Общие: `EventLog`, `NodeCard`, `ConfigEditor`
+- Zones: `ZoneCard`, `views/Zones.vue`
 
 ## 🚀 Запуск тестов
 
@@ -63,14 +77,14 @@ docker compose -f docker-compose.dev.yml run --rm frontend sh -c "npm install &&
 
 ## ⚠️ Известные проблемы
 
-1. **Vuetify + happy-dom**: предупреждение `Right-hand side of 'instanceof' is not an object` появляется в логе. Сообщение перехватывается в `src/__tests__/setup.js`, на результаты не влияет.
+1. **Vuetify + happy-dom**: предупреждение `Right-hand side of 'instanceof' is not an object` остаётся в логах (см. `src/__tests__/setup.js`).
 2. **Глубокие компоненты Vuetify**: `VDataTable`, `VTreeview`, сложные layout-комбинации требуют точечных моков/стабов.
-3. **Chart.js**: графические компоненты пока без тестов.
+3. **Chart.js**: графические компоненты (`TelemetryChart`, `AdvancedChart`) пока без тестов.
 
 ## 📝 TODO
 
-- [ ] Stores: `app`, `events`, `settings`, `nodeConfig`
-- [ ] Services/утилиты: `api.ts`, `echo.ts`, `nodes-api.ts`, `useOfflineMode.ts`, `usePopup.ts`
-- [ ] Ключевые UI: `AdvancedChart.vue`, `TelemetryChart.vue`, `NodeManagementCard.vue`, `views/*`
-- [ ] Интеграционные/E2E (Playwright/Cypress) — отдельный backlog
+- [ ] Services: `api.ts`, `echo.ts`, `nodes-api.ts` (TypeScript версия) + realtime-слой.
+- [ ] Composables/утилиты: `usePopup.ts`, `error-handler.ts`, `useDebounce.ts`, `useResponsive.ts`.
+- [ ] Ключевые UI: `AdvancedChart.vue`, `TelemetryChart.vue`, node-config диалоги, странички `views/*` кроме `Zones`.
+- [ ] Интеграционные/E2E (Playwright/Cypress) — отдельный backlog.
 

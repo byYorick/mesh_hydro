@@ -21,8 +21,8 @@ docker exec hydro_backend_dev php artisan test
 
 Ожидаемый результат:
 ```
-Tests:  108 passed
-Time:   ~30s
+Tests:  164 passed
+Time:   ~110s
 ```
 
 ## Структура тестов
@@ -206,20 +206,21 @@ namespace Tests\Unit;
 
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 
 class MyNewTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
-    public function it_does_something()
+    #[Test]
+    public function it_does_something(): void
     {
         // Arrange - подготовка
         $zone = Zone::factory()->create();
-        
+
         // Act - действие
         $result = $zone->doSomething();
-        
+
         // Assert - проверка
         $this->assertTrue($result);
     }
@@ -235,22 +236,23 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 
 class MyNewFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
-    public function it_can_do_something_via_api()
+    #[Test]
+    public function it_can_do_something_via_api(): void
     {
         // Arrange
         $zone = Zone::factory()->create();
-        
+
         // Act
         $response = $this->postJson('/api/zones', [
             'name' => 'Test Zone',
         ]);
-        
+
         // Assert
         $response->assertStatus(201)
             ->assertJsonStructure(['id', 'name']);

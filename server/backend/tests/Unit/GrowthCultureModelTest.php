@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\GrowthCulture;
 use App\Models\GrowthPreset;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +15,7 @@ class GrowthCultureModelTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_culture()
     {
         $culture = GrowthCulture::create([
@@ -32,7 +33,7 @@ class GrowthCultureModelTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_many_presets()
     {
         $culture = GrowthCulture::create([
@@ -54,7 +55,7 @@ class GrowthCultureModelTest extends TestCase
         $this->assertCount(1, $culture->presets);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_active_cultures()
     {
         GrowthCulture::create([
@@ -76,7 +77,7 @@ class GrowthCultureModelTest extends TestCase
         $this->assertEquals('Active', $activeCultures->first()->name);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_icon_attribute()
     {
         $culture = GrowthCulture::create([
@@ -88,7 +89,7 @@ class GrowthCultureModelTest extends TestCase
         $this->assertEquals('mdi-leaf', $culture->icon);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_category_color_attribute()
     {
         $culture = GrowthCulture::create([

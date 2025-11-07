@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Services\GrowthAnalyticsService;
 use App\Models\GrowthCycle;
 use App\Models\GrowthPreset;
@@ -26,7 +27,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->analytics = app(GrowthAnalyticsService::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_parameter_chart_by_stages()
     {
         // Создаем зону
@@ -90,7 +91,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->assertGreaterThan(0, count($chart['data']));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_parameter_statistics()
     {
         $zone = Zone::factory()->create();
@@ -140,7 +141,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->assertEquals(6.2, $statistics['ph']['max']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_compare_cycles()
     {
         $zone = Zone::factory()->create();
@@ -178,7 +179,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->assertEquals(2, $comparison['summary']['total_cycles']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_comparison_snapshot()
     {
         $zone = Zone::factory()->create();
@@ -209,7 +210,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->assertNotNull($snapshot->total_water_liters);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_cycle_report()
     {
         $zone = Zone::factory()->create();
@@ -255,7 +256,7 @@ class GrowthAnalyticsServiceTest extends TestCase
         $this->assertArrayHasKey('deviations_summary', $report);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_calculate_water_consumption()
     {
         $zone = Zone::factory()->create();

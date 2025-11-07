@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Zone;
 use App\Models\Node;
 use App\Models\ZoneNodeAssignment;
@@ -30,7 +31,7 @@ class ZoneModelTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_zone()
     {
         $zone = Zone::create([
@@ -59,7 +60,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($zone->is_available);
     }
 
-    /** @test */
+    #[Test]
     public function it_belongs_to_root_node()
     {
         $zone = Zone::create([
@@ -76,7 +77,7 @@ class ZoneModelTest extends TestCase
         $this->assertEquals('root', $rootNode->node_type);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_many_nodes()
     {
         // Очищаем все узлы кроме root node
@@ -111,7 +112,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($nodes->contains('node_id', 'climate_test_001'));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_node_by_role()
     {
         $zone = Zone::create([
@@ -132,7 +133,7 @@ class ZoneModelTest extends TestCase
         $this->assertNull($zone->getNodeByRole('water_node'));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_all_nodes()
     {
         // Используем существующий Root Node из setUp
@@ -163,7 +164,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($nodes->contains('node_id', 'relay_test_001'));
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_availability_for_new_cycle()
     {
         // Зона доступна
@@ -224,7 +225,7 @@ class ZoneModelTest extends TestCase
         $this->assertFalse($busyZone->isAvailableForCycle());
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_mqtt_topic_prefix()
     {
         // Создаем второй root узел (test_root_001 уже создан в setUp)
@@ -259,7 +260,7 @@ class ZoneModelTest extends TestCase
         $this->assertEquals($expectedPrefix, $zone2->getMqttTopicPrefix());
     }
 
-    /** @test */
+    #[Test]
     public function it_has_icon_attribute()
     {
         $zoneNFT = Zone::factory()->create(['zone_type' => 'nft']);
@@ -273,7 +274,7 @@ class ZoneModelTest extends TestCase
         $this->assertEquals('mdi-sprout', $zoneOther->icon);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_status_attribute()
     {
         // Используем существующий Root Node из setUp
@@ -312,7 +313,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($status['root_node_online']);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_active_zones()
     {
         Zone::factory()->create(['is_active' => true]);
@@ -325,7 +326,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($activeZones->every(fn($zone) => $zone->is_active === true));
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_available_zones()
     {
         Zone::factory()->create([
@@ -351,7 +352,7 @@ class ZoneModelTest extends TestCase
         $this->assertCount(1, $availableZones);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_zones_by_type()
     {
         Zone::factory()->nft()->create();
@@ -364,7 +365,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($nftZones->every(fn($zone) => $zone->zone_type === 'nft'));
     }
 
-    /** @test */
+    #[Test]
     public function it_casts_assigned_nodes_to_array()
     {
         $zone = Zone::create([
@@ -383,7 +384,7 @@ class ZoneModelTest extends TestCase
         $this->assertEquals('climate_test_001', $zone->assigned_nodes['climate_node']);
     }
 
-    /** @test */
+    #[Test]
     public function it_requires_unique_root_node_id()
     {
         Zone::create([
@@ -404,7 +405,7 @@ class ZoneModelTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_requires_unique_mesh_network_id()
     {
         Zone::create([

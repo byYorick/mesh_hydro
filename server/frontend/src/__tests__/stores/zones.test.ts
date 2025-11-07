@@ -97,6 +97,53 @@ describe('Zones Store', () => {
       expect(store.loading).toBe(false)
     })
 
+    it('should normalize wrapped zone payloads', async () => {
+      const store = useZonesStore()
+      const wrapped = { data: [{ id: 3, name: 'Wrapped Zone', is_active: true }] }
+
+      mockedAxios.get.mockResolvedValue({ data: wrapped })
+
+      await store.fetchZones()
+
+      expect(store.zones).toEqual(wrapped.data)
+    })
+
+    it('should normalize stringified array payloads', async () => {
+      const store = useZonesStore()
+      const payload = JSON.stringify([{ id: 5, name: 'String Zone', is_active: true }])
+
+      mockedAxios.get.mockResolvedValue({ data: payload })
+
+      await store.fetchZones()
+
+      expect(store.zones).toEqual([{ id: 5, name: 'String Zone', is_active: true }])
+    })
+
+    it('should normalize stringified object payloads', async () => {
+      const store = useZonesStore()
+      const payload = JSON.stringify({ zones: [{ id: 6, name: 'String Object Zone', is_active: true }] })
+
+      mockedAxios.get.mockResolvedValue({ data: payload })
+
+      await store.fetchZones()
+
+      expect(store.zones).toEqual([{ id: 6, name: 'String Object Zone', is_active: true }])
+    })
+
+    it('should fallback to empty array on unexpected payload shape', async () => {
+      const store = useZonesStore()
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      mockedAxios.get.mockResolvedValue({ data: { message: 'not an array' } })
+
+      await store.fetchZones()
+
+      expect(store.zones).toEqual([])
+      expect(warnSpy).toHaveBeenCalled()
+
+      warnSpy.mockRestore()
+    })
+
     it('should handle fetch zones error', async () => {
       const store = useZonesStore()
       const errorMessage = 'Network error'

@@ -125,6 +125,7 @@ $zone = Zone::factory()
 - `RefreshDatabase` - база пересоздается перед каждым тестом
 - Factory для генерации данных
 - Реальные связи БД (не моки)
+- PHPUnit атрибуты `#[Test]` вместо устаревших докблоков `@test`
 
 ---
 
@@ -132,8 +133,10 @@ $zone = Zone::factory()
 
 ### Тест создания зоны
 ```php
-/** @test */
-public function it_can_create_a_zone()
+use PHPUnit\Framework\Attributes\Test;
+
+#[Test]
+public function it_can_create_a_zone(): void
 {
     $zone = Zone::factory()->create([
         'name' => 'Test Zone',
@@ -147,8 +150,10 @@ public function it_can_create_a_zone()
 
 ### Тест изоляции зон
 ```php
-/** @test */
-public function zones_maintain_node_isolation()
+use PHPUnit\Framework\Attributes\Test;
+
+#[Test]
+public function zones_maintain_node_isolation(): void
 {
     $zone1 = Zone::factory()->withNodes()->create();
     $zone2 = Zone::factory()->withNodes()->create();
@@ -191,7 +196,7 @@ php artisan migrate:fresh --env=testing
 
 ---
 
-**Последнее обновление:** 6 ноября 2025  
+**Последнее обновление:** 7 ноября 2025  
 **Статус:** ✅ Все тесты проходят  
 **Покрытие:** ~100% Database + Models
 

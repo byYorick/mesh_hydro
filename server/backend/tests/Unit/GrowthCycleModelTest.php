@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Zone;
 use App\Models\Node;
 use App\Models\GrowthCulture;
@@ -77,7 +78,7 @@ class GrowthCycleModelTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_cycle_with_zone()
     {
         $cycle = GrowthCycle::create([
@@ -96,7 +97,7 @@ class GrowthCycleModelTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_belongs_to_zone()
     {
         $cycle = GrowthCycle::create([
@@ -112,7 +113,7 @@ class GrowthCycleModelTest extends TestCase
         $this->assertEquals('Test Zone', $cycle->zone->name);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_progress_percent()
     {
         $cycle = GrowthCycle::create([
@@ -128,7 +129,7 @@ class GrowthCycleModelTest extends TestCase
         $this->assertEquals(50, round($cycle->progress));
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_current_day()
     {
         $cycle = GrowthCycle::create([
@@ -143,7 +144,7 @@ class GrowthCycleModelTest extends TestCase
         $this->assertEquals(11, $cycle->current_day);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_next_stage()
     {
         $cycle = GrowthCycle::create([
@@ -161,7 +162,7 @@ class GrowthCycleModelTest extends TestCase
         $this->assertEquals($this->stage2->id, $nextStage->id);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_transition_to_next_stage()
     {
         $cycle = GrowthCycle::create([
@@ -186,7 +187,7 @@ class GrowthCycleModelTest extends TestCase
         $this->assertEquals($this->stage2->id, $cycle->current_stage_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_status_color_attribute()
     {
         $cycle = GrowthCycle::create([

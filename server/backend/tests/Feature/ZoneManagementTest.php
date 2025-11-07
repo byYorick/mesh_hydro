@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Zone;
 use App\Models\Node;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,7 +26,7 @@ class ZoneManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_zone_with_root_node()
     {
         $zoneData = [
@@ -56,7 +57,7 @@ class ZoneManagementTest extends TestCase
         $this->assertInstanceOf(Node::class, $zone->rootNode);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_duplicate_root_node_in_zones()
     {
         // Создаем первую зону
@@ -78,7 +79,7 @@ class ZoneManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_duplicate_mesh_network_id()
     {
         // Создаем второй Root Node
@@ -107,7 +108,7 @@ class ZoneManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_nodes_for_zone()
     {
         $zone = Zone::create([
@@ -148,7 +149,7 @@ class ZoneManagementTest extends TestCase
         $this->assertCount(3, $nodes);
     }
 
-    /** @test */
+    #[Test]
     public function it_identifies_available_zones()
     {
         // Доступная зона
@@ -207,7 +208,7 @@ class ZoneManagementTest extends TestCase
         $this->assertEquals('Available Zone', $availableZones->first()->name);
     }
 
-    /** @test */
+    #[Test]
     public function zones_maintain_node_isolation()
     {
         // Создаем второй и третий Root Node
@@ -285,7 +286,7 @@ class ZoneManagementTest extends TestCase
         $this->assertFalse($zone3Nodes->contains('node_id', 'ph_001'));
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_zone_node_assignments()
     {
         $zone = Zone::create([
@@ -319,7 +320,7 @@ class ZoneManagementTest extends TestCase
         $this->assertCount(1, $zone->nodeAssignments);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_correct_mqtt_topic_prefix()
     {
         $zone1 = Zone::create([

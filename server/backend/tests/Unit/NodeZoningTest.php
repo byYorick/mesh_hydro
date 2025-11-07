@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Node;
 use App\Models\Zone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ class NodeZoningTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function root_node_has_root_node_id_pointing_to_itself()
     {
         $rootNode = Node::where('node_id', 'test_root_001')->first();
@@ -38,7 +39,7 @@ class NodeZoningTest extends TestCase
         $this->assertTrue($rootNode->isRootNode());
     }
 
-    /** @test */
+    #[Test]
     public function regular_node_belongs_to_root_node()
     {
         $childNode = Node::create([
@@ -55,7 +56,7 @@ class NodeZoningTest extends TestCase
         $this->assertEquals('root', $rootNode->node_type);
     }
 
-    /** @test */
+    #[Test]
     public function root_node_has_many_child_nodes()
     {
         // Очищаем все узлы кроме root node
@@ -89,7 +90,7 @@ class NodeZoningTest extends TestCase
         $this->assertTrue($childNodes->contains('node_id', 'relay_test_001'));
     }
 
-    /** @test */
+    #[Test]
     public function node_can_access_its_zone()
     {
         // Создаем зону
@@ -114,7 +115,7 @@ class NodeZoningTest extends TestCase
         $this->assertEquals('test_root_001', $nodeZone->root_node_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_if_node_is_root()
     {
         $rootNode = Node::where('node_id', 'test_root_001')->first();
@@ -128,7 +129,7 @@ class NodeZoningTest extends TestCase
         $this->assertFalse($regularNode->isRootNode());
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_mesh_nodes_for_root()
     {
         // Очищаем все узлы кроме root node
@@ -152,7 +153,7 @@ class NodeZoningTest extends TestCase
         $this->assertCount(2, $meshNodes);
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_mesh_nodes_for_regular_node()
     {
         // Очищаем все узлы кроме root node
@@ -176,7 +177,7 @@ class NodeZoningTest extends TestCase
         $this->assertCount(2, $meshNodes); // ph_test_001 + climate_test_001
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_nodes_in_zone()
     {
         // Создаем второй Root Node
@@ -220,7 +221,7 @@ class NodeZoningTest extends TestCase
         $this->assertFalse($zone2Nodes->contains('node_id', 'ph_zone1_001'));
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_only_root_nodes()
     {
         // Создаем дополнительные Root Nodes
@@ -258,7 +259,7 @@ class NodeZoningTest extends TestCase
         $this->assertTrue($rootNodes->contains('node_id', 'test_root_003'));
     }
 
-    /** @test */
+    #[Test]
     public function nodes_in_different_zones_are_isolated()
     {
         // Создаем второй Root Node и зону
@@ -308,7 +309,7 @@ class NodeZoningTest extends TestCase
         $this->assertFalse($meshNodes2->contains('node_id', 'ph_zone1'));
     }
 
-    /** @test */
+    #[Test]
     public function node_with_null_root_node_id_can_exist()
     {
         // Для обратной совместимости: узлы без root_node_id
@@ -323,7 +324,7 @@ class NodeZoningTest extends TestCase
         $this->assertEquals('Legacy Zone', $legacyNode->zone);
     }
 
-    /** @test */
+    #[Test]
     public function root_node_fillable_includes_root_node_id()
     {
         $node = new Node();

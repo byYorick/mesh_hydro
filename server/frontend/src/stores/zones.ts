@@ -31,6 +31,51 @@ export interface Zone {
   node_assignments?: any[]
 }
 
+function normalizeZonePayload(payload: any): Zone[] {
+  const convert = (value: any): Zone[] => {
+    if (Array.isArray(value)) {
+      return value as Zone[]
+    }
+
+    if (value?.data && Array.isArray(value.data)) {
+      return value.data as Zone[]
+    }
+
+    if (value?.zones && Array.isArray(value.zones)) {
+      return value.zones as Zone[]
+    }
+
+    if (value?.items && Array.isArray(value.items)) {
+      return value.items as Zone[]
+    }
+
+    return []
+  }
+
+  let normalized: Zone[] = []
+
+  if (typeof payload === 'string') {
+    try {
+      const parsed = JSON.parse(payload)
+      normalized = convert(parsed)
+      if (normalized.length === 0 && Array.isArray(parsed)) {
+        normalized = parsed as Zone[]
+      }
+    } catch (err) {
+      console.warn('zones.ts: failed to parse zones payload string', err)
+      normalized = []
+    }
+  } else {
+    normalized = convert(payload)
+  }
+
+  if (normalized.length === 0 && !Array.isArray(payload)) {
+    console.warn('zones.ts: unexpected zones payload shape, falling back to empty list', payload)
+  }
+
+  return normalized
+}
+
 export const useZonesStore = defineStore('zones', () => {
   // State
   const zones = ref<Zone[]>([])
@@ -69,8 +114,9 @@ export const useZonesStore = defineStore('zones', () => {
     
     try {
       const response = await axios.get('/api/zones')
-      zones.value = response.data
+      zones.value = normalizeZonePayload(response?.data)
     } catch (err: any) {
+      zones.value = []
       error.value = err.response?.data?.message || 'Failed to fetch zones'
       console.error('Error fetching zones:', err)
     } finally {

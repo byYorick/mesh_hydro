@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Console\Commands\LogCycleParametersCommand;
 use App\Models\GrowthCycle;
 use App\Models\Zone;
@@ -17,7 +18,7 @@ class LogCycleParametersCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_logs_parameters_for_active_cycles()
     {
         // Создаем зону с узлами
@@ -65,7 +66,7 @@ class LogCycleParametersCommandTest extends TestCase
         $this->assertNotNull($log->avg_ph);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_cycles_without_telemetry()
     {
         $zone = Zone::factory()->withRootNode()->create();
@@ -88,7 +89,7 @@ class LogCycleParametersCommandTest extends TestCase
         $this->assertEquals(0, $logCount);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_log_parameters_for_specific_cycle()
     {
         $zone = Zone::factory()->withNodes()->create();

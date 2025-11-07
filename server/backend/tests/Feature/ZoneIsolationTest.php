@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Zone;
 use App\Models\Node;
 use App\Models\GrowthCycle;
@@ -18,7 +19,7 @@ class ZoneIsolationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function zones_use_different_mqtt_topics()
     {
         $zone1 = Zone::factory()->create([
@@ -46,7 +47,7 @@ class ZoneIsolationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function zones_use_different_mesh_network_ids()
     {
         $zone1 = Zone::factory()->create([
@@ -68,7 +69,7 @@ class ZoneIsolationTest extends TestCase
         $this->assertEquals(count($meshIds), count(array_unique($meshIds)));
     }
 
-    /** @test */
+    #[Test]
     public function node_can_only_belong_to_one_zone_at_a_time()
     {
         $zone1 = Zone::factory()->withRootNode()->create();
@@ -92,7 +93,7 @@ class ZoneIsolationTest extends TestCase
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[Test]
     public function telemetry_is_routed_by_zone_topic()
     {
         $zone1 = Zone::factory()->withNodes()->create([
@@ -139,7 +140,7 @@ class ZoneIsolationTest extends TestCase
         $this->assertNotEquals($data1, $data2);
     }
 
-    /** @test */
+    #[Test]
     public function commands_are_routed_to_correct_zone()
     {
         $zone1 = Zone::factory()->withNodes()->create([
@@ -164,7 +165,7 @@ class ZoneIsolationTest extends TestCase
             ->assertJsonPath('data.mqtt_topic', "hydro/zone1/commands/{$node1->node_id}");
     }
 
-    /** @test */
+    #[Test]
     public function multiple_cycles_run_independently_in_different_zones()
     {
         // Создаем 3 зоны
@@ -213,7 +214,7 @@ class ZoneIsolationTest extends TestCase
         $this->assertFalse($zones[2]->isAvailableForCycle());
     }
 
-    /** @test */
+    #[Test]
     public function zone_statistics_are_calculated_independently()
     {
         $zone1 = Zone::factory()->withNodes()->create();
@@ -262,7 +263,7 @@ class ZoneIsolationTest extends TestCase
         $this->assertEquals(6.5, round($avg2, 1));
     }
 
-    /** @test */
+    #[Test]
     public function root_node_cannot_be_shared_between_zones()
     {
         $rootNode = Node::factory()->create([
@@ -288,7 +289,7 @@ class ZoneIsolationTest extends TestCase
             ->assertJsonValidationErrors(['root_node_id']);
     }
 
-    /** @test */
+    #[Test]
     public function zone_can_be_disabled_without_affecting_other_zones()
     {
         $zone1 = Zone::factory()->withRootNode()->create(['is_active' => true]);

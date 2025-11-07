@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Services\NodeConfigurationService;
 use App\Models\Node;
 use App\Models\GrowthCycle;
@@ -25,7 +26,7 @@ class NodeConfigurationServiceTest extends TestCase
         $this->service = app(NodeConfigurationService::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_configuration_with_confirmation_required()
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
@@ -56,7 +57,7 @@ class NodeConfigurationServiceTest extends TestCase
         $this->assertEquals($cycle->id, $confirmation->cycle_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_handle_configuration_response()
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
@@ -82,7 +83,7 @@ class NodeConfigurationServiceTest extends TestCase
         $this->assertEquals($receivedConfig, $confirmation->confirmed_config);  // confirmed_config не received_config
     }
 
-    /** @test */
+    #[Test]
     public function it_can_mark_configuration_as_failed()
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
@@ -103,7 +104,7 @@ class NodeConfigurationServiceTest extends TestCase
         $this->assertEquals('Timeout', $confirmation->error_message);  // error_message не failure_reason
     }
 
-    /** @test */
+    #[Test]
     public function it_can_check_for_timeouts()
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
@@ -135,7 +136,7 @@ class NodeConfigurationServiceTest extends TestCase
         $this->assertEquals('pending', $newConfirmation->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_pending_confirmations_for_node()
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);

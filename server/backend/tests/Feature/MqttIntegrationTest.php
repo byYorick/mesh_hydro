@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\Zone;
 use App\Models\Node;
 use App\Services\MqttService;
@@ -17,7 +18,7 @@ class MqttIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function mqtt_listener_extracts_zone_from_topic()
     {
         $zone = Zone::factory()->create([
@@ -34,7 +35,7 @@ class MqttIntegrationTest extends TestCase
         $this->assertEquals('nft1', $zoneName);
     }
 
-    /** @test */
+    #[Test]
     public function mqtt_topics_follow_zone_structure()
     {
         $zone = Zone::factory()->create([
@@ -55,7 +56,7 @@ class MqttIntegrationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function telemetry_message_contains_zone_information()
     {
         $zone = Zone::factory()->withNodes()->create([
@@ -81,7 +82,7 @@ class MqttIntegrationTest extends TestCase
         $this->assertEquals($zone->root_node_id, $message['root_node_id']);
     }
 
-    /** @test */
+    #[Test]
     public function command_response_includes_confirmation_id()
     {
         $zone = Zone::factory()->withNodes()->create();
@@ -108,7 +109,7 @@ class MqttIntegrationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function mqtt_message_size_is_within_limits()
     {
         $zone = Zone::factory()->create([
@@ -140,7 +141,7 @@ class MqttIntegrationTest extends TestCase
         $this->assertLessThan(4 * 1024, $messageSize);
     }
 
-    /** @test */
+    #[Test]
     public function heartbeat_messages_maintain_zone_connection()
     {
         $zone = Zone::factory()->withRootNode()->create([
@@ -167,7 +168,7 @@ class MqttIntegrationTest extends TestCase
         $this->assertTrue($rootNode->isOnline());
     }
 
-    /** @test */
+    #[Test]
     public function zone_commands_are_queued_when_offline()
     {
         $zone = Zone::factory()->withNodes()->create();
@@ -190,7 +191,7 @@ class MqttIntegrationTest extends TestCase
             ->assertJsonPath('status', 'queued');
     }
 
-    /** @test */
+    #[Test]
     public function mqtt_topics_support_wildcards()
     {
         $zone = Zone::factory()->create([

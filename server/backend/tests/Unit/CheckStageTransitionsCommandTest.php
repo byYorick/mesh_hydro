@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Console\Commands\CheckStageTransitionsCommand;
 use App\Models\GrowthCycle;
 use App\Models\GrowthStage;
@@ -17,7 +18,7 @@ class CheckStageTransitionsCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_creates_recommendation_when_stage_duration_exceeded()
     {
         $zone = Zone::factory()->create();
@@ -63,7 +64,7 @@ class CheckStageTransitionsCommandTest extends TestCase
         $this->assertEquals('pending', $recommendation->status);
     }
 
-    /** @test */
+    #[Test]
     public function it_does_not_create_duplicate_recommendations()
     {
         $zone = Zone::factory()->create();
@@ -118,7 +119,7 @@ class CheckStageTransitionsCommandTest extends TestCase
         $this->assertEquals(1, $count);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_cycles_at_last_stage()
     {
         $zone = Zone::factory()->create();
@@ -154,7 +155,7 @@ class CheckStageTransitionsCommandTest extends TestCase
         $this->assertEquals(0, $count);
     }
 
-    /** @test */
+    #[Test]
     public function it_processes_multiple_cycles_independently()
     {
         $zone1 = Zone::factory()->create();

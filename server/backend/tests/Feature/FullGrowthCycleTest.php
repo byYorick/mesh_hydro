@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Models\GrowthCycle;
 use App\Models\GrowthPreset;
 use App\Models\GrowthCulture;
@@ -21,7 +22,7 @@ class FullGrowthCycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_can_create_and_manage_full_growth_cycle()
     {
         // Создаем зону
@@ -94,7 +95,7 @@ class FullGrowthCycleTest extends TestCase
         $this->assertEquals(5, $cycle->rating);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_run_multiple_cycles_in_different_zones_simultaneously()
     {
         // Создаем 3 зоны
@@ -160,7 +161,7 @@ class FullGrowthCycleTest extends TestCase
         $this->assertEquals($cycle3->id, $zones[2]->current_cycle_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_starting_cycle_in_occupied_zone()
     {
         $zone = Zone::factory()->withRootNode()->create();
@@ -189,7 +190,7 @@ class FullGrowthCycleTest extends TestCase
         $response->assertStatus(409);  // 409 Conflict вместо 422 Validation Error
     }
 
-    /** @test */
+    #[Test]
     public function it_tracks_stage_history_throughout_cycle()
     {
         $zone = Zone::factory()->withRootNode()->create();
@@ -254,7 +255,7 @@ class FullGrowthCycleTest extends TestCase
         $this->assertNull($history[2]->ended_at); // Текущая стадия
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_stage_transition_recommendations()
     {
         $zone = Zone::factory()->withRootNode()->create();

@@ -20,10 +20,13 @@ class DatabaseSeeder extends Seeder
         // Оставляем только PID пресеты для реальной работы
         $this->call([
             PidPresetSeeder::class,
+            GrowthPresetsSeeder::class,
+            ZoneSeeder::class,
+            GrowthScenarioSeeder::class,
         ]);
         
-        $this->command->info('✅ Настройки PID пресетов загружены');
-        $this->command->info('💡 Узлы будут автоматически добавлены при подключении через MQTT');
+        $this->command->info('✅ Базовые сиды загружены (presets, зоны, циклы)');
+        $this->command->info('💡 Узлы из сидов имитируют реальное окружение для разработки');
     }
 }
 

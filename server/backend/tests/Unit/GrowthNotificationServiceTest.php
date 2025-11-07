@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 use App\Services\GrowthNotificationService;
 use App\Models\GrowthCycle;
 use App\Models\StageTransitionRecommendation;
@@ -31,7 +32,7 @@ class GrowthNotificationServiceTest extends TestCase
         $this->notificationService = new GrowthNotificationService($telegram, $sms);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_stage_transition_recommendation_notification()
     {
         $zone = Zone::factory()->create();
@@ -80,7 +81,7 @@ class GrowthNotificationServiceTest extends TestCase
         $this->assertArrayHasKey('recommendation_id', $notification->data);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_parameter_deviation_notification()
     {
         $zone = Zone::factory()->create();
@@ -119,7 +120,7 @@ class GrowthNotificationServiceTest extends TestCase
         $this->assertArrayHasKey('deviations', $notification->data);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_growth_delay_notification()
     {
         $zone = Zone::factory()->create();
@@ -143,7 +144,7 @@ class GrowthNotificationServiceTest extends TestCase
         $this->assertEquals(5, $notification->data['days_behind']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_harvest_approaching_notification()
     {
         $zone = Zone::factory()->create();
@@ -168,7 +169,7 @@ class GrowthNotificationServiceTest extends TestCase
         $this->assertEquals(3, $notification->data['days_until_harvest']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_send_weekly_cycle_report()
     {
         $zone = Zone::factory()->create();
