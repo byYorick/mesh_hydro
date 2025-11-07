@@ -239,6 +239,8 @@ Route::middleware('throttle:api')->group(function () {
         Route::middleware('throttle:30,1')->group(function () {
             Route::post('/', [\App\Http\Controllers\GrowthCycleController::class, 'store']);
             Route::put('/{cycle}', [\App\Http\Controllers\GrowthCycleController::class, 'update']);
+            Route::post('/{cycle}/transition', [\App\Http\Controllers\GrowthCycleController::class, 'transition']);
+            Route::post('/{cycle}/accept-transition/{recommendation}', [\App\Http\Controllers\GrowthCycleController::class, 'acceptTransition']);
             Route::post('/{cycle}/harvest', [\App\Http\Controllers\GrowthCycleController::class, 'harvest']);
             Route::post('/{cycle}/cancel', [\App\Http\Controllers\GrowthCycleController::class, 'cancel']);
         });

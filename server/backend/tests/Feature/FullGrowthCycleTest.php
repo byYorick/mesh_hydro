@@ -70,6 +70,10 @@ class FullGrowthCycleTest extends TestCase
             'to_stage_id' => $stage2->id,
         ]);
 
+        if ($response->status() !== 200) {
+            dump($response->json());
+        }
+
         $response->assertStatus(200);
         
         $cycle->refresh();
@@ -221,11 +225,17 @@ class FullGrowthCycleTest extends TestCase
             'started_at' => now()->subDays(10),
         ]);
 
-        // Переход на стадию 2
-        $cycle->transitionToStage($stage2);
+        // Переход на стадию 2 (через API)
+        $this->postJson("/api/growth/cycles/{$cycle->id}/transition", [
+            'to_stage_id' => $stage2->id,
+        ])->assertStatus(200);
 
         // Переход на стадию 3
-        $cycle->transitionToStage($stage3);
+        $this->postJson("/api/growth/cycles/{$cycle->id}/transition", [
+            'to_stage_id' => $stage3->id,
+        ])->assertStatus(200);
+
+        $cycle->refresh();
 
         // Проверяем историю
         $history = $cycle->stageHistory()->orderBy('started_at')->get();

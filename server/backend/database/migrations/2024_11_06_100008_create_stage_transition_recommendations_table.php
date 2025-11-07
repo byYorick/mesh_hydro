@@ -23,7 +23,7 @@ return new class extends Migration
             $table->json('recommended_params')->nullable(); // Новые параметры для следующей стадии
             
             // Статус
-            $table->enum('status', ['pending', 'approved', 'rejected', 'expired'])->default('pending');
+            $table->enum('status', ['pending', 'accepted', 'rejected', 'expired'])->default('pending');
             $table->timestamp('recommended_at')->useCurrent();
             $table->timestamp('responded_at')->nullable();
             $table->unsignedBigInteger('responded_by_user_id')->nullable();

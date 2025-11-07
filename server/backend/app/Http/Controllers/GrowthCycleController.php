@@ -151,9 +151,10 @@ class GrowthCycleController extends Controller
                 ->first();
 
             if ($currentHistory) {
+                $durationDays = max(1, (int) $currentHistory->started_at->diffInDays(now()));
                 $currentHistory->update([
                     'ended_at' => now(),
-                    'actual_duration_days' => $currentHistory->started_at->diffInDays(now()),
+                    'actual_duration_days' => $durationDays,
                 ]);
             }
 
@@ -246,6 +247,140 @@ class GrowthCycleController extends Controller
         ];
 
         return response()->json($stats);
+    }
+
+    /**
+     * Ручной переход на следующую стадию
+     */
+    public function transition(Request $request, GrowthCycle $cycle)
+    {
+        $validated = $request->validate([
+            'to_stage_id' => 'required|exists:growth_stages,id',
+            'notes' => 'nullable|string',
+        ]);
+
+        $nextStage = \App\Models\GrowthStage::find($validated['to_stage_id']);
+
+        // Проверка что стадия принадлежит текущему пресету
+        if ($nextStage->preset_id !== $cycle->preset_id) {
+            return response()->json([
+                'message' => 'Stage does not belong to current preset',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Завершить текущую стадию
+            $currentHistory = $cycle->stageHistory()
+                ->whereNull('ended_at')
+                ->first();
+
+            if ($currentHistory) {
+                $durationDays = max(1, (int) $currentHistory->started_at->diffInDays(now()));
+                $currentHistory->update([
+                    'ended_at' => now(),
+                    'actual_duration_days' => $durationDays,
+                ]);
+            }
+
+            // Создать новую запись истории
+            CycleStageHistory::create([
+                'cycle_id' => $cycle->id,
+                'stage_id' => $nextStage->id,
+                'started_at' => now(),
+                'applied_params' => $nextStage->target_params,
+            ]);
+
+            // Обновить цикл
+            $cycle->update([
+                'current_stage_id' => $nextStage->id,
+            ]);
+
+            DB::commit();
+
+            Log::info("Cycle stage transition", [
+                'cycle_id' => $cycle->id,
+                'from_stage' => $currentHistory?->stage_id,
+                'to_stage' => $nextStage->id,
+            ]);
+
+            return response()->json($cycle->fresh(['currentStage', 'stageHistory']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error transitioning stage', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Принять рекомендацию перехода стадии
+     */
+    public function acceptTransition(GrowthCycle $cycle, \App\Models\StageTransitionRecommendation $recommendation)
+    {
+        // Проверка что рекомендация принадлежит циклу
+        if ($recommendation->cycle_id !== $cycle->id) {
+            return response()->json([
+                'message' => 'Recommendation does not belong to this cycle',
+            ], 422);
+        }
+
+        // Проверка статуса
+        if ($recommendation->status !== 'pending') {
+            return response()->json([
+                'message' => 'Recommendation is not pending',
+                'status' => $recommendation->status,
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Выполнить переход
+            $nextStage = $recommendation->recommendedStage;
+
+            // Завершить текущую стадию
+            $currentHistory = $cycle->stageHistory()
+                ->whereNull('ended_at')
+                ->first();
+
+            if ($currentHistory) {
+                $durationDays = max(1, (int) $currentHistory->started_at->diffInDays(now()));
+                $currentHistory->update([
+                    'ended_at' => now(),
+                    'actual_duration_days' => $durationDays,
+                ]);
+            }
+
+            // Создать новую запись истории
+            CycleStageHistory::create([
+                'cycle_id' => $cycle->id,
+                'stage_id' => $nextStage->id,
+                'started_at' => now(),
+                'applied_params' => $recommendation->recommended_params ?? $nextStage->target_params,
+            ]);
+
+            // Обновить цикл
+            $cycle->update([
+                'current_stage_id' => $nextStage->id,
+            ]);
+
+            // Обновить рекомендацию
+            $recommendation->update([
+                'status' => 'accepted',
+                'responded_at' => now(),
+            ]);
+
+            DB::commit();
+
+            Log::info("Cycle transition recommendation accepted", [
+                'cycle_id' => $cycle->id,
+                'recommendation_id' => $recommendation->id,
+                'to_stage' => $nextStage->id,
+            ]);
+
+            return response()->json($cycle->fresh(['currentStage', 'stageHistory']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Error accepting transition', 'error' => $e->getMessage()], 500);
+        }
     }
 }
 
