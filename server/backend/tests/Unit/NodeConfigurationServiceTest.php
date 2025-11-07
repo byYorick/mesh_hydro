@@ -45,14 +45,14 @@ class NodeConfigurationServiceTest extends TestCase
         ];
 
         $confirmation = $this->service->sendConfigurationWithConfirmation(
-            $node,
+            $node->node_id,  // Используем node_id вместо объекта
             $config,
             $cycle->id
         );
 
         $this->assertInstanceOf(NodeConfigurationConfirmation::class, $confirmation);
         $this->assertEquals('pending', $confirmation->status);
-        $this->assertEquals($node->id, $confirmation->node_id);
+        $this->assertEquals($node->node_id, $confirmation->node_id);  // Сравниваем node_id (string)
         $this->assertEquals($cycle->id, $confirmation->cycle_id);
     }
 
@@ -62,7 +62,7 @@ class NodeConfigurationServiceTest extends TestCase
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
         
         $confirmation = NodeConfigurationConfirmation::create([
-            'node_id' => $node->id,
+            'node_id' => $node->node_id,  // Используем node_id (string)
             'confirmation_id' => 'conf_123',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
@@ -80,7 +80,7 @@ class NodeConfigurationServiceTest extends TestCase
         
         $this->assertEquals('confirmed', $confirmation->status);
         $this->assertNotNull($confirmation->confirmed_at);
-        $this->assertEquals($receivedConfig, $confirmation->received_config);
+        $this->assertEquals($receivedConfig, $confirmation->confirmed_config);  // confirmed_config не received_config
     }
 
     /** @test */
