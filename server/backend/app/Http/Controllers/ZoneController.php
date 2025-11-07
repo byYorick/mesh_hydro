@@ -313,7 +313,7 @@ class ZoneController extends Controller
 
         // TODO: Отправка команды через MQTT
         // Формат топика: hydro/zone{N}/command/{node_id}
-        $mqttTopic = $zone->mqtt_topic_prefix . 'command/' . $request->input('node_id');
+        $mqttTopic = $zone->mqtt_topic_prefix . 'commands/' . $request->input('node_id');
         
         Log::info("⭐ Команда для зоны {$zone->name}: {$request->input('command')} → {$request->input('node_id')}");
 
@@ -325,6 +325,7 @@ class ZoneController extends Controller
                 'zone_name' => $zone->name,
                 'node_id' => $request->input('node_id'),
                 'command' => $request->input('command'),
+                'params' => $request->input('params', []),
                 'mqtt_topic' => $mqttTopic,
             ],
         ]);
@@ -362,6 +363,268 @@ class ZoneController extends Controller
                 'busy_nodes' => $busyNodes,
                 'conflicts_found' => count($busyNodes) > 0,
             ],
+        ]);
+    }
+
+    /**
+     * Получить Root Node зоны
+     * 
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function getRootNode(int $id): JsonResponse
+    {
+        $zone = Zone::with('rootNode')->find($id);
+
+        if (!$zone) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Зона не найдена',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $zone->rootNode,
+        ]);
+    }
+
+    /**
+     * Получить телеметрию зоны
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function getTelemetry(Request $request, int $id): JsonResponse
+    {
+        $zone = Zone::find($id);
+
+        if (!$zone) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Зона не найдена',
+            ], 404);
+        }
+
+        // Получаем узлы зоны
+        $nodes = $zone->getAllNodes();
+        $nodeIds = $nodes->pluck('node_id')->toArray();
+
+        if (empty($nodeIds)) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        // Получаем телеметрию для узлов зоны
+        $query = \App\Models\Telemetry::whereIn('node_id', $nodeIds);
+
+        // Фильтр по времени
+        if ($request->has('from')) {
+            $query->where('received_at', '>=', $request->input('from'));
+        }
+
+        if ($request->has('to')) {
+            $query->where('received_at', '<=', $request->input('to'));
+        }
+
+        $telemetry = $query->orderBy('received_at', 'desc')
+            ->limit($request->input('limit', 100))
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $telemetry,
+            'meta' => [
+                'zone_id' => $zone->id,
+                'zone_name' => $zone->name,
+                'nodes_count' => count($nodeIds),
+            ],
+        ]);
+    }
+
+    /**
+     * Получить статистику зоны
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function getStatistics(Request $request, int $id): JsonResponse
+    {
+        $zone = Zone::find($id);
+
+        if (!$zone) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Зона не найдена',
+            ], 404);
+        }
+
+        $nodes = $zone->getAllNodes();
+        $nodeIds = $nodes->pluck('node_id')->toArray();
+
+        if (empty($nodeIds)) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $field = $request->input('field', 'ph');
+        
+        // Получаем статистику из телеметрии
+        $stats = \DB::table('telemetry')
+            ->whereIn('node_id', $nodeIds)
+            ->where('received_at', '>=', now()->subDays(7))
+            ->selectRaw("
+                AVG((data->>'$field')::numeric) as avg_$field,
+                MIN((data->>'$field')::numeric) as min_$field,
+                MAX((data->>'$field')::numeric) as max_$field,
+                COUNT(*) as readings_count
+            ")
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats,
+            'meta' => [
+                'zone_id' => $zone->id,
+                'zone_name' => $zone->name,
+                'field' => $field,
+            ],
+        ]);
+    }
+
+    /**
+     * Назначить узел зоне
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function assignNode(Request $request, int $id): JsonResponse
+    {
+        $zone = Zone::find($id);
+
+        if (!$zone) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Зона не найдена',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'node_id' => 'required|string|exists:nodes,node_id',
+            'role' => 'required|string|in:ph_node,climate_node,relay_node,water_node,display_node',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $nodeId = $request->input('node_id');
+        $role = $request->input('role');
+
+        // Проверяем, что узел не используется в другой зоне
+        $node = Node::where('node_id', $nodeId)->first();
+        
+        // Если у узла другой root_node_id, возвращаем ошибку
+        if ($node->root_node_id && $node->root_node_id !== $zone->root_node_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Узел уже назначен другой зоне',
+                'data' => [
+                    'node_id' => $nodeId,
+                    'current_zone' => $node->zone?->name,
+                ],
+            ], 422);
+        }
+
+        // Обновляем root_node_id узла
+        $node->update(['root_node_id' => $zone->root_node_id]);
+
+        // Обновляем assigned_nodes зоны
+        $assignedNodes = $zone->assigned_nodes ?? [];
+        $assignedNodes[$role] = $nodeId;
+        $zone->update(['assigned_nodes' => $assignedNodes]);
+
+        // Создаем запись в истории назначений
+        \App\Models\ZoneNodeAssignment::create([
+            'zone_id' => $zone->id,
+            'node_id' => $nodeId,
+            'node_role' => $role,
+            'assigned_at' => now(),
+        ]);
+
+        Log::info("⭐ Узел назначен зоне", [
+            'zone_id' => $zone->id,
+            'zone_name' => $zone->name,
+            'node_id' => $nodeId,
+            'role' => $role,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Узел успешно назначен зоне',
+            'data' => [
+                'zone_id' => $zone->id,
+                'node_id' => $nodeId,
+                'role' => $role,
+            ],
+        ]);
+    }
+
+    /**
+     * Проверить доступность узлов
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function checkNodeAvailability(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'node_ids' => 'required|array',
+            'node_ids.*' => 'string|exists:nodes,node_id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $nodeIds = $request->input('node_ids');
+        $availability = [];
+
+        foreach ($nodeIds as $nodeId) {
+            $node = Node::where('node_id', $nodeId)->first();
+            
+            // Проверяем, используется ли узел в активной зоне
+            $usedInZone = null;
+            if ($node->root_node_id) {
+                $zone = Zone::where('root_node_id', $node->root_node_id)
+                    ->where('is_active', true)
+                    ->first();
+                $usedInZone = $zone ? $zone->name : null;
+            }
+
+            $availability[$nodeId] = [
+                'available' => is_null($usedInZone),
+                'used_in_zone' => $usedInZone,
+                'online' => $node->online,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $availability,
         ]);
     }
 }

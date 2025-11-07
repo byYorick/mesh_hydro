@@ -2,45 +2,75 @@
 
 ## 📋 Обзор
 
-Созданы unit тесты для компонентов и stores Growth Planner и Zoning.
+Фронтенд покрывается Vitest (happy-dom). Текущие тесты закрывают ключевые сценарии Growth Planner и Zone Management.
 
-## ✅ Созданные тесты
+### Сводка покрытия (istanbul)
 
-### Stores (2 файла)
-- ✅ `src/__tests__/stores/zones.test.ts` - Тесты для zones store
-- ✅ `src/__tests__/stores/growth.test.ts` - Тесты для growth store
+| Модуль | Stmts | Branches | Funcs | Lines |
+| --- | --- | --- | --- | --- |
+| `src/components/growth` | 82.84% | 77.77% | 80.39% | 83.66% |
+| `src/components/EventLog.vue` | 84% | 89.28% | 72.72% | 82.6% |
+| `src/components/NodeCard.vue` | 62.93% | 37.8% | 65.38% | 70.58% |
+| `src/stores/nodes.ts` | 55% | 47.5% | 81.48% | 52.74% |
+| `src/stores/telemetry.ts` | 65.07% | 50% | 92.85% | 63.33% |
+| `src/stores/zones.ts` | 52.94% | 32.43% | 68.96% | 51.85% |
+| `src/services/NodeStatusManager.ts` | 53.08% | 67.74% | 40% | 53.24% |
 
-### Components (5 файлов)
-- ✅ `src/__tests__/components/growth/GrowthPresetCard.test.ts` - Тесты для карточки пресета
-- ✅ `src/__tests__/components/growth/CycleCard.test.ts` - Тесты для карточки цикла
-- ✅ `src/__tests__/components/growth/StageTimeline.test.ts` - Тесты для временной шкалы стадий
-- ✅ `src/__tests__/components/growth/ZoneSelector.test.ts` - Тесты для селектора зон
-- ✅ `src/__tests__/components/growth/CreateCycleDialog.test.ts` - Тесты для диалога создания цикла
+Пробелы: остальные stores (`app`, `events`, `settings`, `nodeConfig`), сервисы (`api.ts`, `echo.ts`, `nodes-api.ts`), утилиты и `views/*`.
+
+## ✅ Имеющиеся тесты
+
+### Stores
+- `src/__tests__/stores/growth.test.ts`
+- `src/__tests__/stores/nodes.test.js`
+- `src/__tests__/stores/telemetry.test.js`
+- `src/__tests__/stores/zones.test.ts`
+- `src/__tests__/stores/errors.test.js`
+
+### Services
+- `src/__tests__/services/api.test.js`
+
+### Components
+- Growth: `CreateCycleDialog`, `CycleCard`, `GrowthPresetCard`, `StageTimeline`, `ZoneSelector`
+- Общие: `EventLog`, `NodeCard`, `ConfigEditor`
 
 ## 🚀 Запуск тестов
 
 ```bash
-# Все тесты
+# Локально (Node 18+)
+npm install
 npm test
 
 # В watch режиме
 npm test -- --watch
 
-# С покрытием
+# Покрытие (./coverage/)
 npm run test:coverage
 
 # Конкретный файл
 npm test -- src/__tests__/stores/zones.test.ts
 ```
 
+### Через Docker compose
+
+```powershell
+cd server
+docker compose -f docker-compose.dev.yml run --rm frontend sh -c "npm install && npm test"
+docker compose -f docker-compose.dev.yml run --rm frontend sh -c "npm install && npm run test:coverage"
+```
+
+> `npm install` внутри контейнера обязателен: volume `/app/node_modules` создаётся заново при каждом `docker compose run --rm`.
+
 ## ⚠️ Известные проблемы
 
-1. **CSS файлы Vuetify**: Требуется дополнительная настройка для обработки CSS импортов в тестах
-2. **Vuetify компоненты**: Некоторые компоненты могут требовать дополнительных моков
+1. **Vuetify + happy-dom**: предупреждение `Right-hand side of 'instanceof' is not an object` появляется в логе. Сообщение перехватывается в `src/__tests__/setup.js`, на результаты не влияет.
+2. **Глубокие компоненты Vuetify**: `VDataTable`, `VTreeview`, сложные layout-комбинации требуют точечных моков/стабов.
+3. **Chart.js**: графические компоненты пока без тестов.
 
 ## 📝 TODO
 
-- [ ] Тесты для страниц (GrowthPlanner, PresetLibrary)
-- [ ] Интеграционные тесты
-- [ ] E2E тесты (Playwright/Cypress)
+- [ ] Stores: `app`, `events`, `settings`, `nodeConfig`
+- [ ] Services/утилиты: `api.ts`, `echo.ts`, `nodes-api.ts`, `useOfflineMode.ts`, `usePopup.ts`
+- [ ] Ключевые UI: `AdvancedChart.vue`, `TelemetryChart.vue`, `NodeManagementCard.vue`, `views/*`
+- [ ] Интеграционные/E2E (Playwright/Cypress) — отдельный backlog
 

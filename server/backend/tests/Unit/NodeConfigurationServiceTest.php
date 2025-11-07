@@ -63,7 +63,6 @@ class NodeConfigurationServiceTest extends TestCase
         
         $confirmation = NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_123',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
             'sent_at' => now(),
@@ -72,7 +71,7 @@ class NodeConfigurationServiceTest extends TestCase
         $receivedConfig = ['target_ph' => 6.0];
 
         $this->service->handleConfigurationResponse(
-            $confirmation->confirmation_id,
+            $confirmation->id,
             $receivedConfig
         );
 
@@ -90,13 +89,12 @@ class NodeConfigurationServiceTest extends TestCase
         
         $confirmation = NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_123',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
             'sent_at' => now(),
         ]);
 
-        $this->service->markAsFailed($confirmation->confirmation_id, 'Timeout');
+        $this->service->markAsFailed($confirmation->id, 'Timeout');
 
         $confirmation->refresh();
         
@@ -110,25 +108,23 @@ class NodeConfigurationServiceTest extends TestCase
     {
         $node = Node::factory()->create(['node_id' => 'ph_test_001']);
         
-        // Создаем старое подтверждение (60 минут назад)
+        // Создаем старое подтверждение (70 секунд назад - превышает таймаут 60 секунд)
         $oldConfirmation = NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_old',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
-            'sent_at' => now()->subMinutes(60),
+            'sent_at' => now()->subSeconds(70),
         ]);
 
-        // Создаем свежее подтверждение (5 минут назад)
+        // Создаем свежее подтверждение (30 секунд назад - в пределах таймаута)
         $newConfirmation = NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_new',
             'sent_config' => ['target_ec' => 1.5],
             'status' => 'pending',
-            'sent_at' => now()->subMinutes(5),
+            'sent_at' => now()->subSeconds(30),
         ]);
 
-        $timedOut = $this->service->checkTimeouts(30); // 30 минут таймаут
+        $timedOut = $this->service->checkTimeouts();
 
         $this->assertGreaterThan(0, $timedOut);
 
@@ -146,7 +142,6 @@ class NodeConfigurationServiceTest extends TestCase
         
         NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_1',
             'sent_config' => ['target_ph' => 6.0],
             'status' => 'pending',
             'sent_at' => now(),
@@ -154,7 +149,6 @@ class NodeConfigurationServiceTest extends TestCase
 
         NodeConfigurationConfirmation::create([
             'node_id' => $node->node_id,  // Используем node_id (string)
-            'confirmation_id' => 'conf_2',
             'sent_config' => ['target_ec' => 1.5],
             'status' => 'confirmed',
             'sent_at' => now(),

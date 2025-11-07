@@ -15,6 +15,10 @@ class NodeZoningTest extends TestCase
     {
         parent::setUp();
         
+        // Очищаем все узлы перед каждым тестом
+        Node::query()->delete();
+        Zone::query()->delete();
+        
         // Создаем Root Node
         Node::create([
             'node_id' => 'test_root_001',
@@ -54,6 +58,9 @@ class NodeZoningTest extends TestCase
     /** @test */
     public function root_node_has_many_child_nodes()
     {
+        // Очищаем все узлы кроме root node
+        Node::where('node_id', '!=', 'test_root_001')->delete();
+        
         // Создаем дочерние узлы
         Node::create([
             'node_id' => 'ph_test_001',
@@ -124,6 +131,9 @@ class NodeZoningTest extends TestCase
     /** @test */
     public function it_gets_mesh_nodes_for_root()
     {
+        // Очищаем все узлы кроме root node
+        Node::where('node_id', '!=', 'test_root_001')->delete();
+        
         Node::create([
             'node_id' => 'ph_test_001',
             'node_type' => 'ph_ec',
@@ -145,6 +155,9 @@ class NodeZoningTest extends TestCase
     /** @test */
     public function it_gets_mesh_nodes_for_regular_node()
     {
+        // Очищаем все узлы кроме root node
+        Node::where('node_id', '!=', 'test_root_001')->delete();
+        
         Node::create([
             'node_id' => 'ph_test_001',
             'node_type' => 'ph_ec',

@@ -1,25 +1,36 @@
 /**
  * ⭐ GROWTH PLANNER: Тесты для CreateCycleDialog компонента
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import CreateCycleDialog from '@/components/growth/CreateCycleDialog.vue'
 import { useGrowthStore } from '@/stores/growth'
 import { useZonesStore } from '@/stores/zones'
 import axios from 'axios'
-
-vi.mock('axios')
 const mockedAxios = axios as any
+
+let wrapper: ReturnType<typeof mount> | null = null
 
 describe('CreateCycleDialog.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    mockedAxios.get.mockResolvedValue({ data: [] })
+    mockedAxios.post.mockResolvedValue({ data: {} })
+    wrapper = null
   })
 
-  it('renders dialog when modelValue is true', () => {
-    const wrapper = mount(CreateCycleDialog, {
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount()
+      wrapper = null
+    }
+    document.body.innerHTML = ''
+  })
+
+  it('renders dialog when modelValue is true', async () => {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -28,11 +39,14 @@ describe('CreateCycleDialog.vue', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Создать новый цикл роста')
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
+
+    expect(document.body.innerHTML).toContain('Создать новый цикл роста')
   })
 
   it('hides dialog when modelValue is false', () => {
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: false,
       },
@@ -46,8 +60,8 @@ describe('CreateCycleDialog.vue', () => {
     expect(dialog.props('modelValue')).toBe(false)
   })
 
-  it('starts at step 1', () => {
-    const wrapper = mount(CreateCycleDialog, {
+  it('starts at step 1', async () => {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -56,7 +70,10 @@ describe('CreateCycleDialog.vue', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Шаг 1: Выбор зоны')
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
+
+    expect(document.body.innerHTML).toContain('Шаг 1: Выбор зоны')
   })
 
   it('shows step 2 when next is clicked', async () => {
@@ -71,7 +88,7 @@ describe('CreateCycleDialog.vue', () => {
       } as any,
     ]
 
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -80,14 +97,17 @@ describe('CreateCycleDialog.vue', () => {
       },
     })
 
+    const vm: any = wrapper.vm
+
     // Выбираем зону
-    await wrapper.setData({ 'formData.zone': zonesStore.zones[0] })
+    vm.formData.zone = zonesStore.zones[0]
+    await vm.$nextTick()
     
     // Нажимаем "Далее"
     const nextButton = wrapper.findAll('button').find(btn => btn.text().includes('Далее'))
     if (nextButton) {
       await nextButton.trigger('click')
-      await wrapper.vm.$nextTick()
+      await vm.$nextTick()
       
       // Должен быть шаг 2
       expect(wrapper.text()).toContain('Шаг 2')
@@ -95,7 +115,7 @@ describe('CreateCycleDialog.vue', () => {
   })
 
   it('validates zone selection', async () => {
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -111,7 +131,7 @@ describe('CreateCycleDialog.vue', () => {
       await wrapper.vm.$nextTick()
       
       // Должна быть ошибка валидации
-      expect(wrapper.vm.errors.zone).toBeDefined()
+      expect((wrapper.vm as any).errors.zone).toBeDefined()
     }
   })
 
@@ -124,7 +144,7 @@ describe('CreateCycleDialog.vue', () => {
       ],
     })
 
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -134,15 +154,16 @@ describe('CreateCycleDialog.vue', () => {
     })
 
     // Переходим на шаг 2
-    await wrapper.setData({ currentStep: 2 })
-    await wrapper.vm.$nextTick()
+    const vm: any = wrapper.vm
+    vm.currentStep = 2
+    await vm.$nextTick()
 
     // Должны загрузиться пресеты
     expect(mockedAxios.get).toHaveBeenCalled()
   })
 
   it('validates preset selection', async () => {
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -152,16 +173,17 @@ describe('CreateCycleDialog.vue', () => {
     })
 
     // Переходим на шаг 2 и пытаемся на шаг 3 без выбора пресета
-    await wrapper.setData({ currentStep: 2 })
-    await wrapper.vm.$nextTick()
+    const vm: any = wrapper.vm
+    vm.currentStep = 2
+    await vm.$nextTick()
 
     const nextButton = wrapper.findAll('button').find(btn => btn.text().includes('Далее'))
     if (nextButton) {
       await nextButton.trigger('click')
-      await wrapper.vm.$nextTick()
+      await vm.$nextTick()
       
       // Должна быть ошибка валидации
-      expect(wrapper.vm.errors.preset).toBeDefined()
+      expect(vm.errors.preset).toBeDefined()
     }
   })
 
@@ -195,7 +217,7 @@ describe('CreateCycleDialog.vue', () => {
 
     mockedAxios.post.mockResolvedValue({ data: createdCycle })
 
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -205,14 +227,12 @@ describe('CreateCycleDialog.vue', () => {
     })
 
     // Заполняем форму
-    await wrapper.setData({
-      currentStep: 3,
-      'formData.zone': zonesStore.zones[0],
-      'formData.preset': mockPreset,
-      'formData.plant_count': 10,
-    })
-
-    await wrapper.vm.$nextTick()
+    const vm: any = wrapper.vm
+    vm.currentStep = 3
+    vm.formData.zone = zonesStore.zones[0]
+    vm.formData.preset = mockPreset as any
+    vm.formData.plant_count = 10
+    await vm.$nextTick()
 
     // Нажимаем "Создать цикл"
     const createButton = wrapper.findAll('button').find(btn => btn.text().includes('Создать цикл'))
@@ -235,7 +255,7 @@ describe('CreateCycleDialog.vue', () => {
       data: { id: 1, zone_id: 1, preset_id: 1, status: 'active' },
     })
 
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -245,20 +265,19 @@ describe('CreateCycleDialog.vue', () => {
     })
 
     // Заполняем и создаём
-    await wrapper.setData({
-      currentStep: 3,
-      'formData.zone': { id: 1 } as any,
-      'formData.preset': { id: 1 } as any,
-    })
+    const vm: any = wrapper.vm
+    vm.currentStep = 3
+    vm.formData.zone = { id: 1 } as any
+    vm.formData.preset = { id: 1 } as any
 
-    await wrapper.vm.createCycle()
-    await wrapper.vm.$nextTick()
+    await vm.createCycle()
+    await vm.$nextTick()
 
     expect(wrapper.emitted('created')).toBeTruthy()
   })
 
   it('closes dialog when cancel is clicked', async () => {
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -278,7 +297,7 @@ describe('CreateCycleDialog.vue', () => {
   })
 
   it('resets form when dialog is closed', async () => {
-    const wrapper = mount(CreateCycleDialog, {
+    wrapper = mount(CreateCycleDialog, {
       props: {
         modelValue: true,
       },
@@ -288,18 +307,23 @@ describe('CreateCycleDialog.vue', () => {
     })
 
     // Заполняем форму
-    await wrapper.setData({
-      currentStep: 2,
-      'formData.zone': { id: 1 } as any,
-    })
+    const vm: any = wrapper.vm
+    vm.currentStep = 2
+    vm.formData.zone = { id: 1 } as any
 
     // Закрываем диалог
     await wrapper.setProps({ modelValue: false })
-    await wrapper.vm.$nextTick()
+    await vm.$nextTick()
+    await new Promise(resolve => setTimeout(resolve, 0))
 
-    // Форма должна быть сброшена
-    expect(wrapper.vm.currentStep).toBe(1)
-    expect(wrapper.vm.formData.zone).toBeNull()
+    // Повторно открываем диалог, чтобы сработал reset
+    await wrapper.setProps({ modelValue: true })
+    await vm.$nextTick()
+    await Promise.resolve()
+
+    // Форма должна быть сброшена после повторного открытия
+    expect(vm.currentStep).toBe(1)
+    expect(vm.formData.zone).toBeNull()
   })
 })
 

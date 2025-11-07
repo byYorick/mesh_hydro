@@ -37,11 +37,15 @@ class GrowthAnalyticsTest extends TestCase
             'started_at' => now()->subDays(5),
         ]);
 
-        CycleParameterLog::factory()->count(3)->create([
-            'cycle_id' => $cycle->id,
-            'avg_ph' => 6.0,
-            'avg_ec' => 1.2,
-        ]);
+        foreach (range(1, 3) as $day) {
+            CycleParameterLog::factory()->create([
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(3 - $day)->startOfDay(),
+                'day_number' => $day,
+                'avg_ph' => 6.0,
+                'avg_ec' => 1.2,
+            ]);
+        }
 
         $response = $this->getJson("/api/growth/cycles/{$cycle->id}/analytics/chart");
 
@@ -66,11 +70,15 @@ class GrowthAnalyticsTest extends TestCase
             'culture_id' => $culture->id,
         ]);
 
-        CycleParameterLog::factory()->count(5)->create([
-            'cycle_id' => $cycle->id,
-            'avg_ph' => 6.0,
-            'avg_ec' => 1.2,
-        ]);
+        foreach (range(1, 5) as $day) {
+            CycleParameterLog::factory()->create([
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(5 - $day)->startOfDay(),
+                'day_number' => $day,
+                'avg_ph' => 6.0,
+                'avg_ec' => 1.2,
+            ]);
+        }
 
         $response = $this->getJson("/api/growth/cycles/{$cycle->id}/analytics/statistics");
 
@@ -160,11 +168,15 @@ class GrowthAnalyticsTest extends TestCase
             'harvest_weight_kg' => 10.5,
         ]);
 
-        CycleParameterLog::factory()->count(3)->create([
-            'cycle_id' => $cycle->id,
-            'avg_ph' => 6.0,
-            'water_consumed_liters' => 5.0,
-        ]);
+        foreach (range(1, 3) as $day) {
+            CycleParameterLog::factory()->create([
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(3 - $day)->startOfDay(),
+                'day_number' => $day,
+                'avg_ph' => 6.0,
+                'water_consumed_liters' => 5.0,
+            ]);
+        }
 
         $response = $this->postJson("/api/growth/cycles/{$cycle->id}/analytics/snapshot");
 

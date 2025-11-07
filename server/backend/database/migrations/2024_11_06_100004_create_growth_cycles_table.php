@@ -35,6 +35,9 @@ return new class extends Migration
             // Статус
             $table->enum('status', ['planning', 'active', 'paused', 'harvested', 'failed', 'cancelled'])->default('planning');
             
+            // Название цикла (опционально)
+            $table->string('name')->nullable();
+            
             // Количество растений
             $table->integer('plant_count')->nullable();
             

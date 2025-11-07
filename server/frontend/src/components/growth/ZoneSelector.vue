@@ -176,9 +176,12 @@ watch(() => props.modelValue, (newValue) => {
   selectedZoneId.value = newValue || null
 })
 
+watch(selectedZoneId, (zone) => {
+  emit('update:modelValue', zone)
+})
+
 function handleSelection(zone: Zone | null) {
   selectedZoneId.value = zone
-  emit('update:modelValue', zone)
 }
 
 function getZoneIcon(zoneType: string): string {

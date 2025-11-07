@@ -16,6 +16,10 @@ class ZoneModelTest extends TestCase
     {
         parent::setUp();
         
+        // Очищаем все данные перед каждым тестом
+        Node::query()->delete();
+        Zone::query()->delete();
+        
         // Создаем Root Node для тестов
         Node::create([
             'node_id' => 'test_root_001',
@@ -75,6 +79,9 @@ class ZoneModelTest extends TestCase
     /** @test */
     public function it_has_many_nodes()
     {
+        // Очищаем все узлы кроме root node
+        Node::where('node_id', '!=', 'test_root_001')->delete();
+        
         $zone = Zone::create([
             'name' => 'Test Zone',
             'root_node_id' => 'test_root_001',
@@ -128,6 +135,14 @@ class ZoneModelTest extends TestCase
     /** @test */
     public function it_can_get_all_nodes()
     {
+        // Используем существующий Root Node из setUp
+        $rootNode = Node::where('node_id', 'test_root_001')->first();
+        
+        // Создаем дочерние узлы
+        $phNode = Node::create(['node_id' => 'ph_test_001', 'node_type' => 'ph_ec', 'root_node_id' => 'test_root_001']);
+        $climateNode = Node::create(['node_id' => 'climate_test_001', 'node_type' => 'climate', 'root_node_id' => 'test_root_001']);
+        $relayNode = Node::create(['node_id' => 'relay_test_001', 'node_type' => 'relay', 'root_node_id' => 'test_root_001']);
+
         $zone = Zone::create([
             'name' => 'Test Zone',
             'root_node_id' => 'test_root_001',
@@ -143,16 +158,16 @@ class ZoneModelTest extends TestCase
         $nodes = $zone->getAllNodes();
 
         $this->assertCount(3, $nodes);
-        $this->assertContains('ph_test_001', $nodes);
-        $this->assertContains('climate_test_001', $nodes);
-        $this->assertContains('relay_test_001', $nodes);
+        $this->assertTrue($nodes->contains('node_id', 'ph_test_001'));
+        $this->assertTrue($nodes->contains('node_id', 'climate_test_001'));
+        $this->assertTrue($nodes->contains('node_id', 'relay_test_001'));
     }
 
     /** @test */
     public function it_checks_availability_for_new_cycle()
     {
         // Зона доступна
-        $availableZone = Zone::create([
+        $zone1 = Zone::create([
             'name' => 'Available Zone',
             'root_node_id' => 'test_root_001',
             'mesh_network_id' => 'TEST_MESH_001',
@@ -164,10 +179,19 @@ class ZoneModelTest extends TestCase
 
         $this->assertTrue($zone1->isAvailableForCycle());
 
+        // Создаем второй Root Node для второй зоны
+        Node::create([
+            'node_id' => 'test_root_002',
+            'node_type' => 'root',
+            'root_node_id' => 'test_root_002',
+            'online' => true,
+            'last_seen_at' => now(),
+        ]);
+
         // Зона недоступна (неактивна)
         $zone2 = Zone::create([
             'name' => 'Inactive Zone',
-            'root_node_id' => 'test_root_busy_001',
+            'root_node_id' => 'test_root_002',
             'mesh_network_id' => 'TEST_MESH_002',
             'zone_type' => 'dwc',
             'is_active' => false,
@@ -177,12 +201,41 @@ class ZoneModelTest extends TestCase
 
         $this->assertFalse($zone2->isAvailableForCycle());
 
+        // Создаем третий Root Node для занятой зоны
+        Node::create([
+            'node_id' => 'test_root_003',
+            'node_type' => 'root',
+            'root_node_id' => 'test_root_003',
+            'online' => true,
+            'last_seen_at' => now(),
+        ]);
+
+        // Зона занята (есть активный цикл)
+        $busyZone = Zone::create([
+            'name' => 'Busy Zone',
+            'root_node_id' => 'test_root_003',
+            'mesh_network_id' => 'TEST_MESH_003',
+            'zone_type' => 'nft',
+            'is_active' => true,
+            'is_available' => false,
+            'current_cycle_id' => 123,
+        ]);
+
         $this->assertFalse($busyZone->isAvailableForCycle());
     }
 
     /** @test */
     public function it_generates_mqtt_topic_prefix()
     {
+        // Создаем второй root узел (test_root_001 уже создан в setUp)
+        Node::create([
+            'node_id' => 'test_root_002',
+            'node_type' => 'root',
+            'root_node_id' => 'test_root_002',
+            'online' => true,
+            'last_seen_at' => now(),
+        ]);
+
         // С явно заданным префиксом
         $zone1 = Zone::create([
             'name' => 'Zone 1',
@@ -197,7 +250,7 @@ class ZoneModelTest extends TestCase
         // Без префикса - генерируется автоматически
         $zone2 = Zone::create([
             'name' => 'Zone 2',
-            'root_node_id' => 'test_root_001',
+            'root_node_id' => 'test_root_002',
             'mesh_network_id' => 'TEST_MESH_002',
             'zone_type' => 'dwc',
         ]);
@@ -223,6 +276,13 @@ class ZoneModelTest extends TestCase
     /** @test */
     public function it_has_status_attribute()
     {
+        // Используем существующий Root Node из setUp
+        $rootNode = Node::where('node_id', 'test_root_001')->first();
+        
+        // Создаем дочерние узлы
+        $phNode = Node::create(['node_id' => 'ph_test_001', 'node_type' => 'ph_ec', 'root_node_id' => 'test_root_001']);
+        $climateNode = Node::create(['node_id' => 'climate_test_001', 'node_type' => 'climate', 'root_node_id' => 'test_root_001']);
+
         $zone = Zone::create([
             'name' => 'Test Zone',
             'root_node_id' => 'test_root_001',
@@ -249,6 +309,7 @@ class ZoneModelTest extends TestCase
         $this->assertTrue($status['is_available']);
         $this->assertFalse($status['has_active_cycle']);
         $this->assertEquals(2, $status['nodes_count']);
+        $this->assertTrue($status['root_node_online']);
     }
 
     /** @test */

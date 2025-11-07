@@ -7,14 +7,13 @@ import { setActivePinia, createPinia } from 'pinia'
 import ZoneSelector from '@/components/growth/ZoneSelector.vue'
 import { useZonesStore, type Zone } from '@/stores/zones'
 import axios from 'axios'
-
-vi.mock('axios')
 const mockedAxios = axios as any
 
 describe('ZoneSelector.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    mockedAxios.get.mockResolvedValue({ data: [] })
   })
 
   const mockZones: Zone[] = [
@@ -152,7 +151,7 @@ describe('ZoneSelector.vue', () => {
 
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('Доступна')
+    expect(wrapper.text()).toMatch(/доступна/i)
   })
 
   it('shows busy alert for occupied zone', async () => {
@@ -207,7 +206,8 @@ describe('ZoneSelector.vue', () => {
     await wrapper.vm.$nextTick()
 
     // Зона 1 должна быть исключена
-    const availableZones = wrapper.vm.availableZones
+    const vm: any = wrapper.vm
+    const availableZones = vm.availableZones
     expect(availableZones.find((z: Zone) => z.id === 1)).toBeUndefined()
   })
 

@@ -26,6 +26,7 @@ class GrowthCycle extends Model
         'actual_harvest_at',
         'ended_at',
         'status',
+        'name',
         'plant_count',
         'harvest_weight_kg',
         'notes',

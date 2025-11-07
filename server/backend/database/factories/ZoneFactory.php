@@ -168,13 +168,16 @@ class ZoneFactory extends Factory
                     $nodeType = 'ph_ec';
                 }
 
-                Node::create([
-                    'node_id' => $nodeId,
-                    'node_type' => $nodeType,
-                    'root_node_id' => $zone->root_node_id,
-                    'online' => $this->faker->boolean(80), // 80% онлайн
-                    'last_seen_at' => now()->subMinutes($this->faker->numberBetween(1, 30)),
-                ]);
+                // Используем firstOrCreate чтобы избежать дубликатов
+                Node::firstOrCreate(
+                    ['node_id' => $nodeId],
+                    [
+                        'node_type' => $nodeType,
+                        'root_node_id' => $zone->root_node_id,
+                        'online' => $this->faker->boolean(80), // 80% онлайн
+                        'last_seen_at' => now()->subMinutes($this->faker->numberBetween(1, 30)),
+                    ]
+                );
             }
         });
     }

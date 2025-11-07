@@ -19,12 +19,12 @@ export const useNodesStore = defineStore('nodes', {
 
     // Get online nodes
     onlineNodes: (state) => {
-      return state.nodes.filter(node => node.online)
+      return state.nodes.filter(node => node.online === true || node.is_online === true)
     },
 
     // Get offline nodes
     offlineNodes: (state) => {
-      return state.nodes.filter(node => !node.online)
+      return state.nodes.filter(node => node.online === false || node.is_online === false)
     },
 
     // Get node by ID

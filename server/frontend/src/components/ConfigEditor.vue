@@ -175,6 +175,8 @@ const loading = ref(false)
 const config = ref({})
 const configJson = ref('')
 const jsonError = ref(null)
+const jsonTouched = ref(false)
+let syncingFromConfig = false
 
 // Initialize config when dialog opens
 watch(dialog, (newVal) => {
@@ -183,14 +185,28 @@ watch(dialog, (newVal) => {
   }
 })
 
+watch(config, (newValue) => {
+  if (!jsonTouched.value) {
+    syncingFromConfig = true
+    configJson.value = JSON.stringify(newValue || {}, null, 2)
+    syncingFromConfig = false
+  }
+}, { deep: true })
+
 function resetConfig() {
   config.value = { ...props.node.config } || {}
   config.value.zone = props.node.zone || ''
+  jsonTouched.value = false
+  syncingFromConfig = true
   configJson.value = JSON.stringify(props.node.config || {}, null, 2)
+  syncingFromConfig = false
   jsonError.value = null
 }
 
 function validateJson(value) {
+  if (!syncingFromConfig) {
+    jsonTouched.value = true
+  }
   try {
     JSON.parse(value)
     jsonError.value = null
@@ -216,6 +232,7 @@ async function saveConfig() {
 
     emit('config-updated', finalConfig)
     dialog.value = false
+    jsonTouched.value = false
   } finally {
     loading.value = false
   }

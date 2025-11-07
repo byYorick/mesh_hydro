@@ -1,18 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useErrorsStore } from '@/stores/errors'
-import axios from 'axios'
-
-// Mock axios
-vi.mock('axios', () => ({
-  default: {
-    create: vi.fn(() => ({
-      get: vi.fn(),
-      post: vi.fn(),
-      delete: vi.fn()
-    }))
-  }
-}))
 
 describe('useErrorsStore', () => {
   let store

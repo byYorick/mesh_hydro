@@ -3,7 +3,7 @@
     <v-timeline
       :density="density"
       :side="side"
-      :truncate-line="truncateLine"
+      :truncate-line="timelineTruncateLine"
     >
       <v-timeline-item
         v-for="(stage, index) in stages"
@@ -59,26 +59,20 @@
               <div class="text-body-2">{{ stage.description }}</div>
             </div>
 
-            <v-expansion-panels v-if="showTargetParams && stage.target_params" variant="accordion" class="mt-2">
-              <v-expansion-panel>
-                <v-expansion-panel-title>
-                  <span class="text-caption">Целевые параметры</span>
-                </v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-row dense>
-                    <v-col
-                      v-for="(value, key) in stage.target_params"
-                      :key="key"
-                      cols="6"
-                      md="4"
-                    >
-                      <div class="text-caption text-medium-emphasis">{{ formatParamName(key) }}</div>
-                      <div class="text-body-2 font-weight-medium">{{ formatParamValue(value) }}</div>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
+            <div v-if="showTargetParams && stage.target_params" class="target-params mt-2">
+              <div class="text-caption text-medium-emphasis mb-2">Целевые параметры</div>
+              <v-row dense>
+                <v-col
+                  v-for="(value, key) in stage.target_params"
+                  :key="key"
+                  cols="6"
+                  md="4"
+                >
+                  <div class="text-caption text-medium-emphasis">{{ formatParamName(key) }}</div>
+                  <div class="text-body-2 font-weight-medium">{{ formatParamValue(value) }}</div>
+                </v-col>
+              </v-row>
+            </div>
           </v-card-text>
         </v-card>
       </v-timeline-item>
@@ -109,6 +103,16 @@ const props = withDefaults(defineProps<Props>(), {
   showDetails: true,
   showTargetParams: true,
   showConnector: true,
+})
+
+const timelineTruncateLine = computed(() => {
+  if (props.truncateLine === true) {
+    return 'both'
+  }
+  if (props.truncateLine === false) {
+    return undefined
+  }
+  return props.truncateLine
 })
 
 function isActive(stage: GrowthStage): boolean {

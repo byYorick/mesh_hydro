@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ConfigEditor from '@/components/ConfigEditor.vue'
@@ -22,6 +22,14 @@ describe('ConfigEditor.vue', () => {
     pinia = createPinia()
   })
 
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount()
+      wrapper = undefined
+    }
+    document.body.innerHTML = ''
+  })
+
   it('renders dialog activator slot', () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
@@ -43,18 +51,22 @@ describe('ConfigEditor.vue', () => {
     // Open dialog
     wrapper.vm.dialog = true
     await wrapper.vm.$nextTick()
+    await Promise.resolve()
+    await Promise.resolve()
 
     expect(wrapper.vm.config.interval).toBe(30)
     expect(wrapper.vm.config.zone).toBe('Zone 1')
   })
 
-  it('validates JSON correctly', () => {
+  it('validates JSON correctly', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
       global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
 
     // Valid JSON
     wrapper.vm.validateJson('{"test": "value"}')
@@ -65,13 +77,15 @@ describe('ConfigEditor.vue', () => {
     expect(wrapper.vm.jsonError).toContain('Невалидный JSON')
   })
 
-  it('resetConfig restores original values', () => {
+  it('resetConfig restores original values', async () => {
     wrapper = mount(ConfigEditor, {
       props: { node: sampleNode },
       global: { plugins: [pinia] }
     })
 
     wrapper.vm.dialog = true
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
     wrapper.vm.config.interval = 60 // Change value
 
     wrapper.vm.resetConfig()
@@ -86,7 +100,11 @@ describe('ConfigEditor.vue', () => {
     })
 
     wrapper.vm.dialog = true
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
     wrapper.vm.config.interval = 60
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
 
     await wrapper.vm.saveConfig()
 
@@ -101,8 +119,12 @@ describe('ConfigEditor.vue', () => {
     })
 
     wrapper.vm.dialog = true
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
     wrapper.vm.configJson = '{"interval": 90, "new_field": true}'
     wrapper.vm.validateJson(wrapper.vm.configJson)
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
 
     await wrapper.vm.saveConfig()
 
@@ -128,9 +150,11 @@ describe('ConfigEditor.vue', () => {
 
     wrapper.vm.dialog = true
     await wrapper.vm.$nextTick()
+    await Promise.resolve()
 
-    expect(wrapper.html()).toContain('pH мин')
-    expect(wrapper.html()).toContain('pH макс')
+    const html = document.body.innerHTML
+    expect(html).toContain('pH мин')
+    expect(html).toContain('pH макс')
   })
 
   it('renders Climate specific fields', async () => {
@@ -141,9 +165,11 @@ describe('ConfigEditor.vue', () => {
 
     wrapper.vm.dialog = true
     await wrapper.vm.$nextTick()
+    await Promise.resolve()
 
-    expect(wrapper.html()).toContain('Температура мин')
-    expect(wrapper.html()).toContain('CO₂ макс')
+    const html = document.body.innerHTML
+    expect(html).toContain('Температура мин')
+    expect(html).toContain('CO₂ макс')
   })
 
   it('closes dialog after successful save', async () => {
@@ -153,6 +179,7 @@ describe('ConfigEditor.vue', () => {
     })
 
     wrapper.vm.dialog = true
+    await wrapper.vm.$nextTick()
     expect(wrapper.vm.dialog).toBe(true)
 
     await wrapper.vm.saveConfig()

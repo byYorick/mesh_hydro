@@ -14,7 +14,7 @@ class CheckStageTransitionsCommand extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'growth:check-stage-transitions';
+    protected $signature = 'growth:check-transitions';
 
     /**
      * The console command description.
@@ -96,8 +96,8 @@ class CheckStageTransitionsCommand extends Command
 
         // Проверяем, не создана ли уже рекомендация для этого перехода
         $existingRecommendation = StageTransitionRecommendation::where('cycle_id', $cycle->id)
-            ->where('from_stage_id', $currentStage->id)
-            ->where('to_stage_id', $nextStage->id)
+            ->where('current_stage_id', $currentStage->id)
+            ->where('recommended_stage_id', $nextStage->id)
             ->where('status', 'pending')
             ->first();
 

@@ -78,7 +78,7 @@ describe('CycleCard.vue', () => {
 
     const progressBar = wrapper.findComponent({ name: 'VProgressLinear' })
     expect(progressBar.exists()).toBe(true)
-    expect(progressBar.props('modelValue')).toBe(50)
+    expect(wrapper.text()).toContain('50%')
   })
 
   it('displays current stage information', () => {

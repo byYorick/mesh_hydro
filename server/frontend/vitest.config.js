@@ -3,19 +3,15 @@ import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
 import { fileURLToPath } from 'node:url'
 
-// Плагин для перехвата CSS импортов до загрузки Node.js
+// Простая заглушка для CSS/SCSS импортов в Vitest окружении
+const CSS_RE = /\.(css|scss|sass)(?:\?.*)?$/
+
 const cssHandler = () => ({
   name: 'css-handler',
   enforce: 'pre',
-  resolveId(id) {
-    if (id && typeof id === 'string' && (id.endsWith('.css') || id.endsWith('.scss') || id.endsWith('.sass'))) {
-      return `\0css:${id}`
-    }
-    return null
-  },
   load(id) {
-    if (id && typeof id === 'string' && id.startsWith('\0css:')) {
-      return ''
+    if (typeof id === 'string' && CSS_RE.test(id)) {
+      return 'export default {}'
     }
     return null
   }
@@ -33,12 +29,16 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/__tests__/setup.js'],
+    deps: {
+      inline: ['vuetify']
+    },
     coverage: {
-      provider: 'v8',
+      provider: 'istanbul',
       reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.{ts,tsx,js,jsx,vue}'],
       exclude: [
-        'node_modules/',
-        'src/__tests__/',
+        '**/node_modules/**',
+        'src/__tests__/**',
         '*.config.js',
         'src/main.js'
       ]

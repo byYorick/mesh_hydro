@@ -1,66 +1,37 @@
 # Итоговый статус Frontend тестов
 
-## ✅ Создано тестов: 7 файлов, 63+ тест-кейсов
+## ✅ Покрытие
 
-### Stores (2 файла):
-- ✅ `zones.test.ts` - 10+ тестов
-- ✅ `growth.test.ts` - 15+ тестов
+- 14 файлов тестов (stores, services, компоненты growth + общие)
+- 140+ проверок, стабильный прогон `vitest run` / `docker compose run … npm test`
+- HTML/JSON отчёты покрытия: `server/frontend/coverage/`
 
-### Components (5 файлов):
-- ✅ `GrowthPresetCard.test.ts` - 8+ тестов
-- ✅ `CycleCard.test.ts` - 10+ тестов
-- ✅ `StageTimeline.test.ts` - 10+ тестов
-- ✅ `ZoneSelector.test.ts` - 10+ тестов
-- ✅ `CreateCycleDialog.test.ts` - 10+ тестов
+## 📊 Покрытие (istanbul)
 
-## ⚠️ Известная проблема: CSS импорты Vuetify
+| Модуль | Stmts | Branches | Funcs | Lines |
+| --- | --- | --- | --- | --- |
+| `src/components/growth` | 82.84% | 77.77% | 80.39% | 83.66% |
+| `src/components/EventLog.vue` | 84% | 89.28% | 72.72% | 82.6% |
+| `src/components/NodeCard.vue` | 62.93% | 37.8% | 65.38% | 70.58% |
+| `src/stores/nodes.ts` | 55% | 47.5% | 81.48% | 52.74% |
+| `src/stores/telemetry.ts` | 65.07% | 50% | 92.85% | 63.33% |
+| `src/stores/zones.ts` | 52.94% | 32.43% | 68.96% | 51.85% |
 
-**Ошибка:** `TypeError: Unknown file extension ".css" for /app/node_modules/vuetify/lib/components/VCode/VCode.css`
+## ⚠️ Ограничения
 
-**Причина:** Node.js пытается загрузить CSS файлы напрямую через require/import до того, как Vite может их обработать.
+1. **Vuetify + happy-dom**: предупреждение `Right-hand side of 'instanceof' is not an object` перехватывается в `src/__tests__/setup.js`, но остаётся в логе.
+2. **Chart.js**: компоненты визуализации (например, `TelemetryChart.vue`) пока без моков.
+3. **Большинство views и вспомогательных stores** не покрыты.
 
-**Попытки решения:**
-1. ✅ Создан плагин `cssHandler` с `enforce: 'pre'`
-2. ✅ Настроен `resolve.alias` для CSS файлов
-3. ✅ Создан мок файл `__mocks__/styleMock.js`
-4. ✅ Установлен `sass` для обработки стилей
-5. ✅ Настроен `styles: 'sass'` в Vuetify
-6. ⚠️ Проблема не решена полностью
+## 🔧 Следующие шаги
 
-## 🔧 Рекомендуемые решения
-
-### Вариант 1: Обновить Vuetify
-```bash
-npm install vuetify@latest
-```
-
-### Вариант 2: Использовать vite-plugin-css-modules
-```bash
-npm install -D vite-plugin-css-modules
-```
-
-### Вариант 3: Мокировать Vuetify компоненты
-Создать моки для всех Vuetify компонентов, которые импортируют CSS
-
-### Вариант 4: Использовать другой тестовый фреймворк
-- Jest с правильной конфигурацией
-- Playwright для E2E тестов
-
-## 📊 Текущий статус
-
-- ✅ **Тесты написаны** - 63+ тест-кейсов готовы
-- ✅ **Конфигурация настроена** - vitest.config.js, setup.js
-- ⚠️ **CSS импорты** - требуют дополнительной настройки
-- ✅ **Структура готова** - все тесты созданы
-
-## 🚀 Следующие шаги
-
-1. Решить проблему с CSS импортами (варианты выше)
-2. Запустить все тесты после исправления
-3. Исправить найденные баги
-4. Добавить покрытие кода
+1. Написать тесты для stores `app`, `events`, `settings`, `nodeConfig`.
+2. Покрыть `services/api.ts`, `echo.ts`, `nodes-api.ts`, а также util-композаблы (`useOfflineMode`, `usePopup`).
+3. Протестировать высокоуровневые UI (`AdvancedChart.vue`, `TelemetryChart.vue`, `NodeManagementCard.vue`, `views/*`).
+4. Подготовить интеграционные/E2E сценарии (Playwright/Cypress) — отдельный backlog.
 
 ## 📝 Примечание
 
-Проблема с CSS импортами Vuetify в Vitest является известной и требует дополнительной настройки. Тесты написаны правильно и готовы к запуску после решения проблемы с CSS.
+- Покрытие собирается командой `npm run test:coverage` (локально или через Docker compose с обязательным `npm install`).
+- Отчёт `coverage/index.html` отображает детальный разбор по каждому файлу.
 

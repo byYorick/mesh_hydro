@@ -86,10 +86,11 @@ class MqttIntegrationTest extends TestCase
     {
         $zone = Zone::factory()->withNodes()->create();
         $node = $zone->getAllNodes()->first();
+        $node->update(['online' => true, 'last_seen_at' => now()]);
 
         // Отправляем команду с требованием подтверждения
         $response = $this->postJson("/api/nodes/{$node->node_id}/config", [
-            'target_ph' => 6.0,
+            'config' => ['target_ph' => 6.0],
             'require_confirmation' => true,
         ]);
 
@@ -101,8 +102,8 @@ class MqttIntegrationTest extends TestCase
 
         // Проверяем, что подтверждение создано в БД
         $this->assertDatabaseHas('node_configuration_confirmations', [
-            'confirmation_id' => $confirmationId,
-            'node_id' => $node->id,
+            'id' => $confirmationId,
+            'node_id' => $node->node_id,
             'status' => 'pending',
         ]);
     }
@@ -204,8 +205,8 @@ class MqttIntegrationTest extends TestCase
         ];
 
         foreach ($patterns as $pattern) {
-            // Проверяем, что паттерн валиден
-            $this->assertMatchesRegularExpression('#^hydro/[+#/a-z0-9_]+$#i', $pattern);
+            // Проверяем, что паттерн валиден (используем ~ как разделитель вместо #)
+            $this->assertMatchesRegularExpression('~^hydro/[+#/a-z0-9_]+$~i', $pattern);
         }
     }
 }

@@ -68,23 +68,16 @@ class GrowthAnalyticsServiceTest extends TestCase
         ]);
 
         // Создаем логи параметров
-        CycleParameterLog::create([
-            'cycle_id' => $cycle->id,
-            'log_date' => now()->subDays(3),
-            'day_number' => 3,
-            'avg_ph' => 6.1,
-            'avg_ec' => 1.3,
-            'avg_temp' => 22.5,
-        ]);
-
-        CycleParameterLog::create([
-            'cycle_id' => $cycle->id,
-            'log_date' => now()->subDays(1),
-            'day_number' => 5,
-            'avg_ph' => 6.0,
-            'avg_ec' => 1.2,
-            'avg_temp' => 22.0,
-        ]);
+        foreach (range(1, 3) as $day) {
+            CycleParameterLog::factory()->create([
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(3 - $day)->startOfDay(),
+                'day_number' => $day,
+                'avg_ph' => 6.0,
+                'avg_ec' => 1.2,
+                'water_consumed_liters' => 5.0,
+            ]);
+        }
 
         // Получаем график
         $chart = $this->analytics->getParameterChartByStages($cycle->id, ['ph', 'ec']);
@@ -242,11 +235,15 @@ class GrowthAnalyticsServiceTest extends TestCase
             'started_at' => now()->subDays(10),
         ]);
 
-        CycleParameterLog::factory()->count(5)->create([
-            'cycle_id' => $cycle->id,
-            'avg_ph' => 6.0,
-            'avg_ec' => 1.2,
-        ]);
+        foreach (range(1, 5) as $day) {
+            CycleParameterLog::factory()->create([
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(5 - $day)->startOfDay(),
+                'day_number' => $day,
+                'avg_ph' => 6.0,
+                'avg_ec' => 1.2,
+            ]);
+        }
 
         $report = $this->analytics->getCycleReport($cycle->id);
 

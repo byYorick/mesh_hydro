@@ -49,7 +49,6 @@ declare module 'vue' {
     Sparkline: typeof import('./src/components/ui/Sparkline.vue')['default']
     StageTimeline: typeof import('./src/components/growth/StageTimeline.vue')['default']
     StatCard: typeof import('./src/components/ui/StatCard.vue')['default']
-    StatusBar: typeof import('./src/components/StatusBar.vue')['default']
     SystemStatusCard: typeof import('./src/components/SystemStatusCard.vue')['default']
     TelegramSetupGuide: typeof import('./src/components/TelegramSetupGuide.vue')['default']
     TelemetryChart: typeof import('./src/components/TelemetryChart.vue')['default']

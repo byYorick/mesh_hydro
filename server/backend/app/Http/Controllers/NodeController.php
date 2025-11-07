@@ -169,8 +169,10 @@ class NodeController extends Controller
 
             return response()->json([
                 'success' => true,
+                'status' => 'awaiting_confirmation',
                 'message' => 'Config updated and sent to node (awaiting confirmation)',
                 'node' => $node,
+                'confirmation_id' => $confirmation->id,
                 'confirmation' => $confirmation,
             ]);
         }
@@ -180,15 +182,19 @@ class NodeController extends Controller
             try {
                 $mqtt->sendConfig($nodeId, $validated['config']);
                 $message = 'Config updated and sent to node';
+                $status = 'sent';
             } catch (\Exception $e) {
                 $message = 'Config updated but failed to send to node: ' . $e->getMessage();
+                $status = 'queued';
             }
         } else {
             $message = 'Config updated but node is offline';
+            $status = 'queued';
         }
 
         return response()->json([
             'success' => true,
+            'status' => $status,
             'message' => $message,
             'node' => $node,
         ]);
@@ -206,14 +212,6 @@ class NodeController extends Controller
             'params' => 'nullable|array',
         ]);
 
-        // Проверка что узел онлайн
-        if (!$node->isOnline()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Node is offline',
-            ], 400);
-        }
-
         // Создание записи команды в БД
         $command = Command::create([
             'node_id' => $nodeId,
@@ -221,6 +219,16 @@ class NodeController extends Controller
             'params' => $validated['params'] ?? [],
             'status' => Command::STATUS_PENDING,
         ]);
+
+        // Если узел офлайн — помещаем команду в очередь
+        if (!$node->isOnline()) {
+            return response()->json([
+                'success' => true,
+                'status' => 'queued',
+                'message' => 'Node is offline, command queued for delivery',
+                'command' => $command,
+            ]);
+        }
 
         // Отправка через MQTT
         try {
@@ -235,16 +243,18 @@ class NodeController extends Controller
 
             return response()->json([
                 'success' => true,
+                'status' => 'sent',
                 'message' => 'Command sent to node',
-                'command' => $command,
+                'command' => $command->fresh(),
             ]);
         } catch (\Exception $e) {
             $command->markAsFailed($e->getMessage());
 
             return response()->json([
                 'success' => false,
+                'status' => 'failed',
                 'error' => 'Failed to send command: ' . $e->getMessage(),
-                'command' => $command,
+                'command' => $command->fresh(),
             ], 500);
         }
     }

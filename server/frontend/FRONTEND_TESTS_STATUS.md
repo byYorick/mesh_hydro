@@ -1,61 +1,35 @@
 # Статус Frontend тестов
 
-## ✅ Создано тестов
+## ✅ Покрытые области (Vitest)
 
-### Stores (2 файла):
-- ✅ `src/__tests__/stores/zones.test.ts` - 10+ тестов
-- ✅ `src/__tests__/stores/growth.test.ts` - 15+ тестов
+- Growth Planner: `CreateCycleDialog`, `CycleCard`, `GrowthPresetCard`, `StageTimeline`, `ZoneSelector`
+- Общие компоненты: `EventLog`, `NodeCard`, `ConfigEditor`
+- Stores: `growth`, `zones`, `nodes`, `telemetry`, `errors`
+- Services: `api`
 
-### Components (5 файлов):
-- ✅ `src/__tests__/components/growth/GrowthPresetCard.test.ts` - 8+ тестов
-- ✅ `src/__tests__/components/growth/CycleCard.test.ts` - 10+ тестов
-- ✅ `src/__tests__/components/growth/StageTimeline.test.ts` - 10+ тестов
-- ✅ `src/__tests__/components/growth/ZoneSelector.test.ts` - 10+ тестов
-- ✅ `src/__tests__/components/growth/CreateCycleDialog.test.ts` - 10+ тестов
+**Всего:** 14 файлов тестов, 140+ assert-случаев.
 
-**Всего: ~63+ тест-кейсов создано**
+## 📊 Сводка покрытия (istanbul)
 
-## ⚠️ Известная проблема
+| Область | Stmts | Branches | Funcs | Lines |
+| --- | --- | --- | --- | --- |
+| Компоненты Growth | 82.84% | 77.77% | 80.39% | 83.66% |
+| `EventLog.vue` | 84% | 89.28% | 72.72% | 82.6% |
+| `NodeCard.vue` | 62.93% | 37.8% | 65.38% | 70.58% |
+| `stores/nodes.ts` | 55% | 47.5% | 81.48% | 52.74% |
+| `stores/telemetry.ts` | 65.07% | 50% | 92.85% | 63.33% |
+| `stores/zones.ts` | 52.94% | 32.43% | 68.96% | 51.85% |
 
-### CSS импорты из Vuetify
-Ошибка: `TypeError: Unknown file extension ".css" for /app/node_modules/vuetify/lib/components/VCode/VCode.css`
+## ⚠️ Известные ограничения
 
-**Причина:** Node.js пытается загрузить CSS файлы напрямую, до обработки Vite.
-
-**Попытки решения:**
-1. ✅ Создан плагин `ignoreCssPlugin` с `enforce: 'pre'`
-2. ✅ Настроен `resolve.extensions`
-3. ✅ Настроен `css.transformer`
-4. ⚠️ Проблема не решена полностью
-
-## 🔧 Рекомендуемое решение
-
-### Вариант 1: Использовать vite-plugin-css
-```bash
-npm install -D vite-plugin-css
-```
-
-### Вариант 2: Обновить Vuetify конфигурацию
-Использовать `styles: 'none'` в vite-plugin-vuetify (не работает для всех компонентов)
-
-### Вариант 3: Использовать другой тестовый фреймворк
-- Jest с правильной конфигурацией
-- Playwright для E2E тестов
-
-### Вариант 4: Мокировать Vuetify компоненты
-Создать моки для всех Vuetify компонентов, которые импортируют CSS
-
-## 📝 Текущий статус
-
-- ✅ **Тесты написаны** - 63+ тест-кейсов
-- ✅ **Конфигурация настроена** - vitest.config.js, setup.js
-- ⚠️ **CSS импорты** - требуют дополнительной настройки
-- ✅ **Структура готова** - все тесты созданы и готовы к запуску
+1. **Vuetify + happy-dom**: предупреждение `Right-hand side of 'instanceof' is not an object` перехватывается в `setup.js`, но остаётся в логах.
+2. **Chart.js / canvas**: компоненты `TelemetryChart`, `AdvancedChart` пока не покрыты.
+3. **Views и оставшиеся stores** требуют новых сценариев.
 
 ## 🚀 Следующие шаги
 
-1. Решить проблему с CSS импортами
-2. Запустить все тесты
-3. Исправить найденные баги
-4. Добавить покрытие кода
+1. Stores: `app`, `events`, `settings`, `nodeConfig`
+2. Services/утилиты: `api.ts`, `echo.ts`, `nodes-api.ts`, `useOfflineMode.ts`, `usePopup.ts`
+3. Key UI/Views: `AdvancedChart.vue`, `TelemetryChart.vue`, `NodeManagementCard.vue`, `views/*`
+4. Интеграционное/E2E покрытие (Playwright/Cypress) — отдельный backlog
 

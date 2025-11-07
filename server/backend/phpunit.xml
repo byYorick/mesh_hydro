@@ -19,15 +19,29 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
-        <env name="APP_KEY" value="base64:test"/>
+        <env name="APP_KEY" value="base64:hydro_test_key_2025"/>
+        <env name="APP_DEBUG" value="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="hydro_test"/>
+        <env name="DB_HOST" value="postgres"/>
+        <env name="DB_PORT" value="5432"/>
+        <env name="DB_DATABASE" value="hydro_dev"/>
+        <env name="DB_USERNAME" value="hydro"/>
+        <env name="DB_PASSWORD" value="hydro_dev_pass"/>
+        <env name="BROADCAST_DRIVER" value="log"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="MQTT_HOST" value="mosquitto"/>
+        <env name="MQTT_PORT" value="1883"/>
+        <env name="MQTT_CLIENT_ID" value="hydro_test"/>
+        <env name="REVERB_APP_ID" value="hydro-test"/>
+        <env name="REVERB_APP_KEY" value="hydro-test-key"/>
+        <env name="REVERB_APP_SECRET" value="hydro-test-secret"/>
+        <env name="REVERB_HOST" value="reverb"/>
+        <env name="REVERB_PORT" value="8080"/>
     </php>
 </phpunit>
 

@@ -57,7 +57,7 @@ describe('NodeCard.vue', () => {
 
     // Status should be success (green) for online node
     expect(wrapper.vm.statusColor).toBe('success')
-    expect(wrapper.vm.statusText).toBe('Online')
+    expect(wrapper.vm.statusText).toBe('Онлайн')
   })
 
   it('displays correct status color for offline node', () => {

@@ -192,5 +192,58 @@ class NodeConfigurationService
 
         return $status;
     }
+
+    /**
+     * Обработка ответа конфигурации от узла (алиас для handleConfigurationConfirmation)
+     */
+    public function handleConfigurationResponse(
+        int $confirmationId,
+        array $receivedConfig
+    ): ?NodeConfigurationConfirmation {
+        $confirmation = NodeConfigurationConfirmation::find($confirmationId);
+        
+        if (!$confirmation) {
+            return null;
+        }
+
+        return $this->handleConfigurationConfirmation(
+            $confirmation->node_id,
+            $receivedConfig,
+            $confirmationId
+        );
+    }
+
+    /**
+     * Пометить подтверждение как проваленное
+     */
+    public function markAsFailed(int $confirmationId, string $reason = 'Unknown error'): bool
+    {
+        $confirmation = NodeConfigurationConfirmation::find($confirmationId);
+        
+        if (!$confirmation) {
+            return false;
+        }
+
+        $confirmation->fail($reason);
+        
+        Log::warning("Configuration marked as failed", [
+            'confirmation_id' => $confirmationId,
+            'node_id' => $confirmation->node_id,
+            'reason' => $reason,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Получить ожидающие подтверждения для узла
+     */
+    public function getPendingConfirmations(string $nodeId)
+    {
+        return NodeConfigurationConfirmation::where('node_id', $nodeId)
+            ->where('status', 'pending')
+            ->orderBy('sent_at', 'desc')
+            ->get();
+    }
 }
 

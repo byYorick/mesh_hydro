@@ -44,6 +44,8 @@
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vitest/ui": "^1.1.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/coverage-istanbul": "^1.6.1",
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.4.0",
     "@vueuse/core": "^10.7.0",

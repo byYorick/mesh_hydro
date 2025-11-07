@@ -79,10 +79,12 @@ class Zone extends Model
 
     /**
      * Все узлы зоны (через root_node_id)
+     * Исключает сам Root Node, возвращает только дочерние узлы
      */
     public function nodes(): HasMany
     {
-        return $this->hasMany(Node::class, 'root_node_id', 'root_node_id');
+        return $this->hasMany(Node::class, 'root_node_id', 'root_node_id')
+            ->whereColumn('node_id', '!=', 'root_node_id');
     }
 
     /**
@@ -105,19 +107,25 @@ class Zone extends Model
     }
 
     /**
-     * Получить все узлы зоны (ID)
+     * Получить все узлы зоны (как Collection моделей Node)
      * 
-     * @return array
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getAllNodes(): array
+    public function getAllNodes()
     {
-        return array_filter([
+        $nodeIds = array_filter([
             $this->getNodeByRole('ph_node'),
             $this->getNodeByRole('climate_node'),
             $this->getNodeByRole('relay_node'),
             $this->getNodeByRole('water_node'),
             $this->getNodeByRole('display_node'),
         ]);
+
+        if (empty($nodeIds)) {
+            return collect([]);
+        }
+
+        return Node::whereIn('node_id', $nodeIds)->get();
     }
 
     /**
@@ -142,7 +150,9 @@ class Zone extends Model
         $nodes = $this->getAllNodes();
         $busy = [];
 
-        foreach ($nodes as $nodeId) {
+        foreach ($nodes as $node) {
+            $nodeId = $node->node_id;
+            
             // Проверяем, не используется ли узел в другой активной зоне
             $otherZone = self::where('id', '!=', $this->id)
                 ->where('is_active', true)

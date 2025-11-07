@@ -101,6 +101,7 @@ class FullGrowthCycleTest extends TestCase
         $zone1 = Zone::factory()->withRootNode()->create(['name' => 'NFT Zone 1']);
         $zone2 = Zone::factory()->withRootNode()->create(['name' => 'DWC Zone 2']);
         $zone3 = Zone::factory()->withRootNode()->create(['name' => 'Drip Zone 3']);
+        $zones = [$zone1, $zone2, $zone3];
 
         // Создаем культуры и пресеты
         $culture1 = GrowthCulture::factory()->create();
@@ -122,6 +123,7 @@ class FullGrowthCycleTest extends TestCase
             'culture_id' => $culture1->id,
             'status' => 'active',
         ]);
+        $zone1->update(['current_cycle_id' => $cycle1->id]);
 
         $cycle2 = GrowthCycle::factory()->create([
             'zone_id' => $zone2->id,
@@ -129,6 +131,7 @@ class FullGrowthCycleTest extends TestCase
             'culture_id' => $culture2->id,
             'status' => 'active',
         ]);
+        $zone2->update(['current_cycle_id' => $cycle2->id]);
 
         $cycle3 = GrowthCycle::factory()->create([
             'zone_id' => $zone3->id,
@@ -136,6 +139,7 @@ class FullGrowthCycleTest extends TestCase
             'culture_id' => $culture3->id,
             'status' => 'active',
         ]);
+        $zone3->update(['current_cycle_id' => $cycle3->id]);
 
         // Проверяем изоляцию зон
         $this->assertNotEquals($cycle1->zone_id, $cycle2->zone_id);

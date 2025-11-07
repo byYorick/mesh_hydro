@@ -53,10 +53,12 @@ class Node extends Model
 
     /**
      * ⭐ ЗОНИРОВАНИЕ: Дочерние узлы (для Root Node)
+     * Исключает сам Root Node из списка (где node_id != root_node_id)
      */
     public function childNodes(): HasMany
     {
-        return $this->hasMany(Node::class, 'root_node_id', 'node_id');
+        return $this->hasMany(Node::class, 'root_node_id', 'node_id')
+            ->whereColumn('node_id', '!=', 'root_node_id');
     }
 
     /**

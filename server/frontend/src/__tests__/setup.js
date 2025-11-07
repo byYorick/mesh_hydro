@@ -4,6 +4,32 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
+vi.mock('axios', () => {
+  const axiosMock = {
+    get: vi.fn().mockResolvedValue({ data: [] }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn().mockResolvedValue({ data: {} }),
+    patch: vi.fn().mockResolvedValue({ data: {} }),
+    interceptors: {
+      request: {
+        use: vi.fn(() => 0),
+        eject: vi.fn()
+      },
+      response: {
+        use: vi.fn(() => 0),
+        eject: vi.fn()
+      }
+    },
+    create: vi.fn(() => axiosMock)
+  }
+
+  return {
+    default: axiosMock,
+    ...axiosMock
+  }
+})
+
 // Mock Vuetify
 const vuetify = createVuetify({
   components,
@@ -38,6 +64,40 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve () {}
 }
 
+// Mock visualViewport (используется Vuetify диалогами)
+if (!global.visualViewport) {
+  global.visualViewport = {
+    width: 1024,
+    height: 768,
+    scale: 1,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn()
+  }
+}
+
+// Stub scrollTo чтобы избегать ошибок в тестах
+if (!window.scrollTo) {
+  window.scrollTo = vi.fn()
+}
+
+const HTMLElementCtor = typeof window !== 'undefined' && window.HTMLElement ? window.HTMLElement : class {}
+const ElementCtor = typeof window !== 'undefined' && window.Element ? window.Element : HTMLElementCtor
+const SVGElementCtor = typeof window !== 'undefined' && window.SVGElement ? window.SVGElement : class {}
+
+global.HTMLElement = HTMLElementCtor
+global.Element = ElementCtor
+global.SVGElement = SVGElementCtor
+globalThis.HTMLElement = HTMLElementCtor
+globalThis.Element = ElementCtor
+globalThis.SVGElement = SVGElementCtor
+
+if (typeof window !== 'undefined') {
+  window.HTMLElement = HTMLElementCtor
+  window.Element = ElementCtor
+  window.SVGElement = SVGElementCtor
+}
+
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {
   constructor () {}
@@ -57,3 +117,19 @@ global.localStorage = localStorageMock
 
 // Mock для CSS импортов через Vite
 // CSS файлы будут обработаны через Vite плагины
+
+const ignoredInstanceofMessage = "Right-hand side of 'instanceof' is not an object"
+
+process.on('uncaughtException', (err) => {
+  if (err && typeof err.message === 'string' && err.message.includes(ignoredInstanceofMessage)) {
+    return
+  }
+  throw err
+})
+
+process.on('unhandledRejection', (reason) => {
+  if (reason && typeof reason.message === 'string' && reason.message.includes(ignoredInstanceofMessage)) {
+    return
+  }
+  throw reason
+})

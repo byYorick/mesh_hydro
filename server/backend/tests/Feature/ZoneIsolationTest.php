@@ -85,7 +85,7 @@ class ZoneIsolationTest extends TestCase
         // Пытаемся назначить узел zone2 через API
         $response = $this->postJson("/api/zones/{$zone2->id}/assign-node", [
             'node_id' => $node->node_id,
-            'role' => 'ph_sensor',
+            'role' => 'ph_node',
         ]);
 
         // Должна быть ошибка валидации
@@ -133,8 +133,8 @@ class ZoneIsolationTest extends TestCase
         $response2->assertStatus(200);
 
         // Телеметрия зон не пересекается
-        $data1 = $response1->json();
-        $data2 = $response2->json();
+        $data1 = $response1->json('data');
+        $data2 = $response2->json('data');
 
         $this->assertNotEquals($data1, $data2);
     }
@@ -161,7 +161,7 @@ class ZoneIsolationTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-            ->assertJsonPath('mqtt_topic', "hydro/zone1/commands/{$node1->node_id}");
+            ->assertJsonPath('data.mqtt_topic', "hydro/zone1/commands/{$node1->node_id}");
     }
 
     /** @test */
@@ -255,8 +255,8 @@ class ZoneIsolationTest extends TestCase
         $response2->assertStatus(200);
 
         // Статистика различается
-        $avg1 = $response1->json('avg_ph');
-        $avg2 = $response2->json('avg_ph');
+        $avg1 = $response1->json('data.avg_ph');
+        $avg2 = $response2->json('data.avg_ph');
 
         $this->assertEquals(6.0, round($avg1, 1));
         $this->assertEquals(6.5, round($avg2, 1));

@@ -53,6 +53,7 @@ Route::middleware('throttle:api')->group(function () {
             Route::delete('/{nodeId}', [NodeController::class, 'destroy']);
             Route::post('/{nodeId}/command', [NodeController::class, 'sendCommand']);
             Route::put('/{nodeId}/config', [NodeController::class, 'updateConfig']);
+            Route::post('/{nodeId}/config', [NodeController::class, 'updateConfig']); // POST алиас для тестов
             
             // Управление насосами
             Route::post('/{nodeId}/pump/run', [NodeController::class, 'runPump']);
@@ -191,6 +192,7 @@ Route::middleware('throttle:api')->group(function () {
             Route::patch('/{zone}', [\App\Http\Controllers\ZoneController::class, 'update']);
             Route::delete('/{zone}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
             Route::post('/{zone}/command', [\App\Http\Controllers\ZoneController::class, 'sendCommand']);
+            Route::post('/{zone}/assign-node', [\App\Http\Controllers\ZoneController::class, 'assignNode']);
             Route::post('/check-nodes-availability', [\App\Http\Controllers\ZoneController::class, 'checkNodeAvailability']);
         });
     });

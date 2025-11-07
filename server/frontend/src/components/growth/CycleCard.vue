@@ -34,11 +34,11 @@
       <div v-if="cycle.status === 'active'" class="mb-4">
         <div class="d-flex justify-space-between mb-1">
           <span class="text-caption text-medium-emphasis">Прогресс</span>
-          <span class="text-caption font-weight-medium">{{ Math.round(cycle.progress || 0) }}%</span>
+          <span class="text-caption font-weight-medium">{{ Math.round(progressValue) }}%</span>
         </div>
         <v-progress-linear
-          :model-value="cycle.progress || 0"
-          :color="getProgressColor(cycle.progress || 0)"
+          :model-value="progressValue"
+          :color="getProgressColor(progressValue)"
           height="8"
           rounded
         ></v-progress-linear>
@@ -164,6 +164,15 @@ const statusText = computed(() => {
     cancelled: 'Отменён',
   }
   return map[props.cycle.status] || props.cycle.status
+})
+
+const progressValue = computed(() => {
+  const raw = props.cycle.progress
+  const numeric = typeof raw === 'string' ? Number(raw) : raw
+  if (typeof numeric === 'number' && Number.isFinite(numeric)) {
+    return Math.max(0, Math.min(100, numeric))
+  }
+  return 0
 })
 
 function getProgressColor(progress: number): string {
