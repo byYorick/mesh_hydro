@@ -87,6 +87,56 @@ esp_err_t mqtt_client_manager_reconnect(void);
  */
 void mqtt_client_manager_send_discovery(void);
 
+/**
+ * @brief ⭐ ЗОНИРОВАНИЕ: Установка MQTT Topic Prefix для зоны
+ * 
+ * ВАЖНО: Должно быть вызвано перед start() для настройки правильных топиков
+ * 
+ * @param prefix MQTT prefix (например "hydro/zone1/")
+ * @return ESP_OK при успехе
+ */
+esp_err_t mqtt_client_manager_set_topic_prefix(const char *prefix);
+
+/**
+ * @brief ⭐ ЗОНИРОВАНИЕ: Получение текущего MQTT Topic Prefix
+ * 
+ * @param prefix Буфер для prefix (мин. 64 байта)
+ * @return ESP_OK при успехе
+ */
+esp_err_t mqtt_client_manager_get_topic_prefix(char *prefix);
+
+/**
+ * @brief ⭐ ЗОНИРОВАНИЕ: Публикация с автоматическим добавлением zone prefix
+ * 
+ * Примеры:
+ * - subtopic="telemetry" → публикация в "hydro/zone1/telemetry"
+ * - subtopic="events" → публикация в "hydro/zone1/events"
+ * 
+ * @param subtopic Подтопик (без префикса зоны)
+ * @param data Данные для публикации
+ * @return ESP_OK при успехе
+ */
+esp_err_t mqtt_client_manager_publish_zone(const char *subtopic, const char *data);
+
+/**
+ * @brief ⭐ ЗОНИРОВАНИЕ: Подписка на топик с zone prefix
+ * 
+ * @param subtopic Подтопик (без префикса зоны)
+ * @return ESP_OK при успехе
+ */
+esp_err_t mqtt_client_manager_subscribe_zone(const char *subtopic);
+
+/**
+ * @brief ⭐ ЗОНИРОВАНИЕ: Построение полного топика с zone prefix
+ * 
+ * Вспомогательная функция для других компонентов
+ * 
+ * @param subtopic Подтопик
+ * @param full_topic Буфер для полного топика (мин. 128 байт)
+ * @return ESP_OK при успехе
+ */
+esp_err_t mqtt_client_manager_build_topic(const char *subtopic, char *full_topic);
+
 #ifdef __cplusplus
 }
 #endif

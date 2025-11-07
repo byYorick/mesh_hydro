@@ -18,7 +18,7 @@ class MqttListenerCommand extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Listen for MQTT messages from ROOT node and mesh network';
+    protected $description = '⭐ Listen for MQTT messages from ALL zones (multi-zone support)';
 
     private int $reconnectAttempts = 0;
 
@@ -27,9 +27,10 @@ class MqttListenerCommand extends Command
      */
     public function handle(MqttService $mqtt): int
     {
-        $this->info('╔════════════════════════════════════════╗');
-        $this->info('║   MQTT Listener for Hydro System      ║');
-        $this->info('╚════════════════════════════════════════╝');
+        $this->info('╔═══════════════════════════════════════════╗');
+        $this->info('║  ⭐ MQTT Listener (MULTI-ZONE SUPPORT)   ║');
+        $this->info('║     Hydroponic Management System         ║');
+        $this->info('╚═══════════════════════════════════════════╝');
         $this->newLine();
         
         $maxRetries = (int) $this->option('max-retries');
@@ -69,31 +70,37 @@ class MqttListenerCommand extends Command
         // Сброс счетчика попыток переподключения
         $this->reconnectAttempts = 0;
 
-        // Подписка на телеметрию
-        $this->info('📡 Subscribing to: hydro/telemetry/#');
-        $mqtt->subscribe('hydro/telemetry/#', function ($topic, $message) use ($mqtt) {
-            $this->line("📊 [TELEMETRY] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на телеметрию ВСЕХ зон
+        // Формат: hydro/+/telemetry/# где + = любая зона (zone1, zone2, zone3...)
+        $this->info('📡 Subscribing to: hydro/+/telemetry/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/telemetry/#', function ($topic, $message) use ($mqtt) {
+            // Извлекаем zone из топика: hydro/zone1/telemetry/ph_001
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("📊 [TELEMETRY] [{$zoneName}] {$topic}");
             $mqtt->handleTelemetry($topic, $message);
         });
 
-        // Подписка на события
-        $this->info('📡 Subscribing to: hydro/event/#');
-        $mqtt->subscribe('hydro/event/#', function ($topic, $message) use ($mqtt) {
-            $this->line("🔔 [EVENT] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на события ВСЕХ зон
+        $this->info('📡 Subscribing to: hydro/+/event/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/event/#', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("🔔 [EVENT] [{$zoneName}] {$topic}");
             $mqtt->handleEvent($topic, $message);
         });
 
-        // Подписка на heartbeat
-        $this->info('📡 Subscribing to: hydro/heartbeat/#');
-        $mqtt->subscribe('hydro/heartbeat/#', function ($topic, $message) use ($mqtt) {
-            $this->line("💓 [HEARTBEAT] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на heartbeat ВСЕХ зон
+        $this->info('📡 Subscribing to: hydro/+/heartbeat/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/heartbeat/#', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("💓 [HEARTBEAT] [{$zoneName}] {$topic}");
             $mqtt->handleHeartbeat($topic, $message);
         });
 
-        // Подписка на ответы команд
-        $this->info('📡 Subscribing to: hydro/response/#');
-        $mqtt->subscribe('hydro/response/#', function ($topic, $message) use ($mqtt) {
-            $this->line("📥 [RESPONSE] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на ответы команд ВСЕХ зон
+        $this->info('📡 Subscribing to: hydro/+/response/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/response/#', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("📥 [RESPONSE] [{$zoneName}] {$topic}");
             $mqtt->handleCommandResponse($topic, $message);
         });
 
@@ -105,23 +112,26 @@ class MqttListenerCommand extends Command
             $mqtt->handleDiscovery($topic, $message);
         });
 
-        // Подписка на config_response (ответы нод на запрос конфигурации)
-        $this->info('📡 Subscribing to: hydro/config_response/#');
-        $mqtt->subscribe('hydro/config_response/#', function ($topic, $message) use ($mqtt) {
-            $this->line("📋 [CONFIG_RESPONSE] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на config_response ВСЕХ зон
+        $this->info('📡 Subscribing to: hydro/+/config_response/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/config_response/#', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("📋 [CONFIG_RESPONSE] [{$zoneName}] {$topic}");
             $mqtt->handleConfigResponse($topic, $message);
         });
 
-        // Подписка на ошибки узлов
-        $this->info('📡 Subscribing to: hydro/error/#');
-        $mqtt->subscribe('hydro/error/#', function ($topic, $message) use ($mqtt) {
-            $this->line("❌ [ERROR] {$topic}");
+        // ⭐ ЗОНИРОВАНИЕ: Подписка на ошибки узлов ВСЕХ зон
+        $this->info('📡 Subscribing to: hydro/+/error/# (ALL ZONES)');
+        $mqtt->subscribe('hydro/+/error/#', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("❌ [ERROR] [{$zoneName}] {$topic}");
             $mqtt->handleError($topic, $message);
         });
 
         $this->newLine();
-        $this->info('🎧 MQTT Listener is running (AUTO-DISCOVERY enabled)...');
-        $this->info('Press Ctrl+C to stop');
+        $this->info('🎧 ⭐ MQTT Listener is running (MULTI-ZONE + AUTO-DISCOVERY)...');
+        $this->info('   Listening to ALL zones: zone1, zone2, zone3...');
+        $this->info('   Press Ctrl+C to stop');
         $this->newLine();
 
         // Обработка Ctrl+C для корректного закрытия (только для Unix)
@@ -156,6 +166,29 @@ class MqttListenerCommand extends Command
             $mqtt->disconnect();
             throw $e;
         }
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Извлечение имени зоны из MQTT топика
+     * 
+     * Примеры:
+     * - hydro/zone1/telemetry/ph_001 → zone1
+     * - hydro/zone2/event/critical → zone2
+     * - hydro/zone123/heartbeat/root_123 → zone123
+     * 
+     * @param string $topic MQTT топик
+     * @return string Имя зоны (например "zone1") или "unknown"
+     */
+    private function extractZoneFromTopic(string $topic): string
+    {
+        // Формат: hydro/{zone}/...
+        $parts = explode('/', $topic);
+        
+        if (count($parts) >= 2 && $parts[0] === 'hydro') {
+            return $parts[1];  // zone1, zone2, zone3...
+        }
+        
+        return 'unknown';
     }
 }
 

@@ -135,6 +135,8 @@ class NodeController extends Controller
         $validated = $request->validate([
             'config' => 'required|array',
             'comment' => 'nullable|string|max:500',
+            'cycle_id' => 'nullable|integer|exists:growth_cycles,id',
+            'require_confirmation' => 'nullable|boolean',
         ]);
 
         // Сохранение старой конфигурации для истории
@@ -153,7 +155,27 @@ class NodeController extends Controller
         // Сохранение в БД
         $node->update(['config' => $validated['config']]);
 
-        // Отправка конфигурации на узел через MQTT
+        $requireConfirmation = $validated['require_confirmation'] ?? false;
+        $cycleId = $validated['cycle_id'] ?? null;
+
+        // Если требуется подтверждение, используем сервис подтверждений
+        if ($requireConfirmation && $node->isOnline()) {
+            $configService = app(\App\Services\NodeConfigurationService::class);
+            $confirmation = $configService->sendConfigurationWithConfirmation(
+                $nodeId,
+                $validated['config'],
+                $cycleId
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Config updated and sent to node (awaiting confirmation)',
+                'node' => $node,
+                'confirmation' => $confirmation,
+            ]);
+        }
+
+        // Отправка конфигурации на узел через MQTT (без подтверждения)
         if ($node->isOnline()) {
             try {
                 $mqtt->sendConfig($nodeId, $validated['config']);

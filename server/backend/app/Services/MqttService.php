@@ -11,6 +11,7 @@ use App\Models\Command;
 use App\Models\NodeError;
 use App\Services\NotificationThrottleService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Exception;
 
 class MqttService
@@ -1095,10 +1096,34 @@ class MqttService
                 ]);
                 return;
             }
+
+            // ⭐ GROWTH PLANNER: Обработка подтверждения конфигурации
+            $confirmationId = $data['_confirmation_id'] ?? $config['_confirmation_id'] ?? null;
+            
+            if ($confirmationId) {
+                // Удаляем служебное поле из конфигурации
+                unset($config['_confirmation_id']);
+                
+                $configService = app(\App\Services\NodeConfigurationService::class);
+                $confirmation = $configService->handleConfigurationConfirmation(
+                    $nodeId,
+                    $config,
+                    $confirmationId
+                );
+
+                if ($confirmation) {
+                    Log::info("📋 Configuration confirmation processed", [
+                        'node_id' => $nodeId,
+                        'confirmation_id' => $confirmationId,
+                        'cycle_id' => $confirmation->cycle_id,
+                    ]);
+                }
+            }
             
             Log::info("📋 Config response received", [
                 'node_id' => $nodeId,
-                'config_keys' => array_keys($config)
+                'config_keys' => array_keys($config),
+                'confirmation_id' => $confirmationId
             ]);
             
             // Сохранение конфигурации в кэш (1 час)

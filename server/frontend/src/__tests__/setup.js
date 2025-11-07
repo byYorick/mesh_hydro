@@ -54,3 +54,6 @@ const localStorageMock = {
   clear: vi.fn()
 }
 global.localStorage = localStorageMock
+
+// Mock для CSS импортов через Vite
+// CSS файлы будут обработаны через Vite плагины

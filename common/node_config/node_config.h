@@ -15,11 +15,12 @@
 extern "C" {
 #endif
 
-// Базовая конфигурация (общая для всех узлов)
+// ⭐ Базовая конфигурация (общая для всех узлов) - С ЗОНИРОВАНИЕМ
 typedef struct {
     char node_id[32];             ///< Уникальный ID узла
     char node_type[16];           ///< Тип узла (ph_ec, climate, etc)
-    char zone[32];                ///< Зона/помещение
+    char root_node_id[32];        ///< ⭐ ЗОНИРОВАНИЕ: ID Root Node (зоны)
+    char zone[32];                ///< [DEPRECATED] Зона/помещение (использовать root_node_id)
     bool config_valid;            ///< Флаг валидности конфигурации
     uint32_t config_version;      ///< Версия конфигурации
     uint64_t last_updated;        ///< Время последнего обновления
@@ -257,6 +258,46 @@ cJSON* node_config_export_to_json(const void *config, const char *node_type);
  * @return ESP_OK при успехе
  */
 esp_err_t node_config_erase_all(void);
+
+/**
+ * @brief ⭐ Получение Root Node ID из NVS
+ * 
+ * ЗОНИРОВАНИЕ: Каждый узел должен знать свой Root Node (зону)
+ * 
+ * @param root_id Буфер для Root Node ID (мин. 32 байта)
+ * @return ESP_OK при успехе
+ */
+esp_err_t node_config_get_root_node_id(char *root_id);
+
+/**
+ * @brief ⭐ Сохранение Root Node ID в NVS
+ * 
+ * ЗОНИРОВАНИЕ: Устанавливается при первой регистрации узла в зоне
+ * 
+ * @param root_id Root Node ID (например "root_001")
+ * @return ESP_OK при успехе
+ */
+esp_err_t node_config_set_root_node_id(const char *root_id);
+
+/**
+ * @brief ⭐ Получение Mesh Network ID из NVS
+ * 
+ * ЗОНИРОВАНИЕ: Уникальный MESH_NETWORK_ID для каждой зоны
+ * 
+ * @param mesh_id Буфер для Mesh Network ID (мин. 32 байта)
+ * @return ESP_OK при успехе, ESP_ERR_NOT_FOUND если не установлен
+ */
+esp_err_t node_config_get_mesh_network_id(char *mesh_id);
+
+/**
+ * @brief ⭐ Сохранение Mesh Network ID в NVS
+ * 
+ * ЗОНИРОВАНИЕ: Устанавливается при первой регистрации в зоне
+ * 
+ * @param mesh_id Mesh Network ID (например "HYDRO1_ZONE1")
+ * @return ESP_OK при успехе
+ */
+esp_err_t node_config_set_mesh_network_id(const char *mesh_id);
 
 #ifdef __cplusplus
 }

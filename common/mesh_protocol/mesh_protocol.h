@@ -39,11 +39,12 @@ typedef enum {
 } mesh_event_level_t;
 
 /**
- * @brief Базовая структура сообщения
+ * @brief ⭐ Базовая структура сообщения (с зонированием)
  */
 typedef struct {
     mesh_msg_type_t type;
     char node_id[32];
+    char root_node_id[32];  // ⭐ ЗОНИРОВАНИЕ: ID Root Node (зоны)
     uint64_t timestamp;
     cJSON *data;  // Дополнительные данные (зависят от типа)
 } mesh_message_t;
@@ -58,44 +59,48 @@ typedef struct {
 bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg);
 
 /**
- * @brief Создание JSON строки телеметрии
+ * @brief ⭐ Создание JSON строки телеметрии (с зонированием)
  * 
  * @param node_id ID узла
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param node_type Тип узла (climate, ph, ec, display и т.д.)
  * @param data cJSON объект с данными
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_telemetry(const char *node_id, const char *node_type, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_telemetry(const char *node_id, const char *root_node_id, const char *node_type, cJSON *data, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки команды
+ * @brief ⭐ Создание JSON строки команды (с зонированием)
  * 
  * @param node_id ID целевого узла
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param command Команда (например "run_pump")
  * @param params cJSON объект с параметрами
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_command(const char *node_id, const char *command, cJSON *params, char *out_json, size_t max_len);
+bool mesh_protocol_create_command(const char *node_id, const char *root_node_id, const char *command, cJSON *params, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки конфигурации
+ * @brief ⭐ Создание JSON строки конфигурации (с зонированием)
  * 
  * @param node_id ID целевого узла
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param config cJSON объект с конфигурацией
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_config(const char *node_id, cJSON *config, char *out_json, size_t max_len);
+bool mesh_protocol_create_config(const char *node_id, const char *root_node_id, cJSON *config, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки события
+ * @brief ⭐ Создание JSON строки события (с зонированием)
  * 
  * @param node_id ID узла
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param level Уровень события
  * @param message Текст сообщения
  * @param data cJSON объект с дополнительными данными (может быть NULL)
@@ -103,12 +108,13 @@ bool mesh_protocol_create_config(const char *node_id, cJSON *config, char *out_j
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_event(const char *node_id, mesh_event_level_t level, const char *message, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_event(const char *node_id, const char *root_node_id, mesh_event_level_t level, const char *message, cJSON *data, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки heartbeat
+ * @brief ⭐ Создание JSON строки heartbeat (с зонированием)
  * 
  * @param node_id ID узла
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param node_type Тип узла (climate, ph, ec, display и т.д.)
  * @param uptime Время работы (секунды)
  * @param heap_free Свободная память (байты)
@@ -116,29 +122,31 @@ bool mesh_protocol_create_event(const char *node_id, mesh_event_level_t level, c
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_heartbeat(const char *node_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
+bool mesh_protocol_create_heartbeat(const char *node_id, const char *root_node_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки запроса
+ * @brief ⭐ Создание JSON строки запроса (с зонированием)
  * 
  * @param from_id ID отправителя
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param request Тип запроса (например "all_nodes_data")
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_request(const char *from_id, const char *request, char *out_json, size_t max_len);
+bool mesh_protocol_create_request(const char *from_id, const char *root_node_id, const char *request, char *out_json, size_t max_len);
 
 /**
- * @brief Создание JSON строки ответа
+ * @brief ⭐ Создание JSON строки ответа (с зонированием)
  * 
  * @param to_id ID получателя
+ * @param root_node_id ⭐ ID Root Node (зоны)
  * @param data cJSON объект с данными ответа
  * @param out_json Буфер для JSON строки
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_response(const char *to_id, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_response(const char *to_id, const char *root_node_id, cJSON *data, char *out_json, size_t max_len);
 
 /**
  * @brief Освобождение ресурсов сообщения

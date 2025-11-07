@@ -171,3 +171,81 @@ Route::middleware('throttle:api')->group(function () {
         });
     });
 });
+
+// ⭐ ЗОНИРОВАНИЕ: Zones API
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('zones')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
+        Route::get('/{zone}', [\App\Http\Controllers\ZoneController::class, 'show']);
+        Route::get('/{zone}/nodes', [\App\Http\Controllers\ZoneController::class, 'getNodes']);
+        Route::get('/{zone}/root-node', [\App\Http\Controllers\ZoneController::class, 'getRootNode']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [\App\Http\Controllers\ZoneController::class, 'store']);
+            Route::put('/{zone}', [\App\Http\Controllers\ZoneController::class, 'update']);
+            Route::delete('/{zone}', [\App\Http\Controllers\ZoneController::class, 'destroy']);
+            Route::post('/{zone}/command', [\App\Http\Controllers\ZoneController::class, 'sendCommand']);
+            Route::post('/check-nodes-availability', [\App\Http\Controllers\ZoneController::class, 'checkNodeAvailability']);
+        });
+    });
+});
+
+// ⭐ GROWTH PLANNER: Culture API
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('growth/cultures')->group(function () {
+        Route::get('/', [\App\Http\Controllers\GrowthCultureController::class, 'index']);
+        Route::get('/{culture}', [\App\Http\Controllers\GrowthCultureController::class, 'show']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [\App\Http\Controllers\GrowthCultureController::class, 'store']);
+            Route::put('/{culture}', [\App\Http\Controllers\GrowthCultureController::class, 'update']);
+            Route::delete('/{culture}', [\App\Http\Controllers\GrowthCultureController::class, 'destroy']);
+        });
+    });
+});
+
+// ⭐ GROWTH PLANNER: Presets API
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('growth/presets')->group(function () {
+        Route::get('/', [\App\Http\Controllers\GrowthPresetController::class, 'index']);
+        Route::get('/{preset}', [\App\Http\Controllers\GrowthPresetController::class, 'show']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [\App\Http\Controllers\GrowthPresetController::class, 'store']);
+            Route::put('/{preset}', [\App\Http\Controllers\GrowthPresetController::class, 'update']);
+            Route::delete('/{preset}', [\App\Http\Controllers\GrowthPresetController::class, 'destroy']);
+            Route::post('/{preset}/clone', [\App\Http\Controllers\GrowthPresetController::class, 'clone']);
+        });
+    });
+});
+
+// ⭐ GROWTH PLANNER: Cycles API (привязаны к зонам!)
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('growth/cycles')->group(function () {
+        Route::get('/', [\App\Http\Controllers\GrowthCycleController::class, 'index']);
+        Route::get('/{cycle}', [\App\Http\Controllers\GrowthCycleController::class, 'show']);
+        Route::get('/{cycle}/stats', [\App\Http\Controllers\GrowthCycleController::class, 'stats']);
+        
+        // Аналитика
+        Route::get('/{cycle}/analytics/chart', [\App\Http\Controllers\GrowthAnalyticsController::class, 'getParameterChart']);
+        Route::get('/{cycle}/analytics/statistics', [\App\Http\Controllers\GrowthAnalyticsController::class, 'getParameterStatistics']);
+        Route::get('/{cycle}/analytics/report', [\App\Http\Controllers\GrowthAnalyticsController::class, 'getCycleReport']);
+        Route::post('/{cycle}/analytics/snapshot', [\App\Http\Controllers\GrowthAnalyticsController::class, 'createSnapshot']);
+        
+        // Write operations
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [\App\Http\Controllers\GrowthCycleController::class, 'store']);
+            Route::put('/{cycle}', [\App\Http\Controllers\GrowthCycleController::class, 'update']);
+            Route::post('/{cycle}/harvest', [\App\Http\Controllers\GrowthCycleController::class, 'harvest']);
+            Route::post('/{cycle}/cancel', [\App\Http\Controllers\GrowthCycleController::class, 'cancel']);
+        });
+    });
+    
+    // Сравнение циклов
+    Route::prefix('growth/analytics')->group(function () {
+        Route::post('/compare', [\App\Http\Controllers\GrowthAnalyticsController::class, 'compareCycles']);
+    });
+});

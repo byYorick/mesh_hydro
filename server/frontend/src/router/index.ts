@@ -82,6 +82,42 @@ const routes: any[] = [
       icon: 'mdi-cog',
     },
   },
+  {
+    path: '/zones',
+    name: 'Zones',
+    component: () => import('@/views/Zones.vue'),
+    meta: {
+      title: 'Зоны',
+      icon: 'mdi-map-marker',
+    },
+  },
+  {
+    path: '/growth',
+    name: 'GrowthPlanner',
+    component: () => import('@/views/GrowthPlanner.vue'),
+    meta: {
+      title: 'Планировщик циклов',
+      icon: 'mdi-sprout',
+    },
+  },
+  {
+    path: '/growth/presets',
+    name: 'PresetLibrary',
+    component: () => import('@/views/PresetLibrary.vue'),
+    meta: {
+      title: 'Библиотека пресетов',
+      icon: 'mdi-book-open-variant',
+    },
+  },
+  {
+    path: '/growth/cycles/:id',
+    name: 'CycleDetail',
+    component: () => import('@/views/CycleDetail.vue'),
+    meta: {
+      title: 'Детали цикла',
+      showInMenu: false,
+    },
+  },
 ]
 
 const router = createRouter({

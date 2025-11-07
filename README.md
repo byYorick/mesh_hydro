@@ -22,6 +22,7 @@ IoT система управления гидропонной установк�
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Быстрая справка
 
 ### ⭐ НОВОЕ: Зонирование & Growth Planner
+- **[IMPLEMENTATION_PROGRESS_REPORT.md](IMPLEMENTATION_PROGRESS_REPORT.md)** - 🎯 **ОТЧЁТ О ВЫПОЛНЕННОЙ РАБОТЕ** (70% готово!)
 - **[ZONING_AND_GROWTH_PLANNER_SUMMARY.md](ZONING_AND_GROWTH_PLANNER_SUMMARY.md)** - 📋 РЕЗЮМЕ (начать здесь!)
 - **[ZONING_ARCHITECTURE_PLAN.md](ZONING_ARCHITECTURE_PLAN.md)** - Архитектура зонирования (множественные Root Nodes)
 - **[GROWTH_PLANNER_IMPLEMENTATION_PLAN.md](GROWTH_PLANNER_IMPLEMENTATION_PLAN.md)** - Планировщик циклов роста растений

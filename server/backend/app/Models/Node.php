@@ -4,10 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Carbon\Carbon;
 
 class Node extends Model
 {
+    use HasFactory;
+
     /**
      * Таблица в БД
      */
@@ -18,8 +23,9 @@ class Node extends Model
      */
     protected $fillable = [
         'node_id',        // "ph_ec_001", "climate_001"
-        'node_type',      // "ph_ec", "climate", "relay", "water", "display"
-        'zone',           // "Zone 1", "Zone 2"
+        'node_type',      // "ph_ec", "climate", "relay", "water", "display", "root"
+        'root_node_id',   // ⭐ НОВОЕ: "root_001" - привязка к Root Node
+        'zone',           // Deprecated: "Zone 1", "Zone 2" (для обратной совместимости)
         'mac_address',    // "AA:BB:CC:DD:EE:FF"
         'online',         // true/false
         'last_seen_at',   // timestamp последнего контакта
@@ -36,6 +42,30 @@ class Node extends Model
         'config' => 'array',
         'metadata' => 'array',
     ];
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Root Node (для обычных узлов)
+     */
+    public function rootNode(): BelongsTo
+    {
+        return $this->belongsTo(Node::class, 'root_node_id', 'node_id');
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Дочерние узлы (для Root Node)
+     */
+    public function childNodes(): HasMany
+    {
+        return $this->hasMany(Node::class, 'root_node_id', 'node_id');
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Зона узла (через root_node_id)
+     */
+    public function zone(): HasOne
+    {
+        return $this->hasOne(Zone::class, 'root_node_id', 'root_node_id');
+    }
 
     /**
      * Отношение: узел имеет много записей телеметрии
@@ -166,6 +196,42 @@ class Node extends Model
     public function scopeOfType($query, string $type)
     {
         return $query->where('node_type', $type);
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Проверка - это Root Node?
+     */
+    public function isRootNode(): bool
+    {
+        return $this->node_type === 'root';
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Получить все узлы своей mesh сети
+     */
+    public function getMeshNodes()
+    {
+        if ($this->isRootNode()) {
+            return $this->childNodes;
+        } else {
+            return $this->rootNode?->childNodes ?? collect();
+        }
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Scope - узлы определенного Root Node
+     */
+    public function scopeInZone($query, string $rootNodeId)
+    {
+        return $query->where('root_node_id', $rootNodeId);
+    }
+
+    /**
+     * ⭐ ЗОНИРОВАНИЕ: Scope - только Root Nodes
+     */
+    public function scopeRootNodes($query)
+    {
+        return $query->where('node_type', 'root');
     }
 }
 
