@@ -66,7 +66,7 @@
         <v-col cols="6" v-if="cycle.harvest_weight_kg">
           <div class="text-caption text-medium-emphasis">Урожай</div>
           <div class="text-body-2 font-weight-medium">
-            {{ cycle.harvest_weight_kg.toFixed(2) }} кг
+            {{ harvestWeight }} кг
           </div>
         </v-col>
       </v-row>
@@ -189,6 +189,16 @@ function formatDate(date: string | undefined): string {
     year: 'numeric',
   })
 }
+
+function toDisplayWeight(value: any) {
+  const num = Number(value)
+  if (Number.isFinite(num)) {
+    return num.toFixed(1)
+  }
+  return '—'
+}
+
+const harvestWeight = computed(() => toDisplayWeight(props.cycle?.harvest_weight_kg))
 </script>
 
 <style scoped>

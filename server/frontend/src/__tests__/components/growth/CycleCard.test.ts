@@ -111,8 +111,44 @@ describe('CycleCard.vue', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('5.50')
+    expect(wrapper.text()).toContain('5.5')
     expect(wrapper.text()).toContain('кг')
+  })
+
+  it('formats harvest weight when provided as string', () => {
+    const wrapper = mount(CycleCard, {
+      props: {
+        cycle: {
+          ...mockCycle,
+          status: 'harvested',
+          harvest_weight_kg: '7.25',
+        },
+        showActions: true,
+      },
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    expect(wrapper.text()).toContain('7.3')
+  })
+
+  it('shows dash when harvest weight is invalid', () => {
+    const wrapper = mount(CycleCard, {
+      props: {
+        cycle: {
+          ...mockCycle,
+          status: 'harvested',
+          harvest_weight_kg: 'N/A',
+        },
+        showActions: true,
+      },
+      global: {
+        plugins: [pinia],
+      },
+    })
+
+    expect(wrapper.text()).toContain('— кг')
   })
 
   it('shows correct status chip', () => {

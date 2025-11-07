@@ -1,98 +1,147 @@
-import "./chunk-4MMPKXON.js";
-import {
-  VSnackbar,
-  makeVSnackbarProps
-} from "./chunk-PXEPFNGF.js";
 import {
   VTimeline,
   VTimelineItem
-} from "./chunk-VGU3WQ6F.js";
-import "./chunk-F6LZGKE2.js";
+} from "./chunk-RJ74NEWF.js";
 import {
-  VForm
-} from "./chunk-IXUEJNUJ.js";
-import {
-  VExpansionPanel,
-  VExpansionPanelText,
-  VExpansionPanelTitle,
-  VExpansionPanels
-} from "./chunk-SCENMMU5.js";
-import {
-  VCheckbox,
-  VCheckboxBtn,
-  VSelect,
-  VVirtualScroll,
-  VVirtualScrollItem,
-  makeSelectProps,
-  makeVirtualProps,
-  useMenuActivator,
-  useScrolling,
-  useVirtual
-} from "./chunk-XNQLXL7B.js";
-import {
-  VTextField,
-  makeVTextFieldProps
-} from "./chunk-RXXM4B7C.js";
-import {
-  VTextarea
-} from "./chunk-5BTFPOZ2.js";
-import {
-  VCounter,
-  VField,
-  VFieldLabel,
-  makeVFieldProps
-} from "./chunk-XSTRN2BR.js";
-import {
-  VRating
-} from "./chunk-VKQ5TQ24.js";
-import {
-  VTable,
-  makeVTableProps
-} from "./chunk-ZXHJRP63.js";
+  VSwitch
+} from "./chunk-SAAZXNVT.js";
 import {
   VStepper,
   VStepperActions,
   VStepperHeader,
   VStepperItem,
   VStepperWindow,
-  VStepperWindowItem,
-  VWindow,
-  VWindowItem,
-  makeVWindowItemProps,
-  makeVWindowProps
-} from "./chunk-PRSUXUPD.js";
+  VStepperWindowItem
+} from "./chunk-C7KCHVME.js";
+import "./chunk-4MMPKXON.js";
+import {
+  VTextarea
+} from "./chunk-RDESAGK2.js";
+import {
+  VSnackbar,
+  makeVSnackbarProps
+} from "./chunk-3U2BY2SG.js";
+import {
+  VRating
+} from "./chunk-U3KCYXCA.js";
+import "./chunk-VOIT7EPS.js";
 import "./chunk-OM3TP4DG.js";
 import {
   VSheet,
   makeVSheetProps
-} from "./chunk-6JDDU7JI.js";
+} from "./chunk-5KG5FYFJ.js";
+import "./chunk-F6LZGKE2.js";
 import {
-  VAlert,
-  VAlertTitle
-} from "./chunk-5PIHS5V6.js";
+  VExpansionPanel,
+  VExpansionPanelText,
+  VExpansionPanelTitle,
+  VExpansionPanels
+} from "./chunk-OSY6NP5R.js";
 import {
-  VMain
-} from "./chunk-2GKB3LUR.js";
-import {
-  VMenu,
-  makeVMenuProps
-} from "./chunk-ZN47D3TD.js";
+  VForm
+} from "./chunk-IXUEJNUJ.js";
 import {
   VCol,
   VContainer,
   VRow,
   VSpacer
-} from "./chunk-M23GXNHH.js";
+} from "./chunk-56ZEH4AQ.js";
 import {
-  VBadge
-} from "./chunk-2R237H7J.js";
+  VMain
+} from "./chunk-M7CM5SCD.js";
 import {
-  VDialog,
-  makeVDialogProps
-} from "./chunk-SN22BJ6P.js";
+  VNavigationDrawer
+} from "./chunk-FTFPUU3J.js";
 import {
   VToolbarItems
 } from "./chunk-DBDXJHBL.js";
+import {
+  VAlert,
+  VAlertTitle
+} from "./chunk-Z2B6MT4S.js";
+import {
+  VBadge
+} from "./chunk-B4OD3EQF.js";
+import {
+  VBottomNavigation
+} from "./chunk-TPZIKNMQ.js";
+import {
+  VCard,
+  VCardActions,
+  VCardItem,
+  VCardSubtitle,
+  VCardText,
+  VCardTitle
+} from "./chunk-JEN7EXYR.js";
+import {
+  VDialog,
+  makeVDialogProps
+} from "./chunk-D4UPUE7O.js";
+import {
+  VApp
+} from "./chunk-OG7NPJAR.js";
+import {
+  VAppBar,
+  VAppBarNavIcon,
+  VAppBarTitle
+} from "./chunk-S6AW6K6W.js";
+import {
+  VToolbar,
+  VToolbarTitle
+} from "./chunk-NHM4EHUA.js";
+import {
+  VDataTable,
+  VDataTableFooter,
+  VDataTableHeaders,
+  VDataTableRow,
+  VDataTableRows,
+  VDataTableServer,
+  VDataTableVirtual,
+  VPagination,
+  createPagination,
+  createSort,
+  highlightResult,
+  makeDataTableExpandProps,
+  makeDataTableGroupProps,
+  makeDataTablePaginateProps,
+  makeDataTableSelectProps,
+  makeDataTableSortProps,
+  makeFilterProps,
+  provideExpanded,
+  provideGroupBy,
+  providePagination,
+  provideSelection,
+  provideSort,
+  useFilter,
+  useGroupedItems,
+  useOptions,
+  usePaginatedItems,
+  useSortedItems
+} from "./chunk-FBYU6KZ5.js";
+import {
+  VSelect,
+  VVirtualScroll,
+  makeSelectProps,
+  useMenuActivator,
+  useScrolling
+} from "./chunk-5YHMMBYW.js";
+import {
+  VTextField,
+  makeVTextFieldProps
+} from "./chunk-RPAM7PSX.js";
+import {
+  VCounter,
+  VField,
+  VFieldLabel,
+  makeVFieldProps
+} from "./chunk-AN62RFVQ.js";
+import {
+  VTable
+} from "./chunk-ZXHJRP63.js";
+import {
+  VMenu,
+  makeVMenuProps
+} from "./chunk-SJX2O6K2.js";
 import {
   VList,
   VListGroup,
@@ -109,119 +158,48 @@ import {
   transformItem,
   useItems,
   useListItems
-} from "./chunk-USJOABLX.js";
-import {
-  VNavigationDrawer
-} from "./chunk-BI4NUVVZ.js";
-import "./chunk-VOIT7EPS.js";
-import {
-  VTooltip
-} from "./chunk-IHZOMEUG.js";
-import "./chunk-F3JGRVVN.js";
-import {
-  VOverlay,
-  useHydration
-} from "./chunk-MXEP7SZA.js";
-import "./chunk-PW3B2IAK.js";
-import {
-  makeDelayProps,
-  useDelay,
-  useScopeId
-} from "./chunk-QH73RD4Y.js";
-import {
-  VBottomNavigation
-} from "./chunk-P7MXK3VB.js";
-import {
-  VCard,
-  VCardActions,
-  VCardItem,
-  VCardSubtitle,
-  VCardText,
-  VCardTitle
-} from "./chunk-TULT6GM2.js";
+} from "./chunk-NKUFAYDR.js";
 import {
   VChip
-} from "./chunk-N4TKCTHR.js";
+} from "./chunk-P53DKHJO.js";
 import {
-  VChipGroup,
-  VSlideGroup,
-  VSlideGroupSymbol,
-  makeVSlideGroupProps
-} from "./chunk-6P7C5DQL.js";
+  VChipGroup
+} from "./chunk-6NRX3GFF.js";
 import "./chunk-7PGPWWXG.js";
 import {
   VAvatar
-} from "./chunk-2ZHXIUU6.js";
-import "./chunk-MVBFAXEB.js";
+} from "./chunk-M2VV5JXQ.js";
 import {
   VDivider
 } from "./chunk-CG57HRTQ.js";
 import {
-  VAppBar,
-  VAppBarNavIcon,
-  VAppBarTitle
-} from "./chunk-Y7L3Q5R7.js";
-import {
-  VToolbar,
-  VToolbarTitle
-} from "./chunk-R5WSHSDQ.js";
-import {
-  useSsrBoot
-} from "./chunk-4R7HKKEK.js";
-import {
   VImg,
   VResponsive,
   makeVImgProps
-} from "./chunk-HAY2Y2LG.js";
+} from "./chunk-FG2WRM5T.js";
 import {
   intersect_default
 } from "./chunk-5BZ3L7GI.js";
 import {
-  VBtn,
-  makeVBtnProps
-} from "./chunk-FQKSP47N.js";
+  createDateRange,
+  useDate
+} from "./chunk-QSG7TW2B.js";
 import {
-  VBtnGroup,
-  VBtnToggle
-} from "./chunk-QEBGKFCT.js";
+  createLayout,
+  makeLayoutItemProps,
+  makeLayoutProps,
+  useLayoutItem
+} from "./chunk-UZFXVJER.js";
 import {
-  makePositionProps,
-  usePosition
-} from "./chunk-NI2G2VTV.js";
-import {
-  makeGroupItemProps,
-  makeGroupProps,
-  useGroup,
-  useGroupItem
-} from "./chunk-Y35KG7NE.js";
-import "./chunk-GSWLJLRT.js";
-import {
-  makeRouterProps,
-  useLink
-} from "./chunk-EY3FJRW6.js";
-import {
-  makeElevationProps,
-  useElevation
-} from "./chunk-DA2W7YPQ.js";
-import {
-  makeBorderProps,
-  useBorder
-} from "./chunk-VCJMQSPR.js";
-import {
-  makeVariantProps
-} from "./chunk-AI2K6XWQ.js";
-import {
-  VApp
-} from "./chunk-OG7NPJAR.js";
-import {
-  VSwitch
-} from "./chunk-VCMLU722.js";
+  VCheckbox,
+  VCheckboxBtn
+} from "./chunk-VOV5EW3S.js";
 import {
   VSelectionControl,
   VSelectionControlGroup,
   makeSelectionControlGroupProps,
   makeVSelectionControlProps
-} from "./chunk-WFHZP7WE.js";
+} from "./chunk-S3WVNKS4.js";
 import {
   VInput,
   VLabel,
@@ -231,13 +209,110 @@ import {
   makeValidationProps,
   useFocus,
   useValidation
-} from "./chunk-CFKEBY7Q.js";
+} from "./chunk-SL44GVRM.js";
 import {
   useForm
 } from "./chunk-VIQOD4K4.js";
 import {
-  forwardRefs
-} from "./chunk-QJKQQOXD.js";
+  VTab,
+  VTabs,
+  VTabsWindow,
+  VTabsWindowItem
+} from "./chunk-RAKNBNTC.js";
+import {
+  VSlideGroup,
+  VSlideGroupSymbol
+} from "./chunk-PN2YWUZR.js";
+import "./chunk-3OOUJ4PC.js";
+import "./chunk-CZQTS6NA.js";
+import {
+  VWindow,
+  VWindowItem,
+  makeVWindowItemProps,
+  makeVWindowProps
+} from "./chunk-7NXNHQFM.js";
+import "./chunk-F3JGRVVN.js";
+import "./chunk-MVBFAXEB.js";
+import {
+  VBtn,
+  makeVBtnProps
+} from "./chunk-K7HKJTMU.js";
+import {
+  VProgressCircular
+} from "./chunk-BQCJYC4R.js";
+import {
+  useSsrBoot
+} from "./chunk-4R7HKKEK.js";
+import {
+  VBtnGroup,
+  VBtnToggle
+} from "./chunk-Y2LE6IQS.js";
+import {
+  makeGroupItemProps,
+  makeGroupProps,
+  useGroup,
+  useGroupItem
+} from "./chunk-Y35KG7NE.js";
+import {
+  LoaderSlot
+} from "./chunk-KJPETGFM.js";
+import {
+  VProgressLinear
+} from "./chunk-LVE7YGBS.js";
+import {
+  useIntersectionObserver
+} from "./chunk-UUXT5HMG.js";
+import {
+  makePositionProps,
+  usePosition
+} from "./chunk-NI2G2VTV.js";
+import {
+  makeLocationProps,
+  useLocation
+} from "./chunk-HCC5PZ53.js";
+import "./chunk-AI2K6XWQ.js";
+import {
+  makeBorderProps,
+  useBorder
+} from "./chunk-VCJMQSPR.js";
+import {
+  makeElevationProps,
+  useElevation
+} from "./chunk-DA2W7YPQ.js";
+import {
+  makeRoundedProps,
+  useRounded
+} from "./chunk-2NAJM3NP.js";
+import "./chunk-GSWLJLRT.js";
+import {
+  VDefaultsProvider
+} from "./chunk-7L4ZWQEP.js";
+import {
+  useResizeObserver
+} from "./chunk-SSWKVBM6.js";
+import {
+  VIcon
+} from "./chunk-D6BRSW2B.js";
+import {
+  makeSizeProps
+} from "./chunk-2UL4C4D2.js";
+import {
+  makeDensityProps,
+  useDensity
+} from "./chunk-BBMT6OHG.js";
+import {
+  makeTagProps
+} from "./chunk-FSWG3OMG.js";
+import {
+  ripple_default
+} from "./chunk-OKFONRWX.js";
+import {
+  IconValue,
+  VClassIcon,
+  VComponentIcon,
+  VLigatureIcon,
+  VSvgIcon
+} from "./chunk-JBMQ7ZRV.js";
 import {
   VDialogBottomTransition,
   VDialogTopTransition,
@@ -255,90 +330,48 @@ import {
   VSlideXTransition,
   VSlideYReverseTransition,
   VSlideYTransition
-} from "./chunk-RNHLEATT.js";
+} from "./chunk-EJQAVRI3.js";
 import {
-  MaybeTransition,
-  makeTransitionProps
-} from "./chunk-EL5URPNZ.js";
+  VTooltip
+} from "./chunk-4S4EU77M.js";
 import {
-  VProgressCircular
-} from "./chunk-JKOC4S22.js";
+  VOverlay,
+  useHydration
+} from "./chunk-CCH6SIPQ.js";
 import {
-  LoaderSlot,
-  makeLoaderProps,
-  useLoader
-} from "./chunk-SF6MZFMN.js";
-import {
-  VProgressLinear
-} from "./chunk-VJKABKFD.js";
-import {
-  useIntersectionObserver
-} from "./chunk-UUXT5HMG.js";
-import {
-  makeLocationProps,
-  useLocation
-} from "./chunk-HCC5PZ53.js";
-import {
-  VDefaultsProvider
-} from "./chunk-7L4ZWQEP.js";
-import {
-  VIcon
-} from "./chunk-KGUXEXV6.js";
-import {
-  makeSizeProps
-} from "./chunk-2UL4C4D2.js";
-import {
-  ripple_default
-} from "./chunk-OKFONRWX.js";
-import {
-  makeDimensionProps,
-  useDimension
-} from "./chunk-WP3ESUMW.js";
-import {
-  makeDensityProps,
-  useDensity
-} from "./chunk-BBMT6OHG.js";
-import {
-  makeRoundedProps,
-  useRounded
-} from "./chunk-2NAJM3NP.js";
-import {
-  makeTagProps
-} from "./chunk-FSWG3OMG.js";
-import {
-  useBackgroundColor,
-  useTextColor
-} from "./chunk-XL4SHUX5.js";
-import {
-  createDateRange,
-  useDate
-} from "./chunk-QSG7TW2B.js";
-import "./chunk-3OOUJ4PC.js";
+  makeDelayProps,
+  useDelay
+} from "./chunk-4TCNJUSY.js";
+import "./chunk-HHYKZRRR.js";
 import {
   makeDisplayProps,
   useDisplay
 } from "./chunk-YNJSP2GN.js";
 import {
-  createLayout,
-  makeLayoutItemProps,
-  makeLayoutProps,
-  useLayoutItem
-} from "./chunk-UZFXVJER.js";
+  forwardRefs
+} from "./chunk-QJKQQOXD.js";
+import "./chunk-PW3B2IAK.js";
 import {
-  IconValue,
-  VClassIcon,
-  VComponentIcon,
-  VLigatureIcon,
-  VSvgIcon
-} from "./chunk-JBMQ7ZRV.js";
+  makeRouterProps,
+  useLink
+} from "./chunk-EY3FJRW6.js";
+import {
+  MaybeTransition,
+  makeTransitionProps
+} from "./chunk-EL5URPNZ.js";
+import {
+  makeDimensionProps,
+  useDimension
+} from "./chunk-WP3ESUMW.js";
+import {
+  useBackgroundColor,
+  useTextColor
+} from "./chunk-XL4SHUX5.js";
 import {
   provideLocale,
   useLocale,
   useRtl
 } from "./chunk-TICGPC5M.js";
-import {
-  useResizeObserver
-} from "./chunk-SSWKVBM6.js";
 import {
   useProxiedModel,
   useToggleScope
@@ -360,11 +393,9 @@ import {
   RGBtoCSS,
   RGBtoHSV,
   SUPPORTS_EYE_DROPPER,
-  animate,
   callEvent,
   checkPrintable,
   clamp,
-  consoleError,
   consoleWarn,
   convertToUnit,
   createRange,
@@ -372,7 +403,6 @@ import {
   debounce,
   deepEqual,
   defineComponent,
-  defineFunctionalComponent,
   ensureValidVNode,
   escapeForRegex,
   extractNumber,
@@ -380,19 +410,14 @@ import {
   focusChild,
   genericComponent,
   getContrast,
-  getCurrentInstance,
   getDecimals,
   getEventCoordinates,
   getIndentLines,
-  getObjectValueByPath,
-  getPrefixedEventHandlers,
   getPropertyFromItem,
   getScrollParent,
   has,
   humanReadableFileSize,
   isComposingIgnoreKey,
-  isEmpty,
-  isObject,
   keyValues,
   makeComponentProps,
   matchesSelector,
@@ -403,14 +428,12 @@ import {
   propsFactory,
   provideDefaults,
   renderSlot,
-  standardEasing,
   templateRef,
   useRender,
   wrapInArray
 } from "./chunk-QPYD2SUY.js";
 import {
   Fragment,
-  capitalize,
   computed,
   createBaseVNode,
   createTextVNode,
@@ -425,7 +448,6 @@ import {
   normalizeStyle,
   onBeforeMount,
   onBeforeUnmount,
-  onBeforeUpdate,
   onMounted,
   onScopeDispose,
   onUnmounted,
@@ -433,180 +455,18 @@ import {
   reactive,
   ref,
   shallowRef,
-  toDisplayString,
   toRaw,
   toRef,
-  toRefs,
-  toValue,
-  unref,
   useId,
   vShow,
   watch,
   watchEffect,
-  withDirectives,
-  withModifiers
+  withDirectives
 } from "./chunk-ZS4T33C3.js";
 import "./chunk-DC5AMYBS.js";
 
 // node_modules/vuetify/lib/components/VAutocomplete/VAutocomplete.js
 import "/app/node_modules/vuetify/lib/components/VAutocomplete/VAutocomplete.css";
-
-// node_modules/vuetify/lib/composables/filter.js
-var defaultFilter = (value, query, item) => {
-  if (value == null || query == null) return -1;
-  if (!query.length) return 0;
-  value = value.toString().toLocaleLowerCase();
-  query = query.toString().toLocaleLowerCase();
-  const result = [];
-  let idx = value.indexOf(query);
-  while (~idx) {
-    result.push([idx, idx + query.length]);
-    idx = value.indexOf(query, idx + query.length);
-  }
-  return result.length ? result : -1;
-};
-function normaliseMatch(match, query) {
-  if (match == null || typeof match === "boolean" || match === -1) return;
-  if (typeof match === "number") return [[match, match + query.length]];
-  if (Array.isArray(match[0])) return match;
-  return [match];
-}
-var makeFilterProps = propsFactory({
-  customFilter: Function,
-  customKeyFilter: Object,
-  filterKeys: [Array, String],
-  filterMode: {
-    type: String,
-    default: "intersection"
-  },
-  noFilter: Boolean
-}, "filter");
-function filterItems(items, query, options) {
-  var _a2;
-  const array = [];
-  const filter = (options == null ? void 0 : options.default) ?? defaultFilter;
-  const keys = (options == null ? void 0 : options.filterKeys) ? wrapInArray(options.filterKeys) : false;
-  const customFiltersLength = Object.keys((options == null ? void 0 : options.customKeyFilter) ?? {}).length;
-  if (!(items == null ? void 0 : items.length)) return array;
-  let lookAheadItem = null;
-  loop: for (let i = 0; i < items.length; i++) {
-    const [item, transformed = item] = wrapInArray(items[i]);
-    const customMatches = {};
-    const defaultMatches = {};
-    let match = -1;
-    if ((query || customFiltersLength > 0) && !(options == null ? void 0 : options.noFilter)) {
-      let hasOnlyCustomFilters = false;
-      if (typeof item === "object") {
-        if (item.type === "divider" || item.type === "subheader") {
-          if ((lookAheadItem == null ? void 0 : lookAheadItem.type) === "divider" && item.type === "subheader") {
-            array.push(lookAheadItem);
-          }
-          lookAheadItem = {
-            index: i,
-            matches: {},
-            type: item.type
-          };
-          continue;
-        }
-        const filterKeys = keys || Object.keys(transformed);
-        hasOnlyCustomFilters = filterKeys.length === customFiltersLength;
-        for (const key of filterKeys) {
-          const value = getPropertyFromItem(transformed, key);
-          const keyFilter = (_a2 = options == null ? void 0 : options.customKeyFilter) == null ? void 0 : _a2[key];
-          match = keyFilter ? keyFilter(value, query, item) : filter(value, query, item);
-          if (match !== -1 && match !== false) {
-            if (keyFilter) customMatches[key] = normaliseMatch(match, query);
-            else defaultMatches[key] = normaliseMatch(match, query);
-          } else if ((options == null ? void 0 : options.filterMode) === "every") {
-            continue loop;
-          }
-        }
-      } else {
-        match = filter(item, query, item);
-        if (match !== -1 && match !== false) {
-          defaultMatches.title = normaliseMatch(match, query);
-        }
-      }
-      const defaultMatchesLength = Object.keys(defaultMatches).length;
-      const customMatchesLength = Object.keys(customMatches).length;
-      if (!defaultMatchesLength && !customMatchesLength) continue;
-      if ((options == null ? void 0 : options.filterMode) === "union" && customMatchesLength !== customFiltersLength && !defaultMatchesLength) continue;
-      if ((options == null ? void 0 : options.filterMode) === "intersection" && (customMatchesLength !== customFiltersLength || !defaultMatchesLength && customFiltersLength > 0 && !hasOnlyCustomFilters)) continue;
-    }
-    if (lookAheadItem) {
-      array.push(lookAheadItem);
-      lookAheadItem = null;
-    }
-    array.push({
-      index: i,
-      matches: {
-        ...defaultMatches,
-        ...customMatches
-      }
-    });
-  }
-  return array;
-}
-function useFilter(props, items, query, options) {
-  const filteredItems = shallowRef([]);
-  const filteredMatches = shallowRef(/* @__PURE__ */ new Map());
-  const transformedItems = computed(() => (options == null ? void 0 : options.transform) ? unref(items).map((item) => [item, options.transform(item)]) : unref(items));
-  watchEffect(() => {
-    const _query = typeof query === "function" ? query() : unref(query);
-    const strQuery = typeof _query !== "string" && typeof _query !== "number" ? "" : String(_query);
-    const results = filterItems(transformedItems.value, strQuery, {
-      customKeyFilter: {
-        ...props.customKeyFilter,
-        ...unref(options == null ? void 0 : options.customKeyFilter)
-      },
-      default: props.customFilter,
-      filterKeys: props.filterKeys,
-      filterMode: props.filterMode,
-      noFilter: props.noFilter
-    });
-    const originalItems = unref(items);
-    const _filteredItems = [];
-    const _filteredMatches = /* @__PURE__ */ new Map();
-    results.forEach((_ref) => {
-      let {
-        index,
-        matches
-      } = _ref;
-      const item = originalItems[index];
-      _filteredItems.push(item);
-      _filteredMatches.set(item.value, matches);
-    });
-    filteredItems.value = _filteredItems;
-    filteredMatches.value = _filteredMatches;
-  });
-  function getMatches(item) {
-    return filteredMatches.value.get(item.value);
-  }
-  return {
-    filteredItems,
-    filteredMatches,
-    getMatches
-  };
-}
-function highlightResult(name, text, matches) {
-  if (matches == null || !matches.length) return text;
-  return matches.map((match, i) => {
-    const start = i === 0 ? 0 : matches[i - 1][1];
-    const result = [createBaseVNode("span", {
-      "class": normalizeClass(`${name}__unmask`)
-    }, [text.slice(start, match[0])]), createBaseVNode("span", {
-      "class": normalizeClass(`${name}__mask`)
-    }, [text.slice(match[0], match[1])])];
-    if (i === matches.length - 1) {
-      result.push(createBaseVNode("span", {
-        "class": normalizeClass(`${name}__unmask`)
-      }, [text.slice(match[1])]));
-    }
-    return createBaseVNode(Fragment, null, [result]);
-  });
-}
-
-// node_modules/vuetify/lib/components/VAutocomplete/VAutocomplete.js
 var makeVAutocompleteProps = propsFactory({
   autoSelectFirst: {
     type: [Boolean, String]
@@ -4271,665 +4131,6 @@ var VConfirmEdit = genericComponent()({
   }
 });
 
-// node_modules/vuetify/lib/components/VDataTable/composables/expand.js
-var makeDataTableExpandProps = propsFactory({
-  expandOnClick: Boolean,
-  showExpand: Boolean,
-  expanded: {
-    type: Array,
-    default: () => []
-  }
-}, "DataTable-expand");
-var VDataTableExpandedKey = Symbol.for("vuetify:datatable:expanded");
-function provideExpanded(props) {
-  const expandOnClick = toRef(() => props.expandOnClick);
-  const expanded = useProxiedModel(props, "expanded", props.expanded, (v) => {
-    return new Set(v);
-  }, (v) => {
-    return [...v.values()];
-  });
-  function expand(item, value) {
-    const newExpanded = new Set(expanded.value);
-    const rawValue = toRaw(item.value);
-    if (!value) {
-      const item2 = [...expanded.value].find((x) => toRaw(x) === rawValue);
-      newExpanded.delete(item2);
-    } else {
-      newExpanded.add(rawValue);
-    }
-    expanded.value = newExpanded;
-  }
-  function isExpanded(item) {
-    const rawValue = toRaw(item.value);
-    return [...expanded.value].some((x) => toRaw(x) === rawValue);
-  }
-  function toggleExpand(item) {
-    expand(item, !isExpanded(item));
-  }
-  const data = {
-    expand,
-    expanded,
-    expandOnClick,
-    isExpanded,
-    toggleExpand
-  };
-  provide(VDataTableExpandedKey, data);
-  return data;
-}
-function useExpanded() {
-  const data = inject(VDataTableExpandedKey);
-  if (!data) throw new Error("foo");
-  return data;
-}
-
-// node_modules/vuetify/lib/components/VDataTable/composables/group.js
-var makeDataTableGroupProps = propsFactory({
-  groupBy: {
-    type: Array,
-    default: () => []
-  }
-}, "DataTable-group");
-var VDataTableGroupSymbol = Symbol.for("vuetify:data-table-group");
-function createGroupBy(props) {
-  const groupBy = useProxiedModel(props, "groupBy");
-  return {
-    groupBy
-  };
-}
-function provideGroupBy(options) {
-  const {
-    disableSort,
-    groupBy,
-    sortBy
-  } = options;
-  const opened = ref(/* @__PURE__ */ new Set());
-  const sortByWithGroups = computed(() => {
-    return groupBy.value.map((val) => ({
-      ...val,
-      order: val.order ?? false
-    })).concat((disableSort == null ? void 0 : disableSort.value) ? [] : sortBy.value);
-  });
-  function isGroupOpen(group) {
-    return opened.value.has(group.id);
-  }
-  function toggleGroup(group) {
-    const newOpened = new Set(opened.value);
-    if (!isGroupOpen(group)) newOpened.add(group.id);
-    else newOpened.delete(group.id);
-    opened.value = newOpened;
-  }
-  function extractRows(items) {
-    function dive(group) {
-      const arr = [];
-      for (const item of group.items) {
-        if ("type" in item && item.type === "group") {
-          arr.push(...dive(item));
-        } else {
-          arr.push(item);
-        }
-      }
-      return [...new Set(arr)];
-    }
-    return dive({
-      type: "group",
-      items,
-      id: "dummy",
-      key: "dummy",
-      value: "dummy",
-      depth: 0
-    });
-  }
-  const data = {
-    sortByWithGroups,
-    toggleGroup,
-    opened,
-    groupBy,
-    extractRows,
-    isGroupOpen
-  };
-  provide(VDataTableGroupSymbol, data);
-  return data;
-}
-function useGroupBy() {
-  const data = inject(VDataTableGroupSymbol);
-  if (!data) throw new Error("Missing group!");
-  return data;
-}
-function groupItemsByProperty(items, groupBy) {
-  if (!items.length) return [];
-  const groups = /* @__PURE__ */ new Map();
-  for (const item of items) {
-    const value = getObjectValueByPath(item.raw, groupBy);
-    if (!groups.has(value)) {
-      groups.set(value, []);
-    }
-    groups.get(value).push(item);
-  }
-  return groups;
-}
-function groupItems(items, groupBy) {
-  let depth = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : 0;
-  let prefix = arguments.length > 3 && arguments[3] !== void 0 ? arguments[3] : "root";
-  if (!groupBy.length) return [];
-  const groupedItems = groupItemsByProperty(items, groupBy[0]);
-  const groups = [];
-  const rest = groupBy.slice(1);
-  groupedItems.forEach((items2, value) => {
-    const key = groupBy[0];
-    const id = `${prefix}_${key}_${value}`;
-    groups.push({
-      depth,
-      id,
-      key,
-      value,
-      items: rest.length ? groupItems(items2, rest, depth + 1, id) : items2,
-      type: "group"
-    });
-  });
-  return groups;
-}
-function flattenItems(items, opened, hasSummary) {
-  const flatItems = [];
-  for (const item of items) {
-    if ("type" in item && item.type === "group") {
-      if (item.value != null) {
-        flatItems.push(item);
-      }
-      if (opened.has(item.id) || item.value == null) {
-        flatItems.push(...flattenItems(item.items, opened, hasSummary));
-        if (hasSummary) {
-          flatItems.push({
-            ...item,
-            type: "group-summary"
-          });
-        }
-      }
-    } else {
-      flatItems.push(item);
-    }
-  }
-  return flatItems;
-}
-function useGroupedItems(items, groupBy, opened, hasSummary) {
-  const flatItems = computed(() => {
-    if (!groupBy.value.length) return items.value;
-    const groupedItems = groupItems(items.value, groupBy.value.map((item) => item.key));
-    return flattenItems(groupedItems, opened.value, toValue(hasSummary));
-  });
-  return {
-    flatItems
-  };
-}
-
-// node_modules/vuetify/lib/components/VDataTable/composables/options.js
-function useOptions(_ref) {
-  let {
-    page,
-    itemsPerPage,
-    sortBy,
-    groupBy,
-    search
-  } = _ref;
-  const vm = getCurrentInstance("VDataTable");
-  const options = () => ({
-    page: page.value,
-    itemsPerPage: itemsPerPage.value,
-    sortBy: sortBy.value,
-    groupBy: groupBy.value,
-    search: search.value
-  });
-  let oldOptions = null;
-  watch(options, (value) => {
-    if (deepEqual(oldOptions, value)) return;
-    if (oldOptions && oldOptions.search !== value.search) {
-      page.value = 1;
-    }
-    vm.emit("update:options", value);
-    oldOptions = value;
-  }, {
-    deep: true,
-    immediate: true
-  });
-}
-
-// node_modules/vuetify/lib/components/VDataTable/composables/paginate.js
-var makeDataTablePaginateProps = propsFactory({
-  page: {
-    type: [Number, String],
-    default: 1
-  },
-  itemsPerPage: {
-    type: [Number, String],
-    default: 10
-  }
-}, "DataTable-paginate");
-var VDataTablePaginationSymbol = Symbol.for("vuetify:data-table-pagination");
-function createPagination(props) {
-  const page = useProxiedModel(props, "page", void 0, (value) => Number(value ?? 1));
-  const itemsPerPage = useProxiedModel(props, "itemsPerPage", void 0, (value) => Number(value ?? 10));
-  return {
-    page,
-    itemsPerPage
-  };
-}
-function providePagination(options) {
-  const {
-    page,
-    itemsPerPage,
-    itemsLength
-  } = options;
-  const startIndex = computed(() => {
-    if (itemsPerPage.value === -1) return 0;
-    return itemsPerPage.value * (page.value - 1);
-  });
-  const stopIndex = computed(() => {
-    if (itemsPerPage.value === -1) return itemsLength.value;
-    return Math.min(itemsLength.value, startIndex.value + itemsPerPage.value);
-  });
-  const pageCount = computed(() => {
-    if (itemsPerPage.value === -1 || itemsLength.value === 0) return 1;
-    return Math.ceil(itemsLength.value / itemsPerPage.value);
-  });
-  watch([page, pageCount], () => {
-    if (page.value > pageCount.value) {
-      page.value = pageCount.value;
-    }
-  });
-  function setItemsPerPage(value) {
-    itemsPerPage.value = value;
-    page.value = 1;
-  }
-  function nextPage() {
-    page.value = clamp(page.value + 1, 1, pageCount.value);
-  }
-  function prevPage() {
-    page.value = clamp(page.value - 1, 1, pageCount.value);
-  }
-  function setPage(value) {
-    page.value = clamp(value, 1, pageCount.value);
-  }
-  const data = {
-    page,
-    itemsPerPage,
-    startIndex,
-    stopIndex,
-    pageCount,
-    itemsLength,
-    nextPage,
-    prevPage,
-    setPage,
-    setItemsPerPage
-  };
-  provide(VDataTablePaginationSymbol, data);
-  return data;
-}
-function usePagination() {
-  const data = inject(VDataTablePaginationSymbol);
-  if (!data) throw new Error("Missing pagination!");
-  return data;
-}
-function usePaginatedItems(options) {
-  const vm = getCurrentInstance("usePaginatedItems");
-  const {
-    items,
-    startIndex,
-    stopIndex,
-    itemsPerPage
-  } = options;
-  const paginatedItems = computed(() => {
-    if (itemsPerPage.value <= 0) return items.value;
-    return items.value.slice(startIndex.value, stopIndex.value);
-  });
-  watch(paginatedItems, (val) => {
-    vm.emit("update:currentItems", val);
-  }, {
-    immediate: true
-  });
-  return {
-    paginatedItems
-  };
-}
-
-// node_modules/vuetify/lib/components/VDataTable/composables/select.js
-var singleSelectStrategy = {
-  showSelectAll: false,
-  allSelected: () => [],
-  select: (_ref) => {
-    var _a2;
-    let {
-      items,
-      value
-    } = _ref;
-    return new Set(value ? [(_a2 = items[0]) == null ? void 0 : _a2.value] : []);
-  },
-  selectAll: (_ref2) => {
-    let {
-      selected
-    } = _ref2;
-    return selected;
-  }
-};
-var pageSelectStrategy = {
-  showSelectAll: true,
-  allSelected: (_ref3) => {
-    let {
-      currentPage
-    } = _ref3;
-    return currentPage;
-  },
-  select: (_ref4) => {
-    let {
-      items,
-      value,
-      selected
-    } = _ref4;
-    for (const item of items) {
-      if (value) selected.add(item.value);
-      else selected.delete(item.value);
-    }
-    return selected;
-  },
-  selectAll: (_ref5) => {
-    let {
-      value,
-      currentPage,
-      selected
-    } = _ref5;
-    return pageSelectStrategy.select({
-      items: currentPage,
-      value,
-      selected
-    });
-  }
-};
-var allSelectStrategy = {
-  showSelectAll: true,
-  allSelected: (_ref6) => {
-    let {
-      allItems
-    } = _ref6;
-    return allItems;
-  },
-  select: (_ref7) => {
-    let {
-      items,
-      value,
-      selected
-    } = _ref7;
-    for (const item of items) {
-      if (value) selected.add(item.value);
-      else selected.delete(item.value);
-    }
-    return selected;
-  },
-  selectAll: (_ref8) => {
-    let {
-      value,
-      allItems,
-      selected
-    } = _ref8;
-    return allSelectStrategy.select({
-      items: allItems,
-      value,
-      selected
-    });
-  }
-};
-var makeDataTableSelectProps = propsFactory({
-  showSelect: Boolean,
-  selectStrategy: {
-    type: [String, Object],
-    default: "page"
-  },
-  modelValue: {
-    type: Array,
-    default: () => []
-  },
-  valueComparator: {
-    type: Function,
-    default: deepEqual
-  }
-}, "DataTable-select");
-var VDataTableSelectionSymbol = Symbol.for("vuetify:data-table-selection");
-function provideSelection(props, _ref9) {
-  let {
-    allItems,
-    currentPage
-  } = _ref9;
-  const selected = useProxiedModel(props, "modelValue", props.modelValue, (v) => {
-    return new Set(wrapInArray(v).map((v2) => {
-      var _a2;
-      return ((_a2 = allItems.value.find((item) => props.valueComparator(v2, item.value))) == null ? void 0 : _a2.value) ?? v2;
-    }));
-  }, (v) => {
-    return [...v.values()];
-  });
-  const allSelectable = computed(() => allItems.value.filter((item) => item.selectable));
-  const currentPageSelectable = computed(() => currentPage.value.filter((item) => item.selectable));
-  const selectStrategy = computed(() => {
-    if (typeof props.selectStrategy === "object") return props.selectStrategy;
-    switch (props.selectStrategy) {
-      case "single":
-        return singleSelectStrategy;
-      case "all":
-        return allSelectStrategy;
-      case "page":
-      default:
-        return pageSelectStrategy;
-    }
-  });
-  const lastSelectedIndex = shallowRef(null);
-  function isSelected(items) {
-    return wrapInArray(items).every((item) => selected.value.has(item.value));
-  }
-  function isSomeSelected(items) {
-    return wrapInArray(items).some((item) => selected.value.has(item.value));
-  }
-  function select(items, value) {
-    const newSelected = selectStrategy.value.select({
-      items,
-      value,
-      selected: new Set(selected.value)
-    });
-    selected.value = newSelected;
-  }
-  function toggleSelect(item, index, event) {
-    const items = [];
-    index = index ?? currentPage.value.findIndex((i) => i.value === item.value);
-    if (props.selectStrategy !== "single" && (event == null ? void 0 : event.shiftKey) && lastSelectedIndex.value !== null) {
-      const [start, end] = [lastSelectedIndex.value, index].sort((a, b) => a - b);
-      items.push(...currentPage.value.slice(start, end + 1).filter((item2) => item2.selectable));
-    } else {
-      items.push(item);
-      lastSelectedIndex.value = index;
-    }
-    select(items, !isSelected([item]));
-  }
-  function selectAll(value) {
-    const newSelected = selectStrategy.value.selectAll({
-      value,
-      allItems: allSelectable.value,
-      currentPage: currentPageSelectable.value,
-      selected: new Set(selected.value)
-    });
-    selected.value = newSelected;
-  }
-  const someSelected = computed(() => selected.value.size > 0);
-  const allSelected = computed(() => {
-    const items = selectStrategy.value.allSelected({
-      allItems: allSelectable.value,
-      currentPage: currentPageSelectable.value
-    });
-    return !!items.length && isSelected(items);
-  });
-  const showSelectAll = toRef(() => selectStrategy.value.showSelectAll);
-  const data = {
-    toggleSelect,
-    select,
-    selectAll,
-    isSelected,
-    isSomeSelected,
-    someSelected,
-    allSelected,
-    showSelectAll,
-    lastSelectedIndex,
-    selectStrategy
-  };
-  provide(VDataTableSelectionSymbol, data);
-  return data;
-}
-function useSelection() {
-  const data = inject(VDataTableSelectionSymbol);
-  if (!data) throw new Error("Missing selection!");
-  return data;
-}
-
-// node_modules/vuetify/lib/components/VDataTable/composables/sort.js
-var makeDataTableSortProps = propsFactory({
-  sortBy: {
-    type: Array,
-    default: () => []
-  },
-  customKeySort: Object,
-  multiSort: Boolean,
-  mustSort: Boolean
-}, "DataTable-sort");
-var VDataTableSortSymbol = Symbol.for("vuetify:data-table-sort");
-function createSort(props) {
-  const sortBy = useProxiedModel(props, "sortBy");
-  const mustSort = toRef(() => props.mustSort);
-  const multiSort = toRef(() => props.multiSort);
-  return {
-    sortBy,
-    mustSort,
-    multiSort
-  };
-}
-function provideSort(options) {
-  const {
-    sortBy,
-    mustSort,
-    multiSort,
-    page
-  } = options;
-  const toggleSort = (column) => {
-    if (column.key == null) return;
-    let newSortBy = sortBy.value.map((x) => ({
-      ...x
-    })) ?? [];
-    const item = newSortBy.find((x) => x.key === column.key);
-    if (!item) {
-      if (multiSort.value) {
-        newSortBy.push({
-          key: column.key,
-          order: "asc"
-        });
-      } else {
-        newSortBy = [{
-          key: column.key,
-          order: "asc"
-        }];
-      }
-    } else if (item.order === "desc") {
-      if (mustSort.value && newSortBy.length === 1) {
-        item.order = "asc";
-      } else {
-        newSortBy = newSortBy.filter((x) => x.key !== column.key);
-      }
-    } else {
-      item.order = "desc";
-    }
-    sortBy.value = newSortBy;
-    if (page) page.value = 1;
-  };
-  function isSorted(column) {
-    return !!sortBy.value.find((item) => item.key === column.key);
-  }
-  const data = {
-    sortBy,
-    toggleSort,
-    isSorted
-  };
-  provide(VDataTableSortSymbol, data);
-  return data;
-}
-function useSort() {
-  const data = inject(VDataTableSortSymbol);
-  if (!data) throw new Error("Missing sort!");
-  return data;
-}
-function useSortedItems(props, items, sortBy, options) {
-  const locale = useLocale();
-  const sortedItems = computed(() => {
-    var _a2, _b;
-    if (!sortBy.value.length) return items.value;
-    return sortItems(items.value, sortBy.value, locale.current.value, {
-      transform: options == null ? void 0 : options.transform,
-      sortFunctions: {
-        ...props.customKeySort,
-        ...(_a2 = options == null ? void 0 : options.sortFunctions) == null ? void 0 : _a2.value
-      },
-      sortRawFunctions: (_b = options == null ? void 0 : options.sortRawFunctions) == null ? void 0 : _b.value
-    });
-  });
-  return {
-    sortedItems
-  };
-}
-function sortItems(items, sortByItems, locale, options) {
-  const stringCollator = new Intl.Collator(locale, {
-    sensitivity: "accent",
-    usage: "sort"
-  });
-  const transformedItems = items.map((item) => [item, (options == null ? void 0 : options.transform) ? options.transform(item) : item]);
-  return transformedItems.sort((a, b) => {
-    var _a2, _b;
-    for (let i = 0; i < sortByItems.length; i++) {
-      let hasCustomResult = false;
-      const sortKey = sortByItems[i].key;
-      const sortOrder = sortByItems[i].order ?? "asc";
-      if (sortOrder === false) continue;
-      let sortA = getObjectValueByPath(a[1], sortKey);
-      let sortB = getObjectValueByPath(b[1], sortKey);
-      let sortARaw = a[0].raw;
-      let sortBRaw = b[0].raw;
-      if (sortOrder === "desc") {
-        [sortA, sortB] = [sortB, sortA];
-        [sortARaw, sortBRaw] = [sortBRaw, sortARaw];
-      }
-      if ((_a2 = options == null ? void 0 : options.sortRawFunctions) == null ? void 0 : _a2[sortKey]) {
-        const customResult = options.sortRawFunctions[sortKey](sortARaw, sortBRaw);
-        if (customResult == null) continue;
-        hasCustomResult = true;
-        if (customResult) return customResult;
-      }
-      if ((_b = options == null ? void 0 : options.sortFunctions) == null ? void 0 : _b[sortKey]) {
-        const customResult = options.sortFunctions[sortKey](sortA, sortB);
-        if (customResult == null) continue;
-        hasCustomResult = true;
-        if (customResult) return customResult;
-      }
-      if (hasCustomResult) continue;
-      if (sortA instanceof Date && sortB instanceof Date) {
-        sortA = sortA.getTime();
-        sortB = sortB.getTime();
-      }
-      [sortA, sortB] = [sortA, sortB].map((s) => s != null ? s.toString().toLocaleLowerCase() : s);
-      if (sortA !== sortB) {
-        if (isEmpty(sortA) && isEmpty(sortB)) return 0;
-        if (isEmpty(sortA)) return -1;
-        if (isEmpty(sortB)) return 1;
-        if (!isNaN(sortA) && !isNaN(sortB)) return Number(sortA) - Number(sortB);
-        return stringCollator.compare(sortA, sortB);
-      }
-    }
-    return 0;
-  }).map((_ref) => {
-    let [item] = _ref;
-    return item;
-  });
-}
-
 // node_modules/vuetify/lib/components/VDataIterator/composables/items.js
 var makeDataIteratorItemsProps = propsFactory({
   items: {
@@ -5149,2147 +4350,6 @@ var VDataIterator = genericComponent()({
       }
     }));
     return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTable.js
-import "/app/node_modules/vuetify/lib/components/VDataTable/VDataTable.css";
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableFooter.js
-import "/app/node_modules/vuetify/lib/components/VDataTable/VDataTableFooter.css";
-
-// node_modules/vuetify/lib/components/VPagination/VPagination.js
-import "/app/node_modules/vuetify/lib/components/VPagination/VPagination.css";
-
-// node_modules/vuetify/lib/composables/refs.js
-function useRefs() {
-  const refs = ref([]);
-  onBeforeUpdate(() => refs.value = []);
-  function updateRef(e, i) {
-    refs.value[i] = e;
-  }
-  return {
-    refs,
-    updateRef
-  };
-}
-
-// node_modules/vuetify/lib/components/VPagination/VPagination.js
-var makeVPaginationProps = propsFactory({
-  activeColor: String,
-  start: {
-    type: [Number, String],
-    default: 1
-  },
-  modelValue: {
-    type: Number,
-    default: (props) => props.start
-  },
-  disabled: Boolean,
-  length: {
-    type: [Number, String],
-    default: 1,
-    validator: (val) => val % 1 === 0
-  },
-  totalVisible: [Number, String],
-  firstIcon: {
-    type: IconValue,
-    default: "$first"
-  },
-  prevIcon: {
-    type: IconValue,
-    default: "$prev"
-  },
-  nextIcon: {
-    type: IconValue,
-    default: "$next"
-  },
-  lastIcon: {
-    type: IconValue,
-    default: "$last"
-  },
-  ariaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.root"
-  },
-  pageAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.page"
-  },
-  currentPageAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.currentPage"
-  },
-  firstAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.first"
-  },
-  previousAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.previous"
-  },
-  nextAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.next"
-  },
-  lastAriaLabel: {
-    type: String,
-    default: "$vuetify.pagination.ariaLabel.last"
-  },
-  ellipsis: {
-    type: String,
-    default: "..."
-  },
-  showFirstLastPage: Boolean,
-  ...makeBorderProps(),
-  ...makeComponentProps(),
-  ...makeDensityProps(),
-  ...makeElevationProps(),
-  ...makeRoundedProps(),
-  ...makeSizeProps(),
-  ...makeTagProps({
-    tag: "nav"
-  }),
-  ...makeThemeProps(),
-  ...makeVariantProps({
-    variant: "text"
-  })
-}, "VPagination");
-var VPagination = genericComponent()({
-  name: "VPagination",
-  props: makeVPaginationProps(),
-  emits: {
-    "update:modelValue": (value) => true,
-    first: (value) => true,
-    prev: (value) => true,
-    next: (value) => true,
-    last: (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      slots,
-      emit
-    } = _ref;
-    const page = useProxiedModel(props, "modelValue");
-    const {
-      t,
-      n
-    } = useLocale();
-    const {
-      isRtl
-    } = useRtl();
-    const {
-      themeClasses
-    } = provideTheme(props);
-    const {
-      width
-    } = useDisplay();
-    const maxButtons = shallowRef(-1);
-    provideDefaults(void 0, {
-      scoped: true
-    });
-    const {
-      resizeRef
-    } = useResizeObserver((entries) => {
-      if (!entries.length) return;
-      const {
-        target,
-        contentRect
-      } = entries[0];
-      const firstItem = target.querySelector(".v-pagination__list > *");
-      if (!firstItem) return;
-      const totalWidth = contentRect.width;
-      const itemWidth = firstItem.offsetWidth + parseFloat(getComputedStyle(firstItem).marginRight) * 2;
-      maxButtons.value = getMax(totalWidth, itemWidth);
-    });
-    const length = computed(() => parseInt(props.length, 10));
-    const start = computed(() => parseInt(props.start, 10));
-    const totalVisible = computed(() => {
-      if (props.totalVisible != null) return parseInt(props.totalVisible, 10);
-      else if (maxButtons.value >= 0) return maxButtons.value;
-      return getMax(width.value, 58);
-    });
-    function getMax(totalWidth, itemWidth) {
-      const minButtons = props.showFirstLastPage ? 5 : 3;
-      return Math.max(0, Math.floor(
-        // Round to two decimal places to avoid floating point errors
-        Number(((totalWidth - itemWidth * minButtons) / itemWidth).toFixed(2))
-      ));
-    }
-    const range = computed(() => {
-      if (length.value <= 0 || isNaN(length.value) || length.value > Number.MAX_SAFE_INTEGER) return [];
-      if (totalVisible.value <= 0) return [];
-      else if (totalVisible.value === 1) return [page.value];
-      if (length.value <= totalVisible.value) {
-        return createRange(length.value, start.value);
-      }
-      const even = totalVisible.value % 2 === 0;
-      const middle = even ? totalVisible.value / 2 : Math.floor(totalVisible.value / 2);
-      const left = even ? middle : middle + 1;
-      const right = length.value - middle;
-      if (left - page.value >= 0) {
-        return [...createRange(Math.max(1, totalVisible.value - 1), start.value), props.ellipsis, length.value];
-      } else if (page.value - right >= (even ? 1 : 0)) {
-        const rangeLength = totalVisible.value - 1;
-        const rangeStart = length.value - rangeLength + start.value;
-        return [start.value, props.ellipsis, ...createRange(rangeLength, rangeStart)];
-      } else {
-        const rangeLength = Math.max(1, totalVisible.value - 2);
-        const rangeStart = rangeLength === 1 ? page.value : page.value - Math.ceil(rangeLength / 2) + start.value;
-        return [start.value, props.ellipsis, ...createRange(rangeLength, rangeStart), props.ellipsis, length.value];
-      }
-    });
-    function setValue(e, value, event) {
-      e.preventDefault();
-      page.value = value;
-      event && emit(event, value);
-    }
-    const {
-      refs,
-      updateRef
-    } = useRefs();
-    provideDefaults({
-      VPaginationBtn: {
-        color: toRef(() => props.color),
-        border: toRef(() => props.border),
-        density: toRef(() => props.density),
-        size: toRef(() => props.size),
-        variant: toRef(() => props.variant),
-        rounded: toRef(() => props.rounded),
-        elevation: toRef(() => props.elevation)
-      }
-    });
-    const items = computed(() => {
-      return range.value.map((item, index) => {
-        const ref2 = (e) => updateRef(e, index);
-        if (typeof item === "string") {
-          return {
-            isActive: false,
-            key: `ellipsis-${index}`,
-            page: item,
-            props: {
-              ref: ref2,
-              ellipsis: true,
-              icon: true,
-              disabled: true
-            }
-          };
-        } else {
-          const isActive = item === page.value;
-          return {
-            isActive,
-            key: item,
-            page: n(item),
-            props: {
-              ref: ref2,
-              ellipsis: false,
-              icon: true,
-              disabled: !!props.disabled || Number(props.length) < 2,
-              color: isActive ? props.activeColor : props.color,
-              "aria-current": isActive,
-              "aria-label": t(isActive ? props.currentPageAriaLabel : props.pageAriaLabel, item),
-              onClick: (e) => setValue(e, item)
-            }
-          };
-        }
-      });
-    });
-    const controls = computed(() => {
-      const prevDisabled = !!props.disabled || page.value <= start.value;
-      const nextDisabled = !!props.disabled || page.value >= start.value + length.value - 1;
-      return {
-        first: props.showFirstLastPage ? {
-          icon: isRtl.value ? props.lastIcon : props.firstIcon,
-          onClick: (e) => setValue(e, start.value, "first"),
-          disabled: prevDisabled,
-          "aria-label": t(props.firstAriaLabel),
-          "aria-disabled": prevDisabled
-        } : void 0,
-        prev: {
-          icon: isRtl.value ? props.nextIcon : props.prevIcon,
-          onClick: (e) => setValue(e, page.value - 1, "prev"),
-          disabled: prevDisabled,
-          "aria-label": t(props.previousAriaLabel),
-          "aria-disabled": prevDisabled
-        },
-        next: {
-          icon: isRtl.value ? props.prevIcon : props.nextIcon,
-          onClick: (e) => setValue(e, page.value + 1, "next"),
-          disabled: nextDisabled,
-          "aria-label": t(props.nextAriaLabel),
-          "aria-disabled": nextDisabled
-        },
-        last: props.showFirstLastPage ? {
-          icon: isRtl.value ? props.firstIcon : props.lastIcon,
-          onClick: (e) => setValue(e, start.value + length.value - 1, "last"),
-          disabled: nextDisabled,
-          "aria-label": t(props.lastAriaLabel),
-          "aria-disabled": nextDisabled
-        } : void 0
-      };
-    });
-    function updateFocus() {
-      var _a2;
-      const currentIndex = page.value - start.value;
-      (_a2 = refs.value[currentIndex]) == null ? void 0 : _a2.$el.focus();
-    }
-    function onKeydown(e) {
-      if (e.key === keyValues.left && !props.disabled && page.value > Number(props.start)) {
-        page.value = page.value - 1;
-        nextTick(updateFocus);
-      } else if (e.key === keyValues.right && !props.disabled && page.value < start.value + length.value - 1) {
-        page.value = page.value + 1;
-        nextTick(updateFocus);
-      }
-    }
-    useRender(() => createVNode(props.tag, {
-      "ref": resizeRef,
-      "class": normalizeClass(["v-pagination", themeClasses.value, props.class]),
-      "style": normalizeStyle(props.style),
-      "role": "navigation",
-      "aria-label": t(props.ariaLabel),
-      "onKeydown": onKeydown,
-      "data-test": "v-pagination-root"
-    }, {
-      default: () => [createBaseVNode("ul", {
-        "class": "v-pagination__list"
-      }, [props.showFirstLastPage && createBaseVNode("li", {
-        "key": "first",
-        "class": "v-pagination__first",
-        "data-test": "v-pagination-first"
-      }, [slots.first ? slots.first(controls.value.first) : createVNode(VBtn, mergeProps({
-        "_as": "VPaginationBtn"
-      }, controls.value.first), null)]), createBaseVNode("li", {
-        "key": "prev",
-        "class": "v-pagination__prev",
-        "data-test": "v-pagination-prev"
-      }, [slots.prev ? slots.prev(controls.value.prev) : createVNode(VBtn, mergeProps({
-        "_as": "VPaginationBtn"
-      }, controls.value.prev), null)]), items.value.map((item, index) => createBaseVNode("li", {
-        "key": item.key,
-        "class": normalizeClass(["v-pagination__item", {
-          "v-pagination__item--is-active": item.isActive
-        }]),
-        "data-test": "v-pagination-item"
-      }, [slots.item ? slots.item(item) : createVNode(VBtn, mergeProps({
-        "_as": "VPaginationBtn"
-      }, item.props), {
-        default: () => [item.page]
-      })])), createBaseVNode("li", {
-        "key": "next",
-        "class": "v-pagination__next",
-        "data-test": "v-pagination-next"
-      }, [slots.next ? slots.next(controls.value.next) : createVNode(VBtn, mergeProps({
-        "_as": "VPaginationBtn"
-      }, controls.value.next), null)]), props.showFirstLastPage && createBaseVNode("li", {
-        "key": "last",
-        "class": "v-pagination__last",
-        "data-test": "v-pagination-last"
-      }, [slots.last ? slots.last(controls.value.last) : createVNode(VBtn, mergeProps({
-        "_as": "VPaginationBtn"
-      }, controls.value.last), null)])])]
-    }));
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableFooter.js
-var makeVDataTableFooterProps = propsFactory({
-  prevIcon: {
-    type: IconValue,
-    default: "$prev"
-  },
-  nextIcon: {
-    type: IconValue,
-    default: "$next"
-  },
-  firstIcon: {
-    type: IconValue,
-    default: "$first"
-  },
-  lastIcon: {
-    type: IconValue,
-    default: "$last"
-  },
-  itemsPerPageText: {
-    type: String,
-    default: "$vuetify.dataFooter.itemsPerPageText"
-  },
-  pageText: {
-    type: String,
-    default: "$vuetify.dataFooter.pageText"
-  },
-  firstPageLabel: {
-    type: String,
-    default: "$vuetify.dataFooter.firstPage"
-  },
-  prevPageLabel: {
-    type: String,
-    default: "$vuetify.dataFooter.prevPage"
-  },
-  nextPageLabel: {
-    type: String,
-    default: "$vuetify.dataFooter.nextPage"
-  },
-  lastPageLabel: {
-    type: String,
-    default: "$vuetify.dataFooter.lastPage"
-  },
-  itemsPerPageOptions: {
-    type: Array,
-    default: () => [{
-      value: 10,
-      title: "10"
-    }, {
-      value: 25,
-      title: "25"
-    }, {
-      value: 50,
-      title: "50"
-    }, {
-      value: 100,
-      title: "100"
-    }, {
-      value: -1,
-      title: "$vuetify.dataFooter.itemsPerPageAll"
-    }]
-  },
-  showCurrentPage: Boolean
-}, "VDataTableFooter");
-var VDataTableFooter = genericComponent()({
-  name: "VDataTableFooter",
-  props: makeVDataTableFooterProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const {
-      t
-    } = useLocale();
-    const {
-      page,
-      pageCount,
-      startIndex,
-      stopIndex,
-      itemsLength,
-      itemsPerPage,
-      setItemsPerPage
-    } = usePagination();
-    const itemsPerPageOptions = computed(() => props.itemsPerPageOptions.map((option) => {
-      if (typeof option === "number") {
-        return {
-          value: option,
-          title: option === -1 ? t("$vuetify.dataFooter.itemsPerPageAll") : String(option)
-        };
-      }
-      return {
-        ...option,
-        title: !isNaN(Number(option.title)) ? option.title : t(option.title)
-      };
-    }));
-    useRender(() => {
-      var _a2;
-      const paginationProps = VPagination.filterProps(props);
-      return createBaseVNode("div", {
-        "class": "v-data-table-footer"
-      }, [(_a2 = slots.prepend) == null ? void 0 : _a2.call(slots), createBaseVNode("div", {
-        "class": "v-data-table-footer__items-per-page"
-      }, [createBaseVNode("span", {
-        "aria-label": t(props.itemsPerPageText)
-      }, [t(props.itemsPerPageText)]), createVNode(VSelect, {
-        "items": itemsPerPageOptions.value,
-        "modelValue": itemsPerPage.value,
-        "onUpdate:modelValue": (v) => setItemsPerPage(Number(v)),
-        "density": "compact",
-        "variant": "outlined",
-        "hideDetails": true
-      }, null)]), createBaseVNode("div", {
-        "class": "v-data-table-footer__info"
-      }, [createBaseVNode("div", null, [t(props.pageText, !itemsLength.value ? 0 : startIndex.value + 1, stopIndex.value, itemsLength.value)])]), createBaseVNode("div", {
-        "class": "v-data-table-footer__pagination"
-      }, [createVNode(VPagination, mergeProps({
-        "modelValue": page.value,
-        "onUpdate:modelValue": ($event) => page.value = $event,
-        "density": "comfortable",
-        "firstAriaLabel": props.firstPageLabel,
-        "lastAriaLabel": props.lastPageLabel,
-        "length": pageCount.value,
-        "nextAriaLabel": props.nextPageLabel,
-        "previousAriaLabel": props.prevPageLabel,
-        "rounded": true,
-        "showFirstLastPage": true,
-        "totalVisible": props.showCurrentPage ? 1 : 0,
-        "variant": "plain"
-      }, paginationProps), null)])]);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableColumn.js
-var VDataTableColumn = defineFunctionalComponent({
-  align: {
-    type: String,
-    default: "start"
-  },
-  fixed: {
-    type: [Boolean, String],
-    default: false
-  },
-  fixedOffset: [Number, String],
-  fixedEndOffset: [Number, String],
-  height: [Number, String],
-  lastFixed: Boolean,
-  firstFixedEnd: Boolean,
-  noPadding: Boolean,
-  indent: [Number, String],
-  empty: Boolean,
-  tag: String,
-  width: [Number, String],
-  maxWidth: [Number, String],
-  nowrap: Boolean
-}, (props, _ref) => {
-  let {
-    slots
-  } = _ref;
-  const Tag = props.tag ?? "td";
-  const fixedSide = typeof props.fixed === "string" ? props.fixed : props.fixed ? "start" : "none";
-  return createVNode(Tag, {
-    "class": normalizeClass(["v-data-table__td", {
-      "v-data-table-column--fixed": fixedSide === "start",
-      "v-data-table-column--fixed-end": fixedSide === "end",
-      "v-data-table-column--last-fixed": props.lastFixed,
-      "v-data-table-column--first-fixed-end": props.firstFixedEnd,
-      "v-data-table-column--no-padding": props.noPadding,
-      "v-data-table-column--nowrap": props.nowrap,
-      "v-data-table-column--empty": props.empty
-    }, `v-data-table-column--align-${props.align}`]),
-    "style": {
-      height: convertToUnit(props.height),
-      width: convertToUnit(props.width),
-      maxWidth: convertToUnit(props.maxWidth),
-      left: fixedSide === "start" ? convertToUnit(props.fixedOffset || null) : void 0,
-      right: fixedSide === "end" ? convertToUnit(props.fixedEndOffset || null) : void 0,
-      paddingInlineStart: props.indent ? convertToUnit(props.indent) : void 0
-    }
-  }, {
-    default: () => {
-      var _a2;
-      return [(_a2 = slots.default) == null ? void 0 : _a2.call(slots)];
-    }
-  });
-});
-
-// node_modules/vuetify/lib/components/VDataTable/composables/headers.js
-var makeDataTableHeaderProps = propsFactory({
-  headers: Array
-}, "DataTable-header");
-var VDataTableHeadersSymbol = Symbol.for("vuetify:data-table-headers");
-var defaultHeader = {
-  title: "",
-  sortable: false
-};
-var defaultActionHeader = {
-  ...defaultHeader,
-  width: 48
-};
-function priorityQueue() {
-  let arr = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : [];
-  const queue = arr.map((element) => ({
-    element,
-    priority: 0
-  }));
-  return {
-    enqueue: (element, priority) => {
-      let added = false;
-      for (let i = 0; i < queue.length; i++) {
-        const item = queue[i];
-        if (item.priority > priority) {
-          queue.splice(i, 0, {
-            element,
-            priority
-          });
-          added = true;
-          break;
-        }
-      }
-      if (!added) queue.push({
-        element,
-        priority
-      });
-    },
-    size: () => queue.length,
-    count: () => {
-      let count = 0;
-      if (!queue.length) return 0;
-      const whole = Math.floor(queue[0].priority);
-      for (let i = 0; i < queue.length; i++) {
-        if (Math.floor(queue[i].priority) === whole) count += 1;
-      }
-      return count;
-    },
-    dequeue: () => {
-      return queue.shift();
-    }
-  };
-}
-function extractLeaves(item) {
-  let columns = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : [];
-  if (!item.children) {
-    columns.push(item);
-  } else {
-    for (const child of item.children) {
-      extractLeaves(child, columns);
-    }
-  }
-  return columns;
-}
-function extractKeys(headers) {
-  let keys = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : /* @__PURE__ */ new Set();
-  for (const item of headers) {
-    if (item.key) keys.add(item.key);
-    if (item.children) {
-      extractKeys(item.children, keys);
-    }
-  }
-  return keys;
-}
-function getDefaultItem(item) {
-  if (!item.key) return void 0;
-  if (item.key === "data-table-group") return defaultHeader;
-  if (["data-table-expand", "data-table-select"].includes(item.key)) return defaultActionHeader;
-  return void 0;
-}
-function getDepth(item) {
-  let depth = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 0;
-  if (!item.children) return depth;
-  return Math.max(depth, ...item.children.map((child) => getDepth(child, depth + 1)));
-}
-function parseFixedColumns(items) {
-  let seenFixed = false;
-  function setFixed(item, side) {
-    let parentFixedSide = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : "none";
-    if (!item) return;
-    if (parentFixedSide !== "none") {
-      item.fixed = parentFixedSide;
-    }
-    if (item.fixed === true) {
-      item.fixed = "start";
-    }
-    if (item.fixed === side) {
-      if (item.children) {
-        if (side === "start") {
-          for (let i = item.children.length - 1; i >= 0; i--) {
-            setFixed(item.children[i], side, side);
-          }
-        } else {
-          for (let i = 0; i < item.children.length; i++) {
-            setFixed(item.children[i], side, side);
-          }
-        }
-      } else {
-        if (!seenFixed && side === "start") {
-          item.lastFixed = true;
-        } else if (!seenFixed && side === "end") {
-          item.firstFixedEnd = true;
-        } else if (isNaN(Number(item.width))) {
-          consoleError(`Multiple fixed columns should have a static width (key: ${item.key})`);
-        } else {
-          item.minWidth = Math.max(Number(item.width) || 0, Number(item.minWidth) || 0);
-        }
-        seenFixed = true;
-      }
-    } else {
-      if (item.children) {
-        if (side === "start") {
-          for (let i = item.children.length - 1; i >= 0; i--) {
-            setFixed(item.children[i], side);
-          }
-        } else {
-          for (let i = 0; i < item.children.length; i++) {
-            setFixed(item.children[i], side);
-          }
-        }
-      } else {
-        seenFixed = false;
-      }
-    }
-  }
-  for (let i = items.length - 1; i >= 0; i--) {
-    setFixed(items[i], "start");
-  }
-  for (let i = 0; i < items.length; i++) {
-    setFixed(items[i], "end");
-  }
-  let fixedOffset = 0;
-  for (let i = 0; i < items.length; i++) {
-    fixedOffset = setFixedOffset(items[i], fixedOffset);
-  }
-  let fixedEndOffset = 0;
-  for (let i = items.length - 1; i >= 0; i--) {
-    fixedEndOffset = setFixedEndOffset(items[i], fixedEndOffset);
-  }
-}
-function setFixedOffset(item) {
-  let offset = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 0;
-  if (!item) return offset;
-  if (item.children) {
-    item.fixedOffset = offset;
-    for (const child of item.children) {
-      offset = setFixedOffset(child, offset);
-    }
-  } else if (item.fixed && item.fixed !== "end") {
-    item.fixedOffset = offset;
-    offset += parseFloat(item.width || "0") || 0;
-  }
-  return offset;
-}
-function setFixedEndOffset(item) {
-  let offset = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 0;
-  if (!item) return offset;
-  if (item.children) {
-    item.fixedEndOffset = offset;
-    for (const child of item.children) {
-      offset = setFixedEndOffset(child, offset);
-    }
-  } else if (item.fixed === "end") {
-    item.fixedEndOffset = offset;
-    offset += parseFloat(item.width || "0") || 0;
-  }
-  return offset;
-}
-function parse(items, maxDepth) {
-  const headers = [];
-  let currentDepth = 0;
-  const queue = priorityQueue(items);
-  while (queue.size() > 0) {
-    let rowSize = queue.count();
-    const row = [];
-    let fraction = 1;
-    while (rowSize > 0) {
-      const {
-        element: item,
-        priority
-      } = queue.dequeue();
-      const diff = maxDepth - currentDepth - getDepth(item);
-      row.push({
-        ...item,
-        rowspan: diff ?? 1,
-        colspan: item.children ? extractLeaves(item).length : 1
-      });
-      if (item.children) {
-        for (const child of item.children) {
-          const sort = priority % 1 + fraction / Math.pow(10, currentDepth + 2);
-          queue.enqueue(child, currentDepth + diff + sort);
-        }
-      }
-      fraction += 1;
-      rowSize -= 1;
-    }
-    currentDepth += 1;
-    headers.push(row);
-  }
-  const columns = items.map((item) => extractLeaves(item)).flat();
-  return {
-    columns,
-    headers
-  };
-}
-function convertToInternalHeaders(items) {
-  const internalHeaders = [];
-  for (const item of items) {
-    const defaultItem = {
-      ...getDefaultItem(item),
-      ...item
-    };
-    const key = defaultItem.key ?? (typeof defaultItem.value === "string" ? defaultItem.value : null);
-    const value = defaultItem.value ?? key ?? null;
-    const internalItem = {
-      ...defaultItem,
-      key,
-      value,
-      sortable: defaultItem.sortable ?? (defaultItem.key != null || !!defaultItem.sort),
-      children: defaultItem.children ? convertToInternalHeaders(defaultItem.children) : void 0
-    };
-    internalHeaders.push(internalItem);
-  }
-  return internalHeaders;
-}
-function createHeaders(props, options) {
-  const headers = ref([]);
-  const columns = ref([]);
-  const sortFunctions = ref({});
-  const sortRawFunctions = ref({});
-  const filterFunctions = ref({});
-  watchEffect(() => {
-    var _a2, _b, _c;
-    const _headers = props.headers || Object.keys(props.items[0] ?? {}).map((key) => ({
-      key,
-      title: capitalize(key)
-    }));
-    const items = _headers.slice();
-    const keys = extractKeys(items);
-    if (((_a2 = options == null ? void 0 : options.groupBy) == null ? void 0 : _a2.value.length) && !keys.has("data-table-group")) {
-      items.unshift({
-        key: "data-table-group",
-        title: "Group"
-      });
-    }
-    if (((_b = options == null ? void 0 : options.showSelect) == null ? void 0 : _b.value) && !keys.has("data-table-select")) {
-      items.unshift({
-        key: "data-table-select"
-      });
-    }
-    if (((_c = options == null ? void 0 : options.showExpand) == null ? void 0 : _c.value) && !keys.has("data-table-expand")) {
-      items.push({
-        key: "data-table-expand"
-      });
-    }
-    const internalHeaders = convertToInternalHeaders(items);
-    parseFixedColumns(internalHeaders);
-    const maxDepth = Math.max(...internalHeaders.map((item) => getDepth(item))) + 1;
-    const parsed = parse(internalHeaders, maxDepth);
-    headers.value = parsed.headers;
-    columns.value = parsed.columns;
-    const flatHeaders = parsed.headers.flat(1);
-    for (const header of flatHeaders) {
-      if (!header.key) continue;
-      if (header.sortable) {
-        if (header.sort) {
-          sortFunctions.value[header.key] = header.sort;
-        }
-        if (header.sortRaw) {
-          sortRawFunctions.value[header.key] = header.sortRaw;
-        }
-      }
-      if (header.filter) {
-        filterFunctions.value[header.key] = header.filter;
-      }
-    }
-  });
-  const data = {
-    headers,
-    columns,
-    sortFunctions,
-    sortRawFunctions,
-    filterFunctions
-  };
-  provide(VDataTableHeadersSymbol, data);
-  return data;
-}
-function useHeaders() {
-  const data = inject(VDataTableHeadersSymbol);
-  if (!data) throw new Error("Missing headers!");
-  return data;
-}
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableHeaders.js
-var makeVDataTableHeadersProps = propsFactory({
-  color: String,
-  disableSort: Boolean,
-  fixedHeader: Boolean,
-  multiSort: Boolean,
-  sortAscIcon: {
-    type: IconValue,
-    default: "$sortAsc"
-  },
-  sortDescIcon: {
-    type: IconValue,
-    default: "$sortDesc"
-  },
-  headerProps: {
-    type: Object
-  },
-  /** @deprecated */
-  sticky: Boolean,
-  ...makeDensityProps(),
-  ...makeDisplayProps(),
-  ...makeLoaderProps()
-}, "VDataTableHeaders");
-var VDataTableHeaders = genericComponent()({
-  name: "VDataTableHeaders",
-  props: makeVDataTableHeadersProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const {
-      t
-    } = useLocale();
-    const {
-      toggleSort,
-      sortBy,
-      isSorted
-    } = useSort();
-    const {
-      someSelected,
-      allSelected,
-      selectAll,
-      showSelectAll
-    } = useSelection();
-    const {
-      columns,
-      headers
-    } = useHeaders();
-    const {
-      loaderClasses
-    } = useLoader(props);
-    function getFixedStyles(column, y) {
-      if (!(props.sticky || props.fixedHeader) && !column.fixed) return void 0;
-      const fixedSide = typeof column.fixed === "string" ? column.fixed : column.fixed ? "start" : "none";
-      return {
-        position: "sticky",
-        left: fixedSide === "start" ? convertToUnit(column.fixedOffset) : void 0,
-        right: fixedSide === "end" ? convertToUnit(column.fixedEndOffset) : void 0,
-        top: props.sticky || props.fixedHeader ? `calc(var(--v-table-header-height) * ${y})` : void 0
-      };
-    }
-    function handleEnterKeyPress(event, column) {
-      if (event.key === "Enter" && !props.disableSort) {
-        toggleSort(column);
-      }
-    }
-    function getSortIcon(column) {
-      const item = sortBy.value.find((item2) => item2.key === column.key);
-      if (!item) return props.sortAscIcon;
-      return item.order === "asc" ? props.sortAscIcon : props.sortDescIcon;
-    }
-    const {
-      backgroundColorClasses,
-      backgroundColorStyles
-    } = useBackgroundColor(() => props.color);
-    const {
-      displayClasses,
-      mobile
-    } = useDisplay(props);
-    const slotProps = computed(() => ({
-      headers: headers.value,
-      columns: columns.value,
-      toggleSort,
-      isSorted,
-      sortBy: sortBy.value,
-      someSelected: someSelected.value,
-      allSelected: allSelected.value,
-      selectAll,
-      getSortIcon
-    }));
-    const headerCellClasses = computed(() => ["v-data-table__th", {
-      "v-data-table__th--sticky": props.sticky || props.fixedHeader
-    }, displayClasses.value, loaderClasses.value]);
-    const VDataTableHeaderCell = (_ref2) => {
-      let {
-        column,
-        x,
-        y
-      } = _ref2;
-      const noPadding = column.key === "data-table-select" || column.key === "data-table-expand";
-      const isEmpty2 = column.key === "data-table-group" && column.width === 0 && !column.title;
-      const headerProps = mergeProps(props.headerProps ?? {}, column.headerProps ?? {});
-      return createVNode(VDataTableColumn, mergeProps({
-        "tag": "th",
-        "align": column.align,
-        "class": [{
-          "v-data-table__th--sortable": column.sortable && !props.disableSort,
-          "v-data-table__th--sorted": isSorted(column),
-          "v-data-table__th--fixed": column.fixed
-        }, ...headerCellClasses.value],
-        "style": {
-          width: convertToUnit(column.width),
-          minWidth: convertToUnit(column.minWidth),
-          maxWidth: convertToUnit(column.maxWidth),
-          ...getFixedStyles(column, y)
-        },
-        "colspan": column.colspan,
-        "rowspan": column.rowspan,
-        "fixed": column.fixed,
-        "nowrap": column.nowrap,
-        "lastFixed": column.lastFixed,
-        "firstFixedEnd": column.firstFixedEnd,
-        "noPadding": noPadding,
-        "empty": isEmpty2,
-        "tabindex": column.sortable ? 0 : void 0,
-        "onClick": column.sortable ? () => toggleSort(column) : void 0,
-        "onKeydown": column.sortable ? (event) => handleEnterKeyPress(event, column) : void 0
-      }, headerProps), {
-        default: () => {
-          var _a2;
-          const columnSlotName = `header.${column.key}`;
-          const columnSlotProps = {
-            column,
-            selectAll,
-            isSorted,
-            toggleSort,
-            sortBy: sortBy.value,
-            someSelected: someSelected.value,
-            allSelected: allSelected.value,
-            getSortIcon
-          };
-          if (slots[columnSlotName]) return slots[columnSlotName](columnSlotProps);
-          if (isEmpty2) return "";
-          if (column.key === "data-table-select") {
-            return ((_a2 = slots["header.data-table-select"]) == null ? void 0 : _a2.call(slots, columnSlotProps)) ?? (showSelectAll.value && createVNode(VCheckboxBtn, {
-              "density": props.density,
-              "modelValue": allSelected.value,
-              "indeterminate": someSelected.value && !allSelected.value,
-              "onUpdate:modelValue": selectAll
-            }, null));
-          }
-          return createBaseVNode("div", {
-            "class": "v-data-table-header__content"
-          }, [createBaseVNode("span", null, [column.title]), column.sortable && !props.disableSort && createVNode(VIcon, {
-            "key": "icon",
-            "class": "v-data-table-header__sort-icon",
-            "icon": getSortIcon(column)
-          }, null), props.multiSort && isSorted(column) && createBaseVNode("div", {
-            "key": "badge",
-            "class": normalizeClass(["v-data-table-header__sort-badge", ...backgroundColorClasses.value]),
-            "style": normalizeStyle(backgroundColorStyles.value)
-          }, [sortBy.value.findIndex((x2) => x2.key === column.key) + 1])]);
-        }
-      });
-    };
-    const VDataTableMobileHeaderCell = () => {
-      const displayItems = computed(() => {
-        return columns.value.filter((column) => (column == null ? void 0 : column.sortable) && !props.disableSort);
-      });
-      const appendIcon = computed(() => {
-        const showSelectColumn = columns.value.find((column) => column.key === "data-table-select");
-        if (showSelectColumn == null) return;
-        return allSelected.value ? "$checkboxOn" : someSelected.value ? "$checkboxIndeterminate" : "$checkboxOff";
-      });
-      return createVNode(VDataTableColumn, mergeProps({
-        "tag": "th",
-        "class": [...headerCellClasses.value],
-        "colspan": headers.value.length + 1
-      }, props.headerProps), {
-        default: () => [createBaseVNode("div", {
-          "class": "v-data-table-header__content"
-        }, [createVNode(VSelect, {
-          "chips": true,
-          "class": "v-data-table__td-sort-select",
-          "clearable": true,
-          "density": "default",
-          "items": displayItems.value,
-          "label": t("$vuetify.dataTable.sortBy"),
-          "multiple": props.multiSort,
-          "variant": "underlined",
-          "onClick:clear": () => sortBy.value = [],
-          "appendIcon": appendIcon.value,
-          "onClick:append": () => selectAll(!allSelected.value)
-        }, {
-          chip: (props2) => {
-            var _a2;
-            return createVNode(VChip, {
-              "onClick": ((_a2 = props2.item.raw) == null ? void 0 : _a2.sortable) ? () => toggleSort(props2.item.raw) : void 0,
-              "onMousedown": (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }
-            }, {
-              default: () => [props2.item.title, createVNode(VIcon, {
-                "class": normalizeClass(["v-data-table__td-sort-icon", isSorted(props2.item.raw) && "v-data-table__td-sort-icon-active"]),
-                "icon": getSortIcon(props2.item.raw),
-                "size": "small"
-              }, null)]
-            });
-          }
-        })])]
-      });
-    };
-    useRender(() => {
-      return mobile.value ? createBaseVNode("tr", null, [createVNode(VDataTableMobileHeaderCell, null, null)]) : createBaseVNode(Fragment, null, [slots.headers ? slots.headers(slotProps.value) : headers.value.map((row, y) => createBaseVNode("tr", null, [row.map((column, x) => createVNode(VDataTableHeaderCell, {
-        "column": column,
-        "x": x,
-        "y": y
-      }, null))])), props.loading && createBaseVNode("tr", {
-        "class": "v-data-table-progress"
-      }, [createBaseVNode("th", {
-        "colspan": columns.value.length
-      }, [createVNode(LoaderSlot, {
-        "name": "v-data-table-progress",
-        "absolute": true,
-        "active": true,
-        "color": typeof props.loading === "boolean" ? void 0 : props.loading,
-        "indeterminate": true
-      }, {
-        default: slots.loader
-      })])])]);
-    });
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableGroupHeaderRow.js
-var makeVDataTableGroupHeaderRowProps = propsFactory({
-  item: {
-    type: Object,
-    required: true
-  },
-  groupCollapseIcon: {
-    type: IconValue,
-    default: "$tableGroupCollapse"
-  },
-  groupExpandIcon: {
-    type: IconValue,
-    default: "$tableGroupExpand"
-  },
-  ...makeDensityProps()
-}, "VDataTableGroupHeaderRow");
-var VDataTableGroupHeaderRow = genericComponent()({
-  name: "VDataTableGroupHeaderRow",
-  props: makeVDataTableGroupHeaderRowProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const {
-      isGroupOpen,
-      toggleGroup,
-      extractRows
-    } = useGroupBy();
-    const {
-      isSelected,
-      isSomeSelected,
-      select
-    } = useSelection();
-    const {
-      columns
-    } = useHeaders();
-    const rows = computed(() => {
-      return extractRows([props.item]);
-    });
-    const colspan = toRef(() => columns.value.length - (columns.value.some((c) => c.key === "data-table-select") ? 1 : 0));
-    return () => createBaseVNode("tr", {
-      "class": "v-data-table-group-header-row",
-      "style": {
-        "--v-data-table-group-header-row-depth": props.item.depth
-      }
-    }, [columns.value.map((column) => {
-      var _a2, _b;
-      if (column.key === "data-table-group") {
-        const icon = isGroupOpen(props.item) ? props.groupCollapseIcon : props.groupExpandIcon;
-        const onClick = () => toggleGroup(props.item);
-        return ((_a2 = slots["data-table-group"]) == null ? void 0 : _a2.call(slots, {
-          item: props.item,
-          count: rows.value.length,
-          props: {
-            icon,
-            onClick
-          }
-        })) ?? createVNode(VDataTableColumn, {
-          "class": "v-data-table-group-header-row__column",
-          "colspan": colspan.value
-        }, {
-          default: () => [createVNode(VBtn, {
-            "size": "small",
-            "variant": "text",
-            "icon": icon,
-            "onClick": onClick
-          }, null), createBaseVNode("span", null, [props.item.value]), createBaseVNode("span", null, [createTextVNode("("), rows.value.length, createTextVNode(")")])]
-        });
-      } else if (column.key === "data-table-select") {
-        const modelValue = isSelected(rows.value);
-        const indeterminate = isSomeSelected(rows.value) && !modelValue;
-        const selectGroup = (v) => select(rows.value, v);
-        return ((_b = slots["data-table-select"]) == null ? void 0 : _b.call(slots, {
-          props: {
-            modelValue,
-            indeterminate,
-            "onUpdate:modelValue": selectGroup
-          }
-        })) ?? createVNode(VDataTableColumn, {
-          "class": "v-data-table__td--select-row",
-          "noPadding": true
-        }, {
-          default: () => [createVNode(VCheckboxBtn, {
-            "density": props.density,
-            "modelValue": modelValue,
-            "indeterminate": indeterminate,
-            "onUpdate:modelValue": selectGroup
-          }, null)]
-        });
-      }
-      return "";
-    })]);
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableRow.js
-var makeVDataTableRowProps = propsFactory({
-  index: Number,
-  item: Object,
-  cellProps: [Object, Function],
-  collapseIcon: {
-    type: IconValue,
-    default: "$collapse"
-  },
-  expandIcon: {
-    type: IconValue,
-    default: "$expand"
-  },
-  onClick: EventProp(),
-  onContextmenu: EventProp(),
-  onDblclick: EventProp(),
-  ...makeDensityProps(),
-  ...makeDisplayProps()
-}, "VDataTableRow");
-var VDataTableRow = genericComponent()({
-  name: "VDataTableRow",
-  props: makeVDataTableRowProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const {
-      displayClasses,
-      mobile
-    } = useDisplay(props, "v-data-table__tr");
-    const {
-      isSelected,
-      toggleSelect,
-      someSelected,
-      allSelected,
-      selectAll
-    } = useSelection();
-    const {
-      isExpanded,
-      toggleExpand
-    } = useExpanded();
-    const {
-      toggleSort,
-      sortBy,
-      isSorted
-    } = useSort();
-    const {
-      columns
-    } = useHeaders();
-    useRender(() => createBaseVNode("tr", {
-      "class": normalizeClass(["v-data-table__tr", {
-        "v-data-table__tr--clickable": !!(props.onClick || props.onContextmenu || props.onDblclick)
-      }, displayClasses.value]),
-      "onClick": props.onClick,
-      "onContextmenu": props.onContextmenu,
-      "onDblclick": props.onDblclick
-    }, [props.item && columns.value.map((column, i) => {
-      const item = props.item;
-      const slotName = `item.${column.key}`;
-      const headerSlotName = `header.${column.key}`;
-      const slotProps = {
-        index: props.index,
-        item: item.raw,
-        internalItem: item,
-        value: getObjectValueByPath(item.columns, column.key),
-        column,
-        isSelected,
-        toggleSelect,
-        isExpanded,
-        toggleExpand
-      };
-      const columnSlotProps = {
-        column,
-        selectAll,
-        isSorted,
-        toggleSort,
-        sortBy: sortBy.value,
-        someSelected: someSelected.value,
-        allSelected: allSelected.value,
-        getSortIcon: () => ""
-      };
-      const cellProps = typeof props.cellProps === "function" ? props.cellProps({
-        index: slotProps.index,
-        item: slotProps.item,
-        internalItem: slotProps.internalItem,
-        value: slotProps.value,
-        column
-      }) : props.cellProps;
-      const columnCellProps = typeof column.cellProps === "function" ? column.cellProps({
-        index: slotProps.index,
-        item: slotProps.item,
-        internalItem: slotProps.internalItem,
-        value: slotProps.value
-      }) : column.cellProps;
-      const noPadding = column.key === "data-table-select" || column.key === "data-table-expand";
-      const isEmpty2 = column.key === "data-table-group" && column.width === 0 && !column.title;
-      return createVNode(VDataTableColumn, mergeProps({
-        "align": column.align,
-        "indent": column.intent,
-        "class": {
-          "v-data-table__td--expanded-row": column.key === "data-table-expand",
-          "v-data-table__td--select-row": column.key === "data-table-select"
-        },
-        "fixed": column.fixed,
-        "fixedOffset": column.fixedOffset,
-        "fixedEndOffset": column.fixedEndOffset,
-        "lastFixed": column.lastFixed,
-        "firstFixedEnd": column.firstFixedEnd,
-        "maxWidth": !mobile.value ? column.maxWidth : void 0,
-        "noPadding": noPadding,
-        "empty": isEmpty2,
-        "nowrap": column.nowrap,
-        "width": !mobile.value ? column.width : void 0
-      }, cellProps, columnCellProps), {
-        default: () => {
-          var _a2, _b, _c, _d;
-          if (column.key === "data-table-select") {
-            return ((_a2 = slots["item.data-table-select"]) == null ? void 0 : _a2.call(slots, {
-              ...slotProps,
-              props: {
-                disabled: !item.selectable,
-                modelValue: isSelected([item]),
-                onClick: withModifiers(() => toggleSelect(item), ["stop"])
-              }
-            })) ?? createVNode(VCheckboxBtn, {
-              "disabled": !item.selectable,
-              "density": props.density,
-              "modelValue": isSelected([item]),
-              "onClick": withModifiers((event) => toggleSelect(item, props.index, event), ["stop"])
-            }, null);
-          }
-          if (column.key === "data-table-expand") {
-            return ((_b = slots["item.data-table-expand"]) == null ? void 0 : _b.call(slots, {
-              ...slotProps,
-              props: {
-                icon: isExpanded(item) ? props.collapseIcon : props.expandIcon,
-                size: "small",
-                variant: "text",
-                onClick: withModifiers(() => toggleExpand(item), ["stop"])
-              }
-            })) ?? createVNode(VBtn, {
-              "icon": isExpanded(item) ? props.collapseIcon : props.expandIcon,
-              "size": "small",
-              "variant": "text",
-              "onClick": withModifiers(() => toggleExpand(item), ["stop"])
-            }, null);
-          }
-          if (slots[slotName] && !mobile.value) return slots[slotName](slotProps);
-          const displayValue = toDisplayString(slotProps.value);
-          return !mobile.value ? displayValue : createBaseVNode(Fragment, null, [createBaseVNode("div", {
-            "class": "v-data-table__td-title"
-          }, [((_c = slots[headerSlotName]) == null ? void 0 : _c.call(slots, columnSlotProps)) ?? column.title]), createBaseVNode("div", {
-            "class": "v-data-table__td-value"
-          }, [((_d = slots[slotName]) == null ? void 0 : _d.call(slots, slotProps)) ?? displayValue])]);
-        }
-      });
-    })]));
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableRows.js
-var makeVDataTableRowsProps = propsFactory({
-  loading: [Boolean, String],
-  loadingText: {
-    type: String,
-    default: "$vuetify.dataIterator.loadingText"
-  },
-  hideNoData: Boolean,
-  items: {
-    type: Array,
-    default: () => []
-  },
-  noDataText: {
-    type: String,
-    default: "$vuetify.noDataText"
-  },
-  rowProps: [Object, Function],
-  cellProps: [Object, Function],
-  ...pick(makeVDataTableRowProps(), ["collapseIcon", "expandIcon", "density"]),
-  ...pick(makeVDataTableGroupHeaderRowProps(), ["groupCollapseIcon", "groupExpandIcon", "density"]),
-  ...makeDisplayProps()
-}, "VDataTableRows");
-var VDataTableRows = genericComponent()({
-  name: "VDataTableRows",
-  inheritAttrs: false,
-  props: makeVDataTableRowsProps(),
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const {
-      columns
-    } = useHeaders();
-    const {
-      expandOnClick,
-      toggleExpand,
-      isExpanded
-    } = useExpanded();
-    const {
-      isSelected,
-      toggleSelect
-    } = useSelection();
-    const {
-      toggleGroup,
-      isGroupOpen
-    } = useGroupBy();
-    const {
-      t
-    } = useLocale();
-    const {
-      mobile
-    } = useDisplay(props);
-    useRender(() => {
-      var _a2, _b;
-      const groupHeaderRowProps = pick(props, ["groupCollapseIcon", "groupExpandIcon", "density"]);
-      if (props.loading && (!props.items.length || slots.loading)) {
-        return createBaseVNode("tr", {
-          "class": "v-data-table-rows-loading",
-          "key": "loading"
-        }, [createBaseVNode("td", {
-          "colspan": columns.value.length
-        }, [((_a2 = slots.loading) == null ? void 0 : _a2.call(slots)) ?? t(props.loadingText)])]);
-      }
-      if (!props.loading && !props.items.length && !props.hideNoData) {
-        return createBaseVNode("tr", {
-          "class": "v-data-table-rows-no-data",
-          "key": "no-data"
-        }, [createBaseVNode("td", {
-          "colspan": columns.value.length
-        }, [((_b = slots["no-data"]) == null ? void 0 : _b.call(slots)) ?? t(props.noDataText)])]);
-      }
-      return createBaseVNode(Fragment, null, [props.items.map((item, index) => {
-        var _a3, _b2;
-        if (item.type === "group") {
-          const slotProps2 = {
-            index,
-            item,
-            columns: columns.value,
-            isExpanded,
-            toggleExpand,
-            isSelected,
-            toggleSelect,
-            toggleGroup,
-            isGroupOpen
-          };
-          return slots["group-header"] ? slots["group-header"](slotProps2) : createVNode(VDataTableGroupHeaderRow, mergeProps({
-            "key": `group-header_${item.id}`,
-            "item": item
-          }, getPrefixedEventHandlers(attrs, ":groupHeader", () => slotProps2), groupHeaderRowProps), slots);
-        }
-        if (item.type === "group-summary") {
-          const slotProps2 = {
-            index,
-            item,
-            columns: columns.value,
-            toggleGroup
-          };
-          return ((_a3 = slots["group-summary"]) == null ? void 0 : _a3.call(slots, slotProps2)) ?? "";
-        }
-        const slotProps = {
-          index,
-          item: item.raw,
-          internalItem: item,
-          columns: columns.value,
-          isExpanded,
-          toggleExpand,
-          isSelected,
-          toggleSelect
-        };
-        const itemSlotProps = {
-          ...slotProps,
-          props: mergeProps({
-            key: `item_${item.key ?? item.index}`,
-            onClick: expandOnClick.value ? () => {
-              toggleExpand(item);
-            } : void 0,
-            index,
-            item,
-            cellProps: props.cellProps,
-            collapseIcon: props.collapseIcon,
-            expandIcon: props.expandIcon,
-            density: props.density,
-            mobile: mobile.value
-          }, getPrefixedEventHandlers(attrs, ":row", () => slotProps), typeof props.rowProps === "function" ? props.rowProps({
-            item: slotProps.item,
-            index: slotProps.index,
-            internalItem: slotProps.internalItem
-          }) : props.rowProps)
-        };
-        return createBaseVNode(Fragment, {
-          "key": itemSlotProps.props.key
-        }, [slots.item ? slots.item(itemSlotProps) : createVNode(VDataTableRow, itemSlotProps.props, slots), isExpanded(item) && ((_b2 = slots["expanded-row"]) == null ? void 0 : _b2.call(slots, slotProps))]);
-      })]);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/composables/items.js
-var makeDataTableItemsProps = propsFactory({
-  items: {
-    type: Array,
-    default: () => []
-  },
-  itemValue: {
-    type: [String, Array, Function],
-    default: "id"
-  },
-  itemSelectable: {
-    type: [String, Array, Function],
-    default: null
-  },
-  rowProps: [Object, Function],
-  cellProps: [Object, Function],
-  returnObject: Boolean
-}, "DataTable-items");
-function transformItem3(props, item, index, columns) {
-  const value = props.returnObject ? item : getPropertyFromItem(item, props.itemValue);
-  const selectable = getPropertyFromItem(item, props.itemSelectable, true);
-  const itemColumns = columns.reduce((obj, column) => {
-    if (column.key != null) obj[column.key] = getPropertyFromItem(item, column.value);
-    return obj;
-  }, {});
-  return {
-    type: "item",
-    key: props.returnObject ? getPropertyFromItem(item, props.itemValue) : value,
-    index,
-    value,
-    selectable,
-    columns: itemColumns,
-    raw: item
-  };
-}
-function transformItems2(props, items, columns) {
-  return items.map((item, index) => transformItem3(props, item, index, columns));
-}
-function useDataTableItems(props, columns) {
-  const items = computed(() => transformItems2(props, props.items, columns.value));
-  return {
-    items
-  };
-}
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTable.js
-var makeDataTableProps = propsFactory({
-  ...makeVDataTableRowsProps(),
-  hideDefaultBody: Boolean,
-  hideDefaultFooter: Boolean,
-  hideDefaultHeader: Boolean,
-  width: [String, Number],
-  search: String,
-  ...makeDataTableExpandProps(),
-  ...makeDataTableGroupProps(),
-  ...makeDataTableHeaderProps(),
-  ...makeDataTableItemsProps(),
-  ...makeDataTableSelectProps(),
-  ...makeDataTableSortProps(),
-  ...makeVDataTableHeadersProps(),
-  ...makeVTableProps()
-}, "DataTable");
-var makeVDataTableProps = propsFactory({
-  ...makeDataTablePaginateProps(),
-  ...makeDataTableProps(),
-  ...makeFilterProps(),
-  ...makeVDataTableFooterProps()
-}, "VDataTable");
-var VDataTable = genericComponent()({
-  name: "VDataTable",
-  props: makeVDataTableProps(),
-  emits: {
-    "update:modelValue": (value) => true,
-    "update:page": (value) => true,
-    "update:itemsPerPage": (value) => true,
-    "update:sortBy": (value) => true,
-    "update:options": (value) => true,
-    "update:groupBy": (value) => true,
-    "update:expanded": (value) => true,
-    "update:currentItems": (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const {
-      groupBy
-    } = createGroupBy(props);
-    const {
-      sortBy,
-      multiSort,
-      mustSort
-    } = createSort(props);
-    const {
-      page,
-      itemsPerPage
-    } = createPagination(props);
-    const {
-      disableSort
-    } = toRefs(props);
-    const {
-      columns,
-      headers,
-      sortFunctions,
-      sortRawFunctions,
-      filterFunctions
-    } = createHeaders(props, {
-      groupBy,
-      showSelect: toRef(() => props.showSelect),
-      showExpand: toRef(() => props.showExpand)
-    });
-    const {
-      items
-    } = useDataTableItems(props, columns);
-    const search = toRef(() => props.search);
-    const {
-      filteredItems
-    } = useFilter(props, items, search, {
-      transform: (item) => item.columns,
-      customKeyFilter: filterFunctions
-    });
-    const {
-      toggleSort
-    } = provideSort({
-      sortBy,
-      multiSort,
-      mustSort,
-      page
-    });
-    const {
-      sortByWithGroups,
-      opened,
-      extractRows,
-      isGroupOpen,
-      toggleGroup
-    } = provideGroupBy({
-      groupBy,
-      sortBy,
-      disableSort
-    });
-    const {
-      sortedItems
-    } = useSortedItems(props, filteredItems, sortByWithGroups, {
-      transform: (item) => ({
-        ...item.raw,
-        ...item.columns
-      }),
-      sortFunctions,
-      sortRawFunctions
-    });
-    const {
-      flatItems
-    } = useGroupedItems(sortedItems, groupBy, opened, () => !!slots["group-summary"]);
-    const itemsLength = computed(() => flatItems.value.length);
-    const {
-      startIndex,
-      stopIndex,
-      pageCount,
-      setItemsPerPage
-    } = providePagination({
-      page,
-      itemsPerPage,
-      itemsLength
-    });
-    const {
-      paginatedItems
-    } = usePaginatedItems({
-      items: flatItems,
-      startIndex,
-      stopIndex,
-      itemsPerPage
-    });
-    const paginatedItemsWithoutGroups = computed(() => extractRows(paginatedItems.value));
-    const {
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      someSelected,
-      allSelected
-    } = provideSelection(props, {
-      allItems: items,
-      currentPage: paginatedItemsWithoutGroups
-    });
-    const {
-      isExpanded,
-      toggleExpand
-    } = provideExpanded(props);
-    useOptions({
-      page,
-      itemsPerPage,
-      sortBy,
-      groupBy,
-      search
-    });
-    provideDefaults({
-      VDataTableRows: {
-        hideNoData: toRef(() => props.hideNoData),
-        noDataText: toRef(() => props.noDataText),
-        loading: toRef(() => props.loading),
-        loadingText: toRef(() => props.loadingText)
-      }
-    });
-    const slotProps = computed(() => ({
-      page: page.value,
-      itemsPerPage: itemsPerPage.value,
-      sortBy: sortBy.value,
-      pageCount: pageCount.value,
-      toggleSort,
-      setItemsPerPage,
-      someSelected: someSelected.value,
-      allSelected: allSelected.value,
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      isExpanded,
-      toggleExpand,
-      isGroupOpen,
-      toggleGroup,
-      items: paginatedItemsWithoutGroups.value.map((item) => item.raw),
-      internalItems: paginatedItemsWithoutGroups.value,
-      groupedItems: paginatedItems.value,
-      columns: columns.value,
-      headers: headers.value
-    }));
-    useRender(() => {
-      const dataTableFooterProps = VDataTableFooter.filterProps(props);
-      const dataTableHeadersProps = VDataTableHeaders.filterProps(props);
-      const dataTableRowsProps = VDataTableRows.filterProps(props);
-      const tableProps = VTable.filterProps(props);
-      return createVNode(VTable, mergeProps({
-        "class": ["v-data-table", {
-          "v-data-table--show-select": props.showSelect,
-          "v-data-table--loading": props.loading
-        }, props.class],
-        "style": props.style
-      }, tableProps, {
-        "fixedHeader": props.fixedHeader || props.sticky
-      }), {
-        top: () => {
-          var _a2;
-          return (_a2 = slots.top) == null ? void 0 : _a2.call(slots, slotProps.value);
-        },
-        default: () => {
-          var _a2, _b, _c, _d, _e, _f;
-          return slots.default ? slots.default(slotProps.value) : createBaseVNode(Fragment, null, [(_a2 = slots.colgroup) == null ? void 0 : _a2.call(slots, slotProps.value), !props.hideDefaultHeader && createBaseVNode("thead", {
-            "key": "thead"
-          }, [createVNode(VDataTableHeaders, dataTableHeadersProps, slots)]), (_b = slots.thead) == null ? void 0 : _b.call(slots, slotProps.value), !props.hideDefaultBody && createBaseVNode("tbody", null, [(_c = slots["body.prepend"]) == null ? void 0 : _c.call(slots, slotProps.value), slots.body ? slots.body(slotProps.value) : createVNode(VDataTableRows, mergeProps(attrs, dataTableRowsProps, {
-            "items": paginatedItems.value
-          }), slots), (_d = slots["body.append"]) == null ? void 0 : _d.call(slots, slotProps.value)]), (_e = slots.tbody) == null ? void 0 : _e.call(slots, slotProps.value), (_f = slots.tfoot) == null ? void 0 : _f.call(slots, slotProps.value)]);
-        },
-        bottom: () => slots.bottom ? slots.bottom(slotProps.value) : !props.hideDefaultFooter && createBaseVNode(Fragment, null, [createVNode(VDivider, null, null), createVNode(VDataTableFooter, dataTableFooterProps, {
-          prepend: slots["footer.prepend"]
-        })])
-      });
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableVirtual.js
-var makeVDataTableVirtualProps = propsFactory({
-  ...omit(makeDataTableProps(), ["hideDefaultFooter"]),
-  ...makeDataTableGroupProps(),
-  ...makeVirtualProps(),
-  ...makeFilterProps()
-}, "VDataTableVirtual");
-var VDataTableVirtual = genericComponent()({
-  name: "VDataTableVirtual",
-  props: makeVDataTableVirtualProps(),
-  emits: {
-    "update:modelValue": (value) => true,
-    "update:sortBy": (value) => true,
-    "update:options": (value) => true,
-    "update:groupBy": (value) => true,
-    "update:expanded": (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const {
-      groupBy
-    } = createGroupBy(props);
-    const {
-      sortBy,
-      multiSort,
-      mustSort
-    } = createSort(props);
-    const {
-      disableSort
-    } = toRefs(props);
-    const {
-      columns,
-      headers,
-      filterFunctions,
-      sortFunctions,
-      sortRawFunctions
-    } = createHeaders(props, {
-      groupBy,
-      showSelect: toRef(() => props.showSelect),
-      showExpand: toRef(() => props.showExpand)
-    });
-    const {
-      items
-    } = useDataTableItems(props, columns);
-    const search = toRef(() => props.search);
-    const {
-      filteredItems
-    } = useFilter(props, items, search, {
-      transform: (item) => item.columns,
-      customKeyFilter: filterFunctions
-    });
-    const {
-      toggleSort
-    } = provideSort({
-      sortBy,
-      multiSort,
-      mustSort
-    });
-    const {
-      sortByWithGroups,
-      opened,
-      extractRows,
-      isGroupOpen,
-      toggleGroup
-    } = provideGroupBy({
-      groupBy,
-      sortBy,
-      disableSort
-    });
-    const {
-      sortedItems
-    } = useSortedItems(props, filteredItems, sortByWithGroups, {
-      transform: (item) => ({
-        ...item.raw,
-        ...item.columns
-      }),
-      sortFunctions,
-      sortRawFunctions
-    });
-    const {
-      flatItems
-    } = useGroupedItems(sortedItems, groupBy, opened, () => !!slots["group-summary"]);
-    const allItems = computed(() => extractRows(flatItems.value));
-    const {
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      someSelected,
-      allSelected
-    } = provideSelection(props, {
-      allItems,
-      currentPage: allItems
-    });
-    const {
-      isExpanded,
-      toggleExpand
-    } = provideExpanded(props);
-    const {
-      containerRef,
-      markerRef,
-      paddingTop,
-      paddingBottom,
-      computedItems,
-      handleItemResize,
-      handleScroll,
-      handleScrollend,
-      calculateVisibleItems,
-      scrollToIndex
-    } = useVirtual(props, flatItems);
-    const displayItems = computed(() => computedItems.value.map((item) => item.raw));
-    useOptions({
-      sortBy,
-      page: shallowRef(1),
-      itemsPerPage: shallowRef(-1),
-      groupBy,
-      search
-    });
-    provideDefaults({
-      VDataTableRows: {
-        hideNoData: toRef(() => props.hideNoData),
-        noDataText: toRef(() => props.noDataText),
-        loading: toRef(() => props.loading),
-        loadingText: toRef(() => props.loadingText)
-      }
-    });
-    const slotProps = computed(() => ({
-      sortBy: sortBy.value,
-      toggleSort,
-      someSelected: someSelected.value,
-      allSelected: allSelected.value,
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      isExpanded,
-      toggleExpand,
-      isGroupOpen,
-      toggleGroup,
-      items: allItems.value.map((item) => item.raw),
-      internalItems: allItems.value,
-      groupedItems: flatItems.value,
-      columns: columns.value,
-      headers: headers.value
-    }));
-    useRender(() => {
-      const dataTableHeadersProps = VDataTableHeaders.filterProps(props);
-      const dataTableRowsProps = VDataTableRows.filterProps(props);
-      const tableProps = VTable.filterProps(props);
-      return createVNode(VTable, mergeProps({
-        "class": ["v-data-table", {
-          "v-data-table--loading": props.loading
-        }, props.class],
-        "style": props.style
-      }, tableProps, {
-        "fixedHeader": props.fixedHeader || props.sticky
-      }), {
-        top: () => {
-          var _a2;
-          return (_a2 = slots.top) == null ? void 0 : _a2.call(slots, slotProps.value);
-        },
-        wrapper: () => {
-          var _a2, _b, _c, _d, _e, _f;
-          return createBaseVNode("div", {
-            "ref": containerRef,
-            "onScrollPassive": handleScroll,
-            "onScrollend": handleScrollend,
-            "class": "v-table__wrapper",
-            "style": {
-              height: convertToUnit(props.height)
-            }
-          }, [createBaseVNode("table", null, [(_a2 = slots.colgroup) == null ? void 0 : _a2.call(slots, slotProps.value), !props.hideDefaultHeader && createBaseVNode("thead", {
-            "key": "thead"
-          }, [createVNode(VDataTableHeaders, dataTableHeadersProps, slots)]), (_b = slots.thead) == null ? void 0 : _b.call(slots, slotProps.value), !props.hideDefaultBody && createBaseVNode("tbody", {
-            "key": "tbody"
-          }, [createBaseVNode("tr", {
-            "ref": markerRef,
-            "style": {
-              height: convertToUnit(paddingTop.value),
-              border: 0
-            }
-          }, [createBaseVNode("td", {
-            "colspan": columns.value.length,
-            "style": {
-              height: 0,
-              border: 0
-            }
-          }, null)]), (_c = slots["body.prepend"]) == null ? void 0 : _c.call(slots, slotProps.value), createVNode(VDataTableRows, mergeProps(attrs, dataTableRowsProps, {
-            "items": displayItems.value
-          }), {
-            ...slots,
-            item: (itemSlotProps) => createVNode(VVirtualScrollItem, {
-              "key": itemSlotProps.internalItem.index,
-              "renderless": true,
-              "onUpdate:height": (height) => handleItemResize(itemSlotProps.internalItem.index, height)
-            }, {
-              default: (_ref2) => {
-                var _a3;
-                let {
-                  itemRef
-                } = _ref2;
-                return ((_a3 = slots.item) == null ? void 0 : _a3.call(slots, {
-                  ...itemSlotProps,
-                  itemRef
-                })) ?? createVNode(VDataTableRow, mergeProps(itemSlotProps.props, {
-                  "ref": itemRef,
-                  "key": itemSlotProps.internalItem.index,
-                  "index": itemSlotProps.internalItem.index
-                }), slots);
-              }
-            })
-          }), (_d = slots["body.append"]) == null ? void 0 : _d.call(slots, slotProps.value), createBaseVNode("tr", {
-            "style": {
-              height: convertToUnit(paddingBottom.value),
-              border: 0
-            }
-          }, [createBaseVNode("td", {
-            "colspan": columns.value.length,
-            "style": {
-              height: 0,
-              border: 0
-            }
-          }, null)])]), (_e = slots.tbody) == null ? void 0 : _e.call(slots, slotProps.value), (_f = slots.tfoot) == null ? void 0 : _f.call(slots, slotProps.value)])]);
-        },
-        bottom: () => {
-          var _a2;
-          return (_a2 = slots.bottom) == null ? void 0 : _a2.call(slots, slotProps.value);
-        }
-      });
-    });
-    return {
-      calculateVisibleItems,
-      scrollToIndex
-    };
-  }
-});
-
-// node_modules/vuetify/lib/components/VDataTable/VDataTableServer.js
-var makeVDataTableServerProps = propsFactory({
-  itemsLength: {
-    type: [Number, String],
-    required: true
-  },
-  ...makeDataTablePaginateProps(),
-  ...makeDataTableProps(),
-  ...makeVDataTableFooterProps()
-}, "VDataTableServer");
-var VDataTableServer = genericComponent()({
-  name: "VDataTableServer",
-  props: makeVDataTableServerProps(),
-  emits: {
-    "update:modelValue": (value) => true,
-    "update:page": (page) => true,
-    "update:itemsPerPage": (page) => true,
-    "update:sortBy": (sortBy) => true,
-    "update:options": (options) => true,
-    "update:expanded": (options) => true,
-    "update:groupBy": (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const {
-      groupBy
-    } = createGroupBy(props);
-    const {
-      sortBy,
-      multiSort,
-      mustSort
-    } = createSort(props);
-    const {
-      page,
-      itemsPerPage
-    } = createPagination(props);
-    const {
-      disableSort
-    } = toRefs(props);
-    const itemsLength = computed(() => parseInt(props.itemsLength, 10));
-    const {
-      columns,
-      headers
-    } = createHeaders(props, {
-      groupBy,
-      showSelect: toRef(() => props.showSelect),
-      showExpand: toRef(() => props.showExpand)
-    });
-    const {
-      items
-    } = useDataTableItems(props, columns);
-    const {
-      toggleSort
-    } = provideSort({
-      sortBy,
-      multiSort,
-      mustSort,
-      page
-    });
-    const {
-      opened,
-      isGroupOpen,
-      toggleGroup,
-      extractRows
-    } = provideGroupBy({
-      groupBy,
-      sortBy,
-      disableSort
-    });
-    const {
-      pageCount,
-      setItemsPerPage
-    } = providePagination({
-      page,
-      itemsPerPage,
-      itemsLength
-    });
-    const {
-      flatItems
-    } = useGroupedItems(items, groupBy, opened, () => !!slots["group-summary"]);
-    const {
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      someSelected,
-      allSelected
-    } = provideSelection(props, {
-      allItems: items,
-      currentPage: items
-    });
-    const {
-      isExpanded,
-      toggleExpand
-    } = provideExpanded(props);
-    const itemsWithoutGroups = computed(() => extractRows(items.value));
-    useOptions({
-      page,
-      itemsPerPage,
-      sortBy,
-      groupBy,
-      search: toRef(() => props.search)
-    });
-    provide("v-data-table", {
-      toggleSort,
-      sortBy
-    });
-    provideDefaults({
-      VDataTableRows: {
-        hideNoData: toRef(() => props.hideNoData),
-        noDataText: toRef(() => props.noDataText),
-        loading: toRef(() => props.loading),
-        loadingText: toRef(() => props.loadingText)
-      }
-    });
-    const slotProps = computed(() => ({
-      page: page.value,
-      itemsPerPage: itemsPerPage.value,
-      sortBy: sortBy.value,
-      pageCount: pageCount.value,
-      toggleSort,
-      setItemsPerPage,
-      someSelected: someSelected.value,
-      allSelected: allSelected.value,
-      isSelected,
-      select,
-      selectAll,
-      toggleSelect,
-      isExpanded,
-      toggleExpand,
-      isGroupOpen,
-      toggleGroup,
-      items: itemsWithoutGroups.value.map((item) => item.raw),
-      internalItems: itemsWithoutGroups.value,
-      groupedItems: flatItems.value,
-      columns: columns.value,
-      headers: headers.value
-    }));
-    useRender(() => {
-      const dataTableFooterProps = VDataTableFooter.filterProps(props);
-      const dataTableHeadersProps = VDataTableHeaders.filterProps(props);
-      const dataTableRowsProps = VDataTableRows.filterProps(props);
-      const tableProps = VTable.filterProps(props);
-      return createVNode(VTable, mergeProps({
-        "class": ["v-data-table", {
-          "v-data-table--loading": props.loading
-        }, props.class],
-        "style": props.style
-      }, tableProps, {
-        "fixedHeader": props.fixedHeader || props.sticky
-      }), {
-        top: () => {
-          var _a2;
-          return (_a2 = slots.top) == null ? void 0 : _a2.call(slots, slotProps.value);
-        },
-        default: () => {
-          var _a2, _b, _c, _d, _e, _f;
-          return slots.default ? slots.default(slotProps.value) : createBaseVNode(Fragment, null, [(_a2 = slots.colgroup) == null ? void 0 : _a2.call(slots, slotProps.value), !props.hideDefaultHeader && createBaseVNode("thead", {
-            "key": "thead",
-            "class": "v-data-table__thead",
-            "role": "rowgroup"
-          }, [createVNode(VDataTableHeaders, dataTableHeadersProps, slots)]), (_b = slots.thead) == null ? void 0 : _b.call(slots, slotProps.value), !props.hideDefaultBody && createBaseVNode("tbody", {
-            "class": "v-data-table__tbody",
-            "role": "rowgroup"
-          }, [(_c = slots["body.prepend"]) == null ? void 0 : _c.call(slots, slotProps.value), slots.body ? slots.body(slotProps.value) : createVNode(VDataTableRows, mergeProps(attrs, dataTableRowsProps, {
-            "items": flatItems.value
-          }), slots), (_d = slots["body.append"]) == null ? void 0 : _d.call(slots, slotProps.value)]), (_e = slots.tbody) == null ? void 0 : _e.call(slots, slotProps.value), (_f = slots.tfoot) == null ? void 0 : _f.call(slots, slotProps.value)]);
-        },
-        bottom: () => slots.bottom ? slots.bottom(slotProps.value) : !props.hideDefaultFooter && createBaseVNode(Fragment, null, [createVNode(VDivider, null, null), createVNode(VDataTableFooter, dataTableFooterProps, {
-          prepend: slots["footer.prepend"]
-        })])
-      });
-    });
   }
 });
 
@@ -11584,318 +8644,6 @@ var VSystemBar = genericComponent()({
       }, themeClasses.value, backgroundColorClasses.value, elevationClasses.value, roundedClasses.value, props.class]),
       "style": normalizeStyle([backgroundColorStyles.value, layoutItemStyles.value, ssrBootStyles.value, props.style])
     }, slots));
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VTabs/VTab.js
-import "/app/node_modules/vuetify/lib/components/VTabs/VTab.css";
-
-// node_modules/vuetify/lib/components/VTabs/shared.js
-var VTabsSymbol = Symbol.for("vuetify:v-tabs");
-
-// node_modules/vuetify/lib/components/VTabs/VTab.js
-var makeVTabProps = propsFactory({
-  fixed: Boolean,
-  sliderColor: String,
-  hideSlider: Boolean,
-  direction: {
-    type: String,
-    default: "horizontal"
-  },
-  ...omit(makeVBtnProps({
-    selectedClass: "v-tab--selected",
-    variant: "text"
-  }), ["active", "block", "flat", "location", "position", "symbol"])
-}, "VTab");
-var VTab = genericComponent()({
-  name: "VTab",
-  props: makeVTabProps(),
-  setup(props, _ref) {
-    let {
-      slots,
-      attrs
-    } = _ref;
-    const {
-      textColorClasses: sliderColorClasses,
-      textColorStyles: sliderColorStyles
-    } = useTextColor(() => props.sliderColor);
-    const rootEl = ref();
-    const sliderEl = ref();
-    const isHorizontal = computed(() => props.direction === "horizontal");
-    const isSelected = computed(() => {
-      var _a2, _b;
-      return ((_b = (_a2 = rootEl.value) == null ? void 0 : _a2.group) == null ? void 0 : _b.isSelected.value) ?? false;
-    });
-    function updateSlider(_ref2) {
-      var _a2, _b;
-      let {
-        value
-      } = _ref2;
-      if (value) {
-        const prevEl = (_b = (_a2 = rootEl.value) == null ? void 0 : _a2.$el.parentElement) == null ? void 0 : _b.querySelector(".v-tab--selected .v-tab__slider");
-        const nextEl = sliderEl.value;
-        if (!prevEl || !nextEl) return;
-        const color = getComputedStyle(prevEl).color;
-        const prevBox = prevEl.getBoundingClientRect();
-        const nextBox = nextEl.getBoundingClientRect();
-        const xy = isHorizontal.value ? "x" : "y";
-        const XY = isHorizontal.value ? "X" : "Y";
-        const rightBottom = isHorizontal.value ? "right" : "bottom";
-        const widthHeight = isHorizontal.value ? "width" : "height";
-        const prevPos = prevBox[xy];
-        const nextPos = nextBox[xy];
-        const delta = prevPos > nextPos ? prevBox[rightBottom] - nextBox[rightBottom] : prevBox[xy] - nextBox[xy];
-        const origin = Math.sign(delta) > 0 ? isHorizontal.value ? "right" : "bottom" : Math.sign(delta) < 0 ? isHorizontal.value ? "left" : "top" : "center";
-        const size = Math.abs(delta) + (Math.sign(delta) < 0 ? prevBox[widthHeight] : nextBox[widthHeight]);
-        const scale = size / Math.max(prevBox[widthHeight], nextBox[widthHeight]) || 0;
-        const initialScale = prevBox[widthHeight] / nextBox[widthHeight] || 0;
-        const sigma = 1.5;
-        animate(nextEl, {
-          backgroundColor: [color, "currentcolor"],
-          transform: [`translate${XY}(${delta}px) scale${XY}(${initialScale})`, `translate${XY}(${delta / sigma}px) scale${XY}(${(scale - 1) / sigma + 1})`, "none"],
-          transformOrigin: Array(3).fill(origin)
-        }, {
-          duration: 225,
-          easing: standardEasing
-        });
-      }
-    }
-    useRender(() => {
-      const btnProps = VBtn.filterProps(props);
-      return createVNode(VBtn, mergeProps({
-        "symbol": VTabsSymbol,
-        "ref": rootEl,
-        "class": ["v-tab", props.class],
-        "style": props.style,
-        "tabindex": isSelected.value ? 0 : -1,
-        "role": "tab",
-        "aria-selected": String(isSelected.value),
-        "active": false
-      }, btnProps, attrs, {
-        "block": props.fixed,
-        "maxWidth": props.fixed ? 300 : void 0,
-        "onGroup:selected": updateSlider
-      }), {
-        ...slots,
-        default: () => {
-          var _a2;
-          return createBaseVNode(Fragment, null, [((_a2 = slots.default) == null ? void 0 : _a2.call(slots)) ?? props.text, !props.hideSlider && createBaseVNode("div", {
-            "ref": sliderEl,
-            "class": normalizeClass(["v-tab__slider", sliderColorClasses.value]),
-            "style": normalizeStyle(sliderColorStyles.value)
-          }, null)]);
-        }
-      });
-    });
-    return forwardRefs({}, rootEl);
-  }
-});
-
-// node_modules/vuetify/lib/components/VTabs/VTabs.js
-import "/app/node_modules/vuetify/lib/components/VTabs/VTabs.css";
-
-// node_modules/vuetify/lib/components/VTabs/VTabsWindow.js
-var makeVTabsWindowProps = propsFactory({
-  ...omit(makeVWindowProps(), ["continuous", "nextIcon", "prevIcon", "showArrows", "touch", "mandatory"])
-}, "VTabsWindow");
-var VTabsWindow = genericComponent()({
-  name: "VTabsWindow",
-  props: makeVTabsWindowProps(),
-  emits: {
-    "update:modelValue": (v) => true
-  },
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const group = inject(VTabsSymbol, null);
-    const _model = useProxiedModel(props, "modelValue");
-    const model = computed({
-      get() {
-        var _a2;
-        if (_model.value != null || !group) return _model.value;
-        return (_a2 = group.items.value.find((item) => group.selected.value.includes(item.id))) == null ? void 0 : _a2.value;
-      },
-      set(val) {
-        _model.value = val;
-      }
-    });
-    useRender(() => {
-      const windowProps = VWindow.filterProps(props);
-      return createVNode(VWindow, mergeProps({
-        "_as": "VTabsWindow"
-      }, windowProps, {
-        "modelValue": model.value,
-        "onUpdate:modelValue": ($event) => model.value = $event,
-        "class": ["v-tabs-window", props.class],
-        "style": props.style,
-        "mandatory": false,
-        "touch": false
-      }), slots);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VTabs/VTabsWindowItem.js
-var makeVTabsWindowItemProps = propsFactory({
-  ...makeVWindowItemProps()
-}, "VTabsWindowItem");
-var VTabsWindowItem = genericComponent()({
-  name: "VTabsWindowItem",
-  props: makeVTabsWindowItemProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    useRender(() => {
-      const windowItemProps = VWindowItem.filterProps(props);
-      return createVNode(VWindowItem, mergeProps({
-        "_as": "VTabsWindowItem"
-      }, windowItemProps, {
-        "class": ["v-tabs-window-item", props.class],
-        "style": props.style
-      }), slots);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VTabs/VTabs.js
-function parseItems(items) {
-  if (!items) return [];
-  return items.map((item) => {
-    if (!isObject(item)) return {
-      text: item,
-      value: item
-    };
-    return item;
-  });
-}
-var makeVTabsProps = propsFactory({
-  alignTabs: {
-    type: String,
-    default: "start"
-  },
-  color: String,
-  fixedTabs: Boolean,
-  items: {
-    type: Array,
-    default: () => []
-  },
-  stacked: Boolean,
-  bgColor: String,
-  grow: Boolean,
-  height: {
-    type: [Number, String],
-    default: void 0
-  },
-  hideSlider: Boolean,
-  sliderColor: String,
-  ...pick(makeVTabProps(), ["spaced"]),
-  ...makeVSlideGroupProps({
-    mandatory: "force",
-    selectedClass: "v-tab-item--selected"
-  }),
-  ...makeDensityProps(),
-  ...makeTagProps()
-}, "VTabs");
-var VTabs = genericComponent()({
-  name: "VTabs",
-  props: makeVTabsProps(),
-  emits: {
-    "update:modelValue": (v) => true
-  },
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const model = useProxiedModel(props, "modelValue");
-    const items = computed(() => parseItems(props.items));
-    const {
-      densityClasses
-    } = useDensity(props);
-    const {
-      backgroundColorClasses,
-      backgroundColorStyles
-    } = useBackgroundColor(() => props.bgColor);
-    const {
-      scopeId
-    } = useScopeId();
-    provideDefaults({
-      VTab: {
-        color: toRef(() => props.color),
-        direction: toRef(() => props.direction),
-        stacked: toRef(() => props.stacked),
-        fixed: toRef(() => props.fixedTabs),
-        sliderColor: toRef(() => props.sliderColor),
-        hideSlider: toRef(() => props.hideSlider)
-      }
-    });
-    useRender(() => {
-      const slideGroupProps = VSlideGroup.filterProps(props);
-      const hasWindow = !!(slots.window || props.items.length > 0);
-      return createBaseVNode(Fragment, null, [createVNode(VSlideGroup, mergeProps(slideGroupProps, {
-        "modelValue": model.value,
-        "onUpdate:modelValue": ($event) => model.value = $event,
-        "class": ["v-tabs", `v-tabs--${props.direction}`, `v-tabs--align-tabs-${props.alignTabs}`, {
-          "v-tabs--fixed-tabs": props.fixedTabs,
-          "v-tabs--grow": props.grow,
-          "v-tabs--stacked": props.stacked
-        }, densityClasses.value, backgroundColorClasses.value, props.class],
-        "style": [{
-          "--v-tabs-height": convertToUnit(props.height)
-        }, backgroundColorStyles.value, props.style],
-        "role": "tablist",
-        "symbol": VTabsSymbol
-      }, scopeId, attrs), {
-        default: () => {
-          var _a2;
-          return [((_a2 = slots.default) == null ? void 0 : _a2.call(slots)) ?? items.value.map((item) => {
-            var _a3;
-            return ((_a3 = slots.tab) == null ? void 0 : _a3.call(slots, {
-              item
-            })) ?? createVNode(VTab, mergeProps(item, {
-              "key": item.text,
-              "value": item.value,
-              "spaced": props.spaced
-            }), {
-              default: slots[`tab.${item.value}`] ? () => {
-                var _a4;
-                return (_a4 = slots[`tab.${item.value}`]) == null ? void 0 : _a4.call(slots, {
-                  item
-                });
-              } : void 0
-            });
-          })];
-        }
-      }), hasWindow && createVNode(VTabsWindow, mergeProps({
-        "modelValue": model.value,
-        "onUpdate:modelValue": ($event) => model.value = $event,
-        "key": "tabs-window"
-      }, scopeId), {
-        default: () => {
-          var _a2;
-          return [items.value.map((item) => {
-            var _a3;
-            return ((_a3 = slots.item) == null ? void 0 : _a3.call(slots, {
-              item
-            })) ?? createVNode(VTabsWindowItem, {
-              "value": item.value
-            }, {
-              default: () => {
-                var _a4;
-                return (_a4 = slots[`item.${item.value}`]) == null ? void 0 : _a4.call(slots, {
-                  item
-                });
-              }
-            });
-          }), (_a2 = slots.window) == null ? void 0 : _a2.call(slots)];
-        }
-      })]);
-    });
     return {};
   }
 });

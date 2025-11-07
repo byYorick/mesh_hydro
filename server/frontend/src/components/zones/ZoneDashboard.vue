@@ -262,7 +262,17 @@ const filteredZones = computed(() => {
 })
 
 function viewZone(zone: Zone) {
-  router.push({ name: 'ZoneDetail', params: { id: zone.id } })
+  if (typeof router.hasRoute === 'function' && !router.hasRoute('ZoneDetail')) {
+    showSnackbar('Детальный просмотр зоны пока недоступен', 'info')
+    return
+  }
+
+  try {
+    router.push({ name: 'ZoneDetail', params: { id: zone.id } })
+  } catch (err) {
+    console.error('ZoneDashboard: failed to navigate to ZoneDetail', err)
+    showSnackbar('Не удалось открыть детальный просмотр зоны', 'error')
+  }
 }
 
 function editZone(zone: Zone) {
