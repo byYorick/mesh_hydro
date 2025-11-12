@@ -21,6 +21,7 @@ class Zone extends Model
      * Поля доступные для массового заполнения
      */
     protected $fillable = [
+        'greenhouse_id',
         'name',
         'description',
         'root_node_id',
@@ -49,9 +50,15 @@ class Zone extends Model
         'plant_capacity' => 'integer',
         'is_active' => 'boolean',
         'is_available' => 'boolean',
+        'greenhouse_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function greenhouse(): BelongsTo
+    {
+        return $this->belongsTo(Greenhouse::class);
+    }
 
     /**
      * Root Node зоны

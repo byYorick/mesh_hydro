@@ -99,6 +99,20 @@
             </template>
           </v-select>
 
+          <v-select
+            v-model="formData.greenhouse_id"
+            :items="greenhouseOptions"
+            item-title="label"
+            item-value="value"
+            label="Теплица"
+            variant="outlined"
+            density="comfortable"
+            prepend-inner-icon="mdi-leaf-circle"
+            :loading="greenhousesStore.loading"
+            class="mb-3"
+            clearable
+          ></v-select>
+
           <!-- Mesh Network ID -->
           <v-text-field
             v-model="formData.mesh_network_id"
@@ -211,6 +225,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useZonesStore, type Zone } from '@/stores/zones'
 import { useNodesStore } from '@/stores/nodes'
+import { useGreenhousesStore } from '@/stores/greenhouses'
 
 interface Props {
   modelValue: boolean
@@ -224,6 +239,7 @@ const emit = defineEmits<{
 
 const zonesStore = useZonesStore()
 const nodesStore = useNodesStore()
+const greenhousesStore = useGreenhousesStore()
 
 const dialog = computed({
   get: () => props.modelValue,
@@ -247,6 +263,7 @@ const formData = ref<{
   plant_capacity?: number
   is_active: boolean
   is_available: boolean
+  greenhouse_id?: number | null
 }>({
   name: '',
   description: '',
@@ -260,6 +277,7 @@ const formData = ref<{
   plant_capacity: undefined,
   is_active: true,
   is_available: true,
+  greenhouse_id: greenhousesStore.selectedId ?? null,
 })
 
 const errors = ref<Record<string, string[]>>({})
@@ -283,10 +301,13 @@ const availableRootNodes = computed(() => {
   return rootNodes.filter((n: any) => !usedRootNodeIds.includes(n.node_id))
 })
 
+const greenhouseOptions = computed(() => greenhousesStore.greenhouseOptions)
+
 watch(dialog, (isOpen) => {
   if (isOpen) {
     resetForm()
     loadRootNodes()
+    loadGreenhouses()
   }
 })
 
@@ -304,6 +325,7 @@ function resetForm() {
     plant_capacity: undefined,
     is_active: true,
     is_available: true,
+    greenhouse_id: greenhousesStore.selectedId ?? null,
   }
   errors.value = {}
 }
@@ -314,6 +336,16 @@ async function loadRootNodes() {
     await nodesStore.fetchNodes()
   } finally {
     loadingNodes.value = false
+  }
+}
+
+async function loadGreenhouses() {
+  try {
+    if (!greenhousesStore.items.length) {
+      await greenhousesStore.fetchGreenhouses()
+    }
+  } catch (error) {
+    console.warn('Не удалось загрузить список теплиц', error)
   }
 }
 
@@ -346,6 +378,7 @@ function closeDialog() {
 onMounted(() => {
   if (dialog.value) {
     loadRootNodes()
+    loadGreenhouses()
   }
 })
 </script>

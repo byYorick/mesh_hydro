@@ -74,7 +74,6 @@ class MqttListenerCommand extends Command
         // Формат: hydro/+/telemetry/# где + = любая зона (zone1, zone2, zone3...)
         $this->info('📡 Subscribing to: hydro/+/telemetry/# (ALL ZONES)');
         $mqtt->subscribe('hydro/+/telemetry/#', function ($topic, $message) use ($mqtt) {
-            // Извлекаем zone из топика: hydro/zone1/telemetry/ph_001
             $zoneName = $this->extractZoneFromTopic($topic);
             $this->line("📊 [TELEMETRY] [{$zoneName}] {$topic}");
             $mqtt->handleTelemetry($topic, $message);
@@ -105,10 +104,10 @@ class MqttListenerCommand extends Command
         });
 
         // Подписка на discovery (автопоиск узлов)
-        // Подписываемся БЕЗ wildcard, т.к. ESP32 публикует в "hydro/discovery"
-        $this->info('📡 Subscribing to: hydro/discovery');
-        $mqtt->subscribe('hydro/discovery', function ($topic, $message) use ($mqtt) {
-            $this->line("🔍 [DISCOVERY] {$topic}");
+        $this->info('📡 Subscribing to: hydro/+/discovery');
+        $mqtt->subscribe('hydro/+/discovery', function ($topic, $message) use ($mqtt) {
+            $zoneName = $this->extractZoneFromTopic($topic);
+            $this->line("🔍 [DISCOVERY] [{$zoneName}] {$topic}");
             $mqtt->handleDiscovery($topic, $message);
         });
 
@@ -181,13 +180,17 @@ class MqttListenerCommand extends Command
      */
     private function extractZoneFromTopic(string $topic): string
     {
-        // Формат: hydro/{zone}/...
         $parts = explode('/', $topic);
-        
+
         if (count($parts) >= 2 && $parts[0] === 'hydro') {
-            return $parts[1];  // zone1, zone2, zone3...
+            $zone = $parts[1];
+            if ($zone === 'setup') {
+                return 'setup';
+            }
+
+            return $zone;
         }
-        
+
         return 'unknown';
     }
 }

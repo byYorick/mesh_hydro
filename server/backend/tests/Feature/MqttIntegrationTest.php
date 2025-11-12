@@ -18,6 +18,25 @@ class MqttIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $mqttMock = Mockery::mock(MqttService::class);
+        $mqttMock->shouldIgnoreMissing();
+        $mqttMock->shouldReceive('sendConfig')->andReturnNull();
+        $mqttMock->shouldReceive('sendCommand')->andReturnNull();
+        $mqttMock->shouldReceive('publish')->andReturnNull();
+
+        app()->instance(MqttService::class, $mqttMock);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     #[Test]
     public function mqtt_listener_extracts_zone_from_topic()
     {

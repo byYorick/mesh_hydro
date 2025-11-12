@@ -11,6 +11,7 @@
 #include "mesh_protocol.h"
 #include "node_config.h"
 #include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
+#include "zone_config.h"
 
 #include "esp_log.h"
 #include "esp_wifi.h"
@@ -29,6 +30,8 @@ static TaskHandle_t s_main_task = NULL;
 static TaskHandle_t s_heartbeat_task = NULL;
 static bool s_discovery_sent = false;
 static uint32_t s_boot_time = 0;
+static char s_root_node_id[32] = {0};
+static char s_mesh_network_id[32] = {0};
 
 // Forward declarations
 static void climate_main_task(void *arg);
@@ -51,9 +54,28 @@ esp_err_t climate_controller_init(climate_node_config_t *config) {
     s_boot_time = (uint32_t)time(NULL);
     s_discovery_sent = false;
 
+    zone_config_init();
+
+    const char *root_id = zone_config_get_root_id();
+    if (root_id && root_id[0] != '\0' && zone_config_validate(root_id)) {
+        strncpy(s_root_node_id, root_id, sizeof(s_root_node_id) - 1);
+    } else if (s_config->base.root_node_id[0] != '\0') {
+        strncpy(s_root_node_id, s_config->base.root_node_id, sizeof(s_root_node_id) - 1);
+    } else {
+        strncpy(s_root_node_id, "root_setup", sizeof(s_root_node_id) - 1);
+    }
+
+    const char *mesh_id = zone_config_get_mesh_id();
+    if (mesh_id && mesh_id[0] != '\0' && zone_config_validate(mesh_id)) {
+        strncpy(s_mesh_network_id, mesh_id, sizeof(s_mesh_network_id) - 1);
+    } else if (node_config_get_mesh_network_id(s_mesh_network_id) != ESP_OK || s_mesh_network_id[0] == '\0') {
+        strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+    }
+
     ESP_LOGI(TAG, "Climate Controller initialized");
     ESP_LOGI(TAG, "Node ID: %s, Zone: %s", s_config->base.node_id, s_config->base.zone);
     ESP_LOGI(TAG, "Read interval: %d ms", s_config->read_interval_ms);
+    ESP_LOGI(TAG, "Context: root_node_id=%s mesh_network_id=%s", s_root_node_id, s_mesh_network_id);
 
     return ESP_OK;
 }
@@ -274,6 +296,9 @@ static void send_discovery(void) {
             "{\"type\":\"discovery\","
             "\"node_id\":\"%s\","
             "\"node_type\":\"climate\","
+            "\"root_node_id\":\"%s\","
+            "\"mesh_network_id\":\"%s\","
+            "\"zone\":\"%s\","
             "\"mac_address\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
             "\"firmware\":\"1.0.0\","
             "\"hardware\":\"ESP32\","
@@ -281,6 +306,9 @@ static void send_discovery(void) {
             "\"heap_free\":%lu,"
             "\"wifi_rssi\":%d}",
             s_config->base.node_id,
+            s_root_node_id,
+            s_mesh_network_id,
+            s_config->base.zone,
             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
             (unsigned long)heap_free,
             rssi);
@@ -313,6 +341,8 @@ static void send_heartbeat(void) {
     cJSON_AddStringToObject(root, "type", "heartbeat");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "climate");
+    cJSON_AddStringToObject(root, "root_node_id", s_root_node_id);
+    cJSON_AddStringToObject(root, "mesh_network_id", s_mesh_network_id);
     
     char mac_str[18];
     snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -361,7 +391,7 @@ static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lu
     cJSON_AddNumberToObject(data, "rssi_to_parent", rssi);
 
     char json_buf[512];
-    if (mesh_protocol_create_telemetry(s_config->base.node_id, "climate", data,
+    if (mesh_protocol_create_telemetry(s_config->base.node_id, s_root_node_id, s_mesh_network_id, "climate", data,
                                         json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         
@@ -420,7 +450,7 @@ static void send_event(mesh_event_level_t level, const char *message, float temp
     }
     
     char json_buf[512];
-    if (mesh_protocol_create_event(s_config->base.node_id, level, message, data,
+    if (mesh_protocol_create_event(s_config->base.node_id, s_root_node_id, s_mesh_network_id, level, message, data,
                                     json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         

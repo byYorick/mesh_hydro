@@ -25,6 +25,8 @@ typedef enum {
     MESH_MSG_HEARTBEAT,      ///< Heartbeat (NODE → ROOT)
     MESH_MSG_REQUEST,        ///< Запрос данных (Display → ROOT)
     MESH_MSG_RESPONSE,       ///< Ответ на запрос (ROOT → Display)
+    MESH_MSG_DISCOVERY,      ///< Discovery (NODE → ROOT для регистрации)
+    MESH_MSG_CONFIG_CONFIRMATION, ///< Подтверждение конфигурации (NODE → ROOT)
     MESH_MSG_UNKNOWN         ///< Неизвестный тип
 } mesh_msg_type_t;
 
@@ -45,6 +47,7 @@ typedef struct {
     mesh_msg_type_t type;
     char node_id[32];
     char root_node_id[32];  // ⭐ ЗОНИРОВАНИЕ: ID Root Node (зоны)
+    char mesh_network_id[32];  // ⭐ ЗОНИРОВАНИЕ: mesh-network / topic segment
     uint64_t timestamp;
     cJSON *data;  // Дополнительные данные (зависят от типа)
 } mesh_message_t;
@@ -59,6 +62,15 @@ typedef struct {
 bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg);
 
 /**
+ * @brief Предварительная валидация структуры JSON перед парсингом
+ *
+ * @param json_str JSON строка
+ * @param error_ptr [out] указатель на позицию ошибки (может быть NULL)
+ * @return true если JSON корректен
+ */
+bool mesh_protocol_validate_structure(const char *json_str, const char **error_ptr);
+
+/**
  * @brief ⭐ Создание JSON строки телеметрии (с зонированием)
  * 
  * @param node_id ID узла
@@ -69,7 +81,7 @@ bool mesh_protocol_parse(const char *json_str, mesh_message_t *msg);
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_telemetry(const char *node_id, const char *root_node_id, const char *node_type, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_telemetry(const char *node_id, const char *root_node_id, const char *mesh_network_id, const char *node_type, cJSON *data, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки команды (с зонированием)
@@ -82,7 +94,7 @@ bool mesh_protocol_create_telemetry(const char *node_id, const char *root_node_i
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_command(const char *node_id, const char *root_node_id, const char *command, cJSON *params, char *out_json, size_t max_len);
+bool mesh_protocol_create_command(const char *node_id, const char *root_node_id, const char *mesh_network_id, const char *command, cJSON *params, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки конфигурации (с зонированием)
@@ -94,7 +106,7 @@ bool mesh_protocol_create_command(const char *node_id, const char *root_node_id,
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_config(const char *node_id, const char *root_node_id, cJSON *config, char *out_json, size_t max_len);
+bool mesh_protocol_create_config(const char *node_id, const char *root_node_id, const char *mesh_network_id, cJSON *config, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки события (с зонированием)
@@ -108,7 +120,7 @@ bool mesh_protocol_create_config(const char *node_id, const char *root_node_id, 
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_event(const char *node_id, const char *root_node_id, mesh_event_level_t level, const char *message, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_event(const char *node_id, const char *root_node_id, const char *mesh_network_id, mesh_event_level_t level, const char *message, cJSON *data, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки heartbeat (с зонированием)
@@ -122,7 +134,7 @@ bool mesh_protocol_create_event(const char *node_id, const char *root_node_id, m
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_heartbeat(const char *node_id, const char *root_node_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
+bool mesh_protocol_create_heartbeat(const char *node_id, const char *root_node_id, const char *mesh_network_id, const char *node_type, uint32_t uptime, uint32_t heap_free, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки запроса (с зонированием)
@@ -134,7 +146,7 @@ bool mesh_protocol_create_heartbeat(const char *node_id, const char *root_node_i
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_request(const char *from_id, const char *root_node_id, const char *request, char *out_json, size_t max_len);
+bool mesh_protocol_create_request(const char *from_id, const char *root_node_id, const char *mesh_network_id, const char *request, char *out_json, size_t max_len);
 
 /**
  * @brief ⭐ Создание JSON строки ответа (с зонированием)
@@ -146,7 +158,7 @@ bool mesh_protocol_create_request(const char *from_id, const char *root_node_id,
  * @param max_len Размер буфера
  * @return true при успехе
  */
-bool mesh_protocol_create_response(const char *to_id, const char *root_node_id, cJSON *data, char *out_json, size_t max_len);
+bool mesh_protocol_create_response(const char *to_id, const char *root_node_id, const char *mesh_network_id, cJSON *data, char *out_json, size_t max_len);
 
 /**
  * @brief Освобождение ресурсов сообщения
@@ -169,6 +181,33 @@ uint64_t mesh_protocol_get_timestamp(void);
  * @return Строка уровня
  */
 const char* mesh_protocol_event_level_to_str(mesh_event_level_t level);
+
+/**
+ * @brief Сформировать MQTT топик в мультизонном формате
+ * 
+ * Формат: hydro/{mesh_id}/{msg_type}/{node_id}
+ * 
+ * @param out Буфер для результата
+ * @param max_len Размер буфера
+ * @param mesh_id Идентификатор mesh (NULL = использовать zone_config_get_mesh_id())
+ * @param msg_type Тип сообщения ("heartbeat", "telemetry", "event", "command", "config", "discovery", "config_response")
+ * @param node_id Идентификатор узла
+ * @return true если топик успешно сформирован, false если буфер мал или параметры невалидны
+ * 
+ * Примеры:
+ * @code
+ * char topic[192];
+ * mesh_topic_format(topic, sizeof(topic), "zone_greenhouse_1", "heartbeat", "climate_001");
+ * // Результат: "hydro/zone_greenhouse_1/heartbeat/climate_001"
+ * 
+ * // Использовать mesh_id из zone_config
+ * mesh_topic_format(topic, sizeof(topic), NULL, "telemetry", "ph_001");
+ * @endcode
+ */
+bool mesh_topic_format(char *out, size_t max_len, 
+                       const char *mesh_id, 
+                       const char *msg_type, 
+                       const char *node_id);
 
 #ifdef __cplusplus
 }

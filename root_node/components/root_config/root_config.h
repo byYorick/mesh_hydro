@@ -27,6 +27,8 @@ typedef struct {
     char root_node_id[32];        ///< ID Root Node (например "root_001")
     char mesh_network_id[32];     ///< Уникальный MESH_NETWORK_ID зоны (например "HYDRO1_ZONE1")
     char mqtt_topic_prefix[64];   ///< MQTT prefix для зоны (например "hydro/zone1/")
+    char mqtt_host[128];          ///< MQTT broker host для зоны
+    uint16_t mqtt_port;           ///< MQTT broker port
     char zone_name[64];           ///< Название зоны (например "Зона 1 - NFT")
     char zone_location[64];       ///< Расположение зоны (например "Лаборатория А")
     uint8_t zone_number;          ///< Номер зоны (1, 2, 3...)
@@ -78,6 +80,16 @@ esp_err_t root_config_get_mesh_network_id(char *mesh_id);
  * @return ESP_OK при успехе
  */
 esp_err_t root_config_set_mesh_network_id(const char *mesh_id);
+
+/**
+ * @brief Получение настроек MQTT брокера
+ */
+esp_err_t root_config_get_mqtt_endpoint(char *host, size_t host_len, uint16_t *port);
+
+/**
+ * @brief Установка настроек MQTT брокера
+ */
+esp_err_t root_config_set_mqtt_endpoint(const char *host, uint16_t port);
 
 /**
  * @brief ⭐ Получение MQTT Topic Prefix

@@ -30,6 +30,7 @@ class UpdateNodeRequest extends FormRequest
             'config' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
             'online' => ['sometimes', 'boolean'],
+            'greenhouse_id' => ['nullable', 'integer', 'exists:greenhouses,id'],
         ];
     }
 

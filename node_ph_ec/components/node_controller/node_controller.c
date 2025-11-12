@@ -11,6 +11,7 @@
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 #include "node_config.h"
+#include "mesh_config.h"
 
 #include "esp_log.h"
 // #include "esp_task_wdt.h"  // Закомментировано для ESP-IDF v5.5
@@ -24,6 +25,8 @@ static const char *TAG = "node_controller";
 static ph_ec_node_config_t *s_config = NULL;
 static TaskHandle_t s_main_task = NULL;
 static bool s_autonomous_mode = false;
+static char s_root_node_id[32] = {0};
+static char s_mesh_network_id[32] = {0};
 
 // Forward declarations
 static void node_controller_main_task(void *arg);
@@ -44,6 +47,17 @@ esp_err_t node_controller_init(ph_ec_node_config_t *config) {
 
     s_config = config;
 
+    if (node_config_get_root_node_id(s_root_node_id) != ESP_OK || s_root_node_id[0] == '\0') {
+        if (s_config->base.root_node_id[0] != '\0') {
+            strncpy(s_root_node_id, s_config->base.root_node_id, sizeof(s_root_node_id) - 1);
+        } else {
+            strncpy(s_root_node_id, "root_setup", sizeof(s_root_node_id) - 1);
+        }
+    }
+    if (node_config_get_mesh_network_id(s_mesh_network_id) != ESP_OK || s_mesh_network_id[0] == '\0') {
+        strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+    }
+
     // Регистрация callback изменения состояния связи
     connection_monitor_register_state_cb(on_connection_state_changed);
 
@@ -51,6 +65,7 @@ esp_err_t node_controller_init(ph_ec_node_config_t *config) {
     ESP_LOGI(TAG, "Node ID: %s, Zone: %s", s_config->base.node_id, s_config->base.zone);
     ESP_LOGI(TAG, "pH target: %.2f, EC target: %.2f", s_config->ph_target, s_config->ec_target);
     ESP_LOGI(TAG, "Autonomous mode: %s", s_config->autonomous_enabled ? "ENABLED" : "DISABLED");
+    ESP_LOGI(TAG, "Context: root_node_id=%s mesh_network_id=%s", s_root_node_id, s_mesh_network_id);
 
     return ESP_OK;
 }
@@ -151,8 +166,9 @@ static void send_telemetry(float ph, float ec, float temp) {
     cJSON_AddNumberToObject(data, "ec", ec);
     cJSON_AddNumberToObject(data, "temp", temp);
 
+    const char *node_type = (s_config->base.node_type[0] != '\0') ? s_config->base.node_type : "ph_ec";
     char json_buf[512];
-    if (mesh_protocol_create_telemetry(s_config->base.node_id, data,
+    if (mesh_protocol_create_telemetry(s_config->base.node_id, s_root_node_id, s_mesh_network_id, node_type, data,
                                         json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         

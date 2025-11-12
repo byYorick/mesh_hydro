@@ -10,6 +10,7 @@ idf_component_register(
         driver
         mesh_manager
         mesh_protocol
+        zone_config
         mesh_config        # Централизованная конфигурация
         node_config
         ph_sensor

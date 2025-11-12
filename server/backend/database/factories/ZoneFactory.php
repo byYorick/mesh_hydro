@@ -22,8 +22,10 @@ class ZoneFactory extends Factory
             [
                 'node_type' => 'root',
                 'root_node_id' => $rootNodeId,
+                'zone' => 'TEST_MESH_' . $zoneNumber,
                 'online' => true,
                 'last_seen_at' => now(),
+                'metadata' => [],
             ]
         );
 
@@ -47,6 +49,7 @@ class ZoneFactory extends Factory
             'current_cycle_id' => null,
             'image_url' => null,
             'notes' => $this->faker->optional()->sentence(),
+            'greenhouse_id' => null,
         ];
     }
 
@@ -174,12 +177,20 @@ class ZoneFactory extends Factory
                     [
                         'node_type' => $nodeType,
                         'root_node_id' => $zone->root_node_id,
+                        'zone' => $zone->mesh_network_id,
+                        'greenhouse_id' => $zone->greenhouse_id,
                         'online' => $this->faker->boolean(80), // 80% онлайн
                         'last_seen_at' => now()->subMinutes($this->faker->numberBetween(1, 30)),
+                        'metadata' => [],
                     ]
                 );
             }
         });
+    }
+
+    public function forGreenhouse(int $greenhouseId): static
+    {
+        return $this->state(fn () => ['greenhouse_id' => $greenhouseId]);
     }
 }
 

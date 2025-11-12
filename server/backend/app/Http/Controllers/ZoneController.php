@@ -36,7 +36,7 @@ class ZoneController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Zone::with(['rootNode', 'currentCycle']);
+        $query = Zone::with(['rootNode', 'currentCycle', 'greenhouse']);
 
         // Фильтр по доступности
         if ($request->has('available')) {
@@ -60,6 +60,9 @@ class ZoneController extends Controller
         }
 
         $zones = $query->get();
+        $zones->each(function (Zone $zone) {
+            $zone->greenhouse_name = $zone->greenhouse?->name;
+        });
 
         return response()->json([
             'success' => true,
@@ -93,6 +96,7 @@ class ZoneController extends Controller
             'plant_capacity' => 'nullable|integer|min:0',
             'is_active' => 'boolean',
             'is_available' => 'boolean',
+            'greenhouse_id' => 'nullable|integer|exists:greenhouses,id',
         ]);
 
         if ($validator->fails()) {
@@ -112,13 +116,15 @@ class ZoneController extends Controller
         }
 
         $zone = Zone::create($request->all());
+        $zone->load(['rootNode', 'greenhouse']);
+        $zone->greenhouse_name = $zone->greenhouse?->name;
 
         Log::info("⭐ Зона создана: {$zone->name} (ID: {$zone->id}, Root: {$zone->root_node_id})");
 
         return response()->json([
             'success' => true,
             'message' => 'Зона успешно создана',
-            'data' => $zone->load('rootNode'),
+            'data' => $zone,
         ], 201);
     }
 
@@ -130,7 +136,7 @@ class ZoneController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $zone = Zone::with(['rootNode', 'currentCycle', 'nodeAssignments.node'])->find($id);
+        $zone = Zone::with(['rootNode', 'currentCycle', 'nodeAssignments.node', 'greenhouse'])->find($id);
 
         if (!$zone) {
             return response()->json([
@@ -138,6 +144,8 @@ class ZoneController extends Controller
                 'message' => 'Зона не найдена',
             ], 404);
         }
+
+        $zone->greenhouse_name = $zone->greenhouse?->name;
 
         return response()->json([
             'success' => true,
@@ -173,6 +181,7 @@ class ZoneController extends Controller
             'plant_capacity' => 'nullable|integer|min:0',
             'is_active' => 'boolean',
             'is_available' => 'boolean',
+            'greenhouse_id' => 'nullable|integer|exists:greenhouses,id',
         ]);
 
         if ($validator->fails()) {
@@ -183,13 +192,15 @@ class ZoneController extends Controller
         }
 
         $zone->update($request->all());
+        $zone->load(['rootNode', 'greenhouse']);
+        $zone->greenhouse_name = $zone->greenhouse?->name;
 
         Log::info("⭐ Зона обновлена: {$zone->name} (ID: {$zone->id})");
 
         return response()->json([
             'success' => true,
             'message' => 'Зона успешно обновлена',
-            'data' => $zone->load('rootNode'),
+            'data' => $zone,
         ]);
     }
 
@@ -541,7 +552,7 @@ class ZoneController extends Controller
                 'message' => 'Узел уже назначен другой зоне',
                 'data' => [
                     'node_id' => $nodeId,
-                    'current_zone' => $node->zone?->name,
+                    'current_zone' => $node->zoneRelation?->name,
                 ],
             ], 422);
         }

@@ -12,6 +12,7 @@
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 #include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
+#include "zone_config.h"
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -33,6 +34,8 @@ static bool s_discovery_sent = false;
 static uint32_t s_boot_time = 0;
 static bool s_emergency_mode = false;
 static bool s_autonomous_mode = false;
+static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
+static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 
 // Адаптивные PID контроллеры
 static adaptive_pid_t s_pid_ph_up;
@@ -65,6 +68,28 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     s_discovery_sent = false;
     s_emergency_mode = false;
     s_autonomous_mode = false;
+
+    zone_config_init();
+    const char *mesh_id = zone_config_get_mesh_id();
+    const char *root_id = zone_config_get_root_id();
+
+    if (mesh_id && mesh_id[0] != '\0' && zone_config_validate(mesh_id)) {
+        strncpy(s_mesh_network_id, mesh_id, sizeof(s_mesh_network_id) - 1);
+    } else if (config->base.zone[0] != '\0') {
+        strncpy(s_mesh_network_id, config->base.zone, sizeof(s_mesh_network_id) - 1);
+    } else {
+        strncpy(s_mesh_network_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_mesh_network_id) - 1);
+    }
+    s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+
+    if (root_id && root_id[0] != '\0' && zone_config_validate(root_id)) {
+        strncpy(s_root_node_id, root_id, sizeof(s_root_node_id) - 1);
+    } else if (config->base.root_node_id[0] != '\0') {
+        strncpy(s_root_node_id, config->base.root_node_id, sizeof(s_root_node_id) - 1);
+    } else {
+        strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
+    }
+    s_root_node_id[sizeof(s_root_node_id) - 1] = '\0';
     
     // Инициализация адаптивных PID контроллеров
     ESP_LOGI(TAG, "[INIT] Initializing pH UP PID: target=%.2f, Kp=%.2f, Ki=%.2f, Kd=%.2f",
@@ -107,6 +132,8 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     ESP_LOGI(TAG, "pH Manager initialized");
     ESP_LOGI(TAG, "Node ID: %s, pH target: %.2f", 
              s_config->base.node_id, s_config->ph_target);
+    ESP_LOGI(TAG, "Zone context: mesh_id=%s, root_id=%s",
+             s_mesh_network_id, s_root_node_id);
     
     return ESP_OK;
 }
@@ -242,6 +269,10 @@ static void send_discovery(void) {
     cJSON_AddStringToObject(root, "type", "discovery");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "ph");
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
     
     // Sensors
     cJSON *sensors = cJSON_CreateArray();
@@ -305,6 +336,10 @@ static void send_telemetry(void) {
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "ph");  // ВАЖНО: тип узла для backend
     cJSON_AddStringToObject(root, "mac_address", mac_str);  // Добавляем MAC адрес
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
     
     cJSON *data = cJSON_CreateObject();
     if (!data) {
@@ -358,6 +393,10 @@ static void send_heartbeat(void) {
     cJSON_AddNumberToObject(root, "heap_free", esp_get_free_heap_size());
     cJSON_AddNumberToObject(root, "rssi_to_parent", get_rssi_to_parent());
     cJSON_AddBoolToObject(root, "autonomous", s_autonomous_mode);
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
@@ -576,6 +615,14 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
     cJSON_AddStringToObject(root, "type", "event");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddStringToObject(root, "node_type", "ph");
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
     cJSON_AddStringToObject(root, "level", mesh_protocol_event_level_to_str(level));
     cJSON_AddStringToObject(root, "message", message);
     cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
@@ -1243,6 +1290,10 @@ void ph_manager_send_config_response(void) {
     cJSON_AddStringToObject(root, "type", "config_response");
     cJSON_AddStringToObject(root, "node_id", s_config->base.node_id);
     cJSON_AddNumberToObject(root, "timestamp", (uint32_t)time(NULL));
+    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
+    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
+    cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
+    cJSON_AddStringToObject(root, "root_node_id", root_id);
     
     // Создание объекта конфигурации
     cJSON *config = cJSON_CreateObject();

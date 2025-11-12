@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             GrowthPresetsSeeder::class,
             ZoneSeeder::class,
             GrowthScenarioSeeder::class,
+            GreenhouseZoneCycleSeeder::class,
         ]);
         
         $this->command->info('✅ Базовые сиды загружены (presets, зоны, циклы)');

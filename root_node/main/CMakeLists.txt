@@ -15,5 +15,12 @@ idf_component_register(
         data_router
         climate_logic
         json
+        setup_portal
+        esp_http_client
+        esp_http_server
+        esp_app_format
+        node_config
+        root_config
+        zone_config
 )
 

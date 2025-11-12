@@ -12,6 +12,7 @@ idf_component_register(
         mesh_protocol
         mesh_config
         node_config
+        zone_config
         climate_controller
         sht3x_driver
         ccs811_driver

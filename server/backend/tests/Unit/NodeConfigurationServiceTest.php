@@ -13,16 +13,28 @@ use App\Models\GrowthPreset;
 use App\Models\GrowthCulture;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use App\Services\MqttService;
 
 class NodeConfigurationServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     private NodeConfigurationService $service;
+    private MqttService $mqttMock;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->mqttMock = $this->createMock(MqttService::class);
+        $this->mqttMock
+            ->method('sendConfig')
+            ->willReturnCallback(function (string $nodeId, array $config): void {
+                // no-op for tests
+            });
+
+        app()->instance(MqttService::class, $this->mqttMock);
+
         $this->service = app(NodeConfigurationService::class);
     }
 

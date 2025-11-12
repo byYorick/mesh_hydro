@@ -7,8 +7,18 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
+
+#define NODE_SETUP_NAMESPACE "setup_net"
+#define NODE_SETUP_KEY_CONFIGURED "configured"
+#define NODE_SETUP_KEY_ROUTER_SSID "router_ssid"
+#define NODE_SETUP_KEY_ROUTER_PASS "router_pass"
+#define NODE_BASE_NAMESPACE "hydro_ns"
+#define NODE_KEY_ROOT_ID "root_node_id"
+#define NODE_KEY_MESH_ID "mesh_id"
 
 static const char *TAG = "node_config";
 
@@ -800,6 +810,254 @@ esp_err_t node_config_erase_all(void) {
         ESP_LOGE(TAG, "NVS erase failed: %s", esp_err_to_name(err));
     }
     
+    return err;
+}
+
+bool node_config_is_configured(void) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_SETUP_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    uint8_t flag = 0;
+    err = nvs_get_u8(handle, NODE_SETUP_KEY_CONFIGURED, &flag);
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    return flag == 1;
+}
+
+void node_config_generate_setup_pin(char *pin_out, size_t pin_size) {
+    if (pin_out == NULL || pin_size == 0) {
+        return;
+    }
+
+    uint8_t mac[6] = {0};
+    esp_efuse_mac_get_default(mac);
+    snprintf(pin_out, pin_size, "%02X%02X%02X", mac[3], mac[4], mac[5]);
+}
+
+void node_config_generate_temp_mesh_id(const char *pin, char *mesh_id_out, size_t mesh_id_size) {
+    if (mesh_id_out == NULL || mesh_id_size == 0) {
+        return;
+    }
+
+    if (pin && pin[0] != '\0') {
+        snprintf(mesh_id_out, mesh_id_size, "HYDRO_%s", pin);
+    } else {
+        char generated_pin[7] = {0};
+        node_config_generate_setup_pin(generated_pin, sizeof(generated_pin));
+        snprintf(mesh_id_out, mesh_id_size, "HYDRO_%s", generated_pin);
+    }
+}
+
+esp_err_t node_config_get_router_credentials(char *ssid, size_t ssid_len, char *password, size_t password_len) {
+    if ((ssid == NULL || ssid_len == 0) && (password == NULL || password_len == 0)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_SETUP_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (ssid && ssid_len > 0) {
+        size_t len = ssid_len;
+        err = nvs_get_str(handle, NODE_SETUP_KEY_ROUTER_SSID, ssid, &len);
+        if (err != ESP_OK) {
+            nvs_close(handle);
+            return err;
+        }
+    }
+
+    if (password && password_len > 0) {
+        size_t len = password_len;
+        err = nvs_get_str(handle, NODE_SETUP_KEY_ROUTER_PASS, password, &len);
+        if (err != ESP_OK) {
+            nvs_close(handle);
+            return err;
+        }
+    }
+
+    nvs_close(handle);
+    return ESP_OK;
+}
+
+esp_err_t node_config_set_router_credentials(const char *ssid, const char *password) {
+    if (ssid == NULL || password == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_SETUP_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_str(handle, NODE_SETUP_KEY_ROUTER_SSID, ssid);
+    if (err == ESP_OK) {
+        err = nvs_set_str(handle, NODE_SETUP_KEY_ROUTER_PASS, password);
+    }
+
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t node_config_mark_configured(bool configured) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_SETUP_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_u8(handle, NODE_SETUP_KEY_CONFIGURED, configured ? 1 : 0);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t node_config_get_root_node_id(char *root_id)
+{
+    if (root_id == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    root_id[0] = '\0';
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_BASE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to open NVS for root_id: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    size_t len = 0;
+    err = nvs_get_str(handle, NODE_KEY_ROOT_ID, NULL, &len);
+    if (err == ESP_OK && len > 0) {
+        if (len > NODE_CONFIG_ROOT_ID_MAX_LEN) {
+            len = NODE_CONFIG_ROOT_ID_MAX_LEN;
+        }
+        err = nvs_get_str(handle, NODE_KEY_ROOT_ID, root_id, &len);
+    }
+
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "root_node_id not set yet");
+        root_id[0] = '\0';
+    } else if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read root_node_id: %s", esp_err_to_name(err));
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t node_config_set_root_node_id(const char *root_id)
+{
+    if (root_id == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strlen(root_id) >= NODE_CONFIG_ROOT_ID_MAX_LEN) {
+        ESP_LOGE(TAG, "root_node_id too long: %s", root_id);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_BASE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS for root_id: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = nvs_set_str(handle, NODE_KEY_ROOT_ID, root_id);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to store root_node_id: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "root_node_id saved: %s", root_id);
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t node_config_get_mesh_network_id(char *mesh_id)
+{
+    if (mesh_id == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    mesh_id[0] = '\0';
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_BASE_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to open NVS for mesh_id: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    size_t len = 0;
+    err = nvs_get_str(handle, NODE_KEY_MESH_ID, NULL, &len);
+    if (err == ESP_OK && len > 0) {
+        if (len > NODE_CONFIG_MESH_ID_MAX_LEN) {
+            len = NODE_CONFIG_MESH_ID_MAX_LEN;
+        }
+        err = nvs_get_str(handle, NODE_KEY_MESH_ID, mesh_id, &len);
+    }
+
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "mesh_network_id not set yet");
+        mesh_id[0] = '\0';
+    } else if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read mesh_network_id: %s", esp_err_to_name(err));
+    }
+
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t node_config_set_mesh_network_id(const char *mesh_id)
+{
+    if (mesh_id == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strlen(mesh_id) >= NODE_CONFIG_MESH_ID_MAX_LEN) {
+        ESP_LOGE(TAG, "mesh_network_id too long: %s", mesh_id);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(NODE_BASE_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS for mesh_id: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = nvs_set_str(handle, NODE_KEY_MESH_ID, mesh_id);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to store mesh_network_id: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "mesh_network_id saved: %s", mesh_id);
+    }
+
+    nvs_close(handle);
     return err;
 }
 

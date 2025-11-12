@@ -9,6 +9,9 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NodeErrorController;
 use App\Http\Controllers\PidPresetController;
+use App\Http\Controllers\NewNodeController;
+use App\Http\Controllers\Api\ZoneController as ApiZoneController;
+use App\Http\Controllers\GreenhouseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,12 +35,16 @@ Route::middleware('throttle:api')->group(function () {
             'timestamp' => now()->toIso8601String(),
         ]);
     });
+
+    // Discovery endpoint для ROOT в setup-режиме
+    Route::post('/discovery/root', [\App\Http\Controllers\SetupDiscoveryController::class, 'root']);
 });
 
 // Fallback polling routes с более мягким rate limiting
 Route::middleware('throttle:120,1')->group(function () {
     Route::get('/nodes', [NodeController::class, 'index']);
     Route::get('/events', [EventController::class, 'index']);
+    Route::get('/new-nodes', [NewNodeController::class, 'index']);
 });
 
 // Узлы (Nodes) - с более строгим rate limiting для write operations
@@ -64,6 +71,13 @@ Route::middleware('throttle:api')->group(function () {
             Route::get('/{nodeId}/config/request', [NodeController::class, 'requestConfig']);
             Route::get('/{nodeId}/config/history', [NodeController::class, 'getConfigHistory']);
         });
+    });
+
+    Route::prefix('new-nodes')->group(function () {
+        Route::get('/', [NewNodeController::class, 'index']);
+        Route::get('/{mac}', [NewNodeController::class, 'show']);
+        Route::post('/{mac}/configure', [NewNodeController::class, 'configure'])->middleware('throttle:60,1');
+        Route::delete('/{mac}', [NewNodeController::class, 'destroy'])->middleware('throttle:30,1');
     });
 });
 
@@ -158,6 +172,33 @@ Route::middleware('throttle:api')->group(function () {
     });
 });
 
+// Теплицы
+Route::middleware('throttle:api')->group(function () {
+    Route::prefix('greenhouses')->group(function () {
+        Route::get('/', [GreenhouseController::class, 'index']);
+        Route::get('/{greenhouse}', [GreenhouseController::class, 'show']);
+        Route::get('/{greenhouse}/zones', [GreenhouseController::class, 'zones']);
+        Route::get('/{greenhouse}/nodes', [GreenhouseController::class, 'nodes']);
+        Route::get('/{greenhouse}/automation-rules', [GreenhouseController::class, 'listAutomationRules']);
+
+        Route::middleware('throttle:30,1')->group(function () {
+            Route::post('/', [GreenhouseController::class, 'store']);
+            Route::put('/{greenhouse}', [GreenhouseController::class, 'update']);
+            Route::delete('/{greenhouse}', [GreenhouseController::class, 'destroy']);
+
+            Route::post('/{greenhouse}/zones', [GreenhouseController::class, 'attachZone']);
+            Route::delete('/{greenhouse}/zones/{zone}', [GreenhouseController::class, 'detachZone']);
+
+            Route::post('/{greenhouse}/nodes', [GreenhouseController::class, 'attachNode']);
+            Route::delete('/{greenhouse}/nodes/{nodeId}', [GreenhouseController::class, 'detachNode']);
+
+            Route::post('/{greenhouse}/automation-rules', [GreenhouseController::class, 'createAutomationRule']);
+            Route::put('/{greenhouse}/automation-rules/{rule}', [GreenhouseController::class, 'updateAutomationRule']);
+            Route::delete('/{greenhouse}/automation-rules/{rule}', [GreenhouseController::class, 'deleteAutomationRule']);
+        });
+    });
+});
+
 // Настройки системы
 Route::middleware('throttle:api')->group(function () {
     Route::prefix('settings')->group(function () {
@@ -176,9 +217,10 @@ Route::middleware('throttle:api')->group(function () {
 // ⭐ ЗОНИРОВАНИЕ: Zones API
 Route::middleware('throttle:api')->group(function () {
     Route::prefix('zones')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ZoneController::class, 'index']);
+        Route::get('/', [ApiZoneController::class, 'index']);
         Route::get('/{zone}', [\App\Http\Controllers\ZoneController::class, 'show']);
-        Route::get('/{zone}/nodes', [\App\Http\Controllers\ZoneController::class, 'getNodes']);
+        Route::get('/{zone}/nodes', [ApiZoneController::class, 'nodes']);
+        Route::get('/{zone}/stats', [ApiZoneController::class, 'stats']);
         Route::get('/{zone}/root-node', [\App\Http\Controllers\ZoneController::class, 'getRootNode']);
         Route::get('/{zone}/telemetry', [\App\Http\Controllers\ZoneController::class, 'getTelemetry']);
         Route::get('/{zone}/statistics', [\App\Http\Controllers\ZoneController::class, 'getStatistics']);

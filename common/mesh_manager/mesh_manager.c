@@ -40,8 +40,16 @@ esp_err_t mesh_manager_init(const mesh_manager_config_t *config) {
     ESP_ERROR_CHECK(ret);
 
     // Инициализация TCP/IP
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_err_t err = esp_netif_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "esp_event_loop_create_default failed: %s", esp_err_to_name(err));
+        return err;
+    }
     
     // Создание сетевых интерфейсов для mesh (STA и AP)
     esp_netif_t *ap_netif = NULL;

@@ -20,11 +20,11 @@ return [
     */
 
     'topics' => [
-        'telemetry' => 'hydro/telemetry/+',
-        'status' => 'hydro/status/+',
-        'events' => 'hydro/events/+',
-        'command' => 'hydro/command/#',
-        'config' => 'hydro/config/#',
+        'telemetry' => 'hydro/+/telemetry/+',
+        'status' => 'hydro/+/status/+',
+        'events' => 'hydro/+/event/+',
+        'command' => 'hydro/+/command/#',
+        'config' => 'hydro/+/config/#',
     ],
 
     /*

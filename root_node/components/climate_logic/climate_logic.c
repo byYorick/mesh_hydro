@@ -7,6 +7,7 @@
 #include "node_registry.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
+#include "root_config.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -148,8 +149,17 @@ static void send_command_to_relay(const char *command) {
     // Создание JSON команды
     cJSON *params = cJSON_CreateObject();
     
+    char root_node_id[32] = {0};
+    if (root_config_get_root_node_id(root_node_id) != ESP_OK || root_node_id[0] == '\0') {
+        strncpy(root_node_id, "root_000", sizeof(root_node_id) - 1);
+    }
+    char mesh_network_id[32] = {0};
+    if (root_config_get_mesh_network_id(mesh_network_id) != ESP_OK || mesh_network_id[0] == '\0') {
+        strncpy(mesh_network_id, "setup", sizeof(mesh_network_id) - 1);
+    }
+    
     char json_buf[256];
-    if (mesh_protocol_create_command("relay_001", command, params, 
+    if (mesh_protocol_create_command("relay_001", root_node_id, mesh_network_id, command, params,
                                       json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send(relay->mac_addr, 
                                          (uint8_t *)json_buf, strlen(json_buf));

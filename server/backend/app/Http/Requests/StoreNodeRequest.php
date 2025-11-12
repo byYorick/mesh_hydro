@@ -26,6 +26,7 @@ class StoreNodeRequest extends FormRequest
             'mac_address' => ['nullable', 'string', 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/'],
             'config' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
+            'greenhouse_id' => ['nullable', 'integer', 'exists:greenhouses,id'],
         ];
     }
 

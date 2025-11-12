@@ -225,6 +225,7 @@ declare global {
   const useFullscreen: typeof import('@vueuse/core')['useFullscreen']
   const useGamepad: typeof import('@vueuse/core')['useGamepad']
   const useGeolocation: typeof import('@vueuse/core')['useGeolocation']
+  const useGreenhousesStore: typeof import('./src/stores/greenhouses')['useGreenhousesStore']
   const useGrowthStore: typeof import('./src/stores/growth')['useGrowthStore']
   const useId: typeof import('vue')['useId']
   const useIdle: typeof import('@vueuse/core')['useIdle']
@@ -288,6 +289,7 @@ declare global {
   const useScrollLock: typeof import('@vueuse/core')['useScrollLock']
   const useSessionStorage: typeof import('@vueuse/core')['useSessionStorage']
   const useSettingsStore: typeof import('./src/stores/settings.js')['useSettingsStore']
+  const useSetupStore: typeof import('./src/stores/setup')['useSetupStore']
   const useShare: typeof import('@vueuse/core')['useShare']
   const useSlots: typeof import('vue')['useSlots']
   const useSorted: typeof import('@vueuse/core')['useSorted']
@@ -586,6 +588,7 @@ declare module 'vue' {
     readonly useFullscreen: UnwrapRef<typeof import('@vueuse/core')['useFullscreen']>
     readonly useGamepad: UnwrapRef<typeof import('@vueuse/core')['useGamepad']>
     readonly useGeolocation: UnwrapRef<typeof import('@vueuse/core')['useGeolocation']>
+    readonly useGreenhousesStore: UnwrapRef<typeof import('./src/stores/greenhouses')['useGreenhousesStore']>
     readonly useGrowthStore: UnwrapRef<typeof import('./src/stores/growth')['useGrowthStore']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useIdle: UnwrapRef<typeof import('@vueuse/core')['useIdle']>
@@ -649,6 +652,7 @@ declare module 'vue' {
     readonly useScrollLock: UnwrapRef<typeof import('@vueuse/core')['useScrollLock']>
     readonly useSessionStorage: UnwrapRef<typeof import('@vueuse/core')['useSessionStorage']>
     readonly useSettingsStore: UnwrapRef<typeof import('./src/stores/settings.js')['useSettingsStore']>
+    readonly useSetupStore: UnwrapRef<typeof import('./src/stores/setup')['useSetupStore']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>
     readonly useSlots: UnwrapRef<typeof import('vue')['useSlots']>
     readonly useSorted: UnwrapRef<typeof import('@vueuse/core')['useSorted']>

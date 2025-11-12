@@ -477,17 +477,17 @@ I (10000) climate_ctrl: 📊 Telemetry: 24.5°C, 65%, 820ppm, 450lux
 
 | Тип | Описание | Частота | Топик MQTT |
 |-----|----------|---------|------------|
-| **HEARTBEAT** | Проверка связи | 5 сек | `hydro/heartbeat/{node_id}` |
-| **TELEMETRY** | Данные с датчиков | 5-30 сек | `hydro/telemetry/{node_id}` |
-| **EVENT** | Критичные события | По событию | `hydro/event/{node_id}` |
-| **DISCOVERY** | Регистрация узла | При старте + каждые 30 сек | `hydro/discovery` |
+| **HEARTBEAT** | Проверка связи | 5 сек | `hydro/<mesh_id>/heartbeat/{node_id}` |
+| **TELEMETRY** | Данные с датчиков | 5-30 сек | `hydro/<mesh_id>/telemetry/{node_id}` |
+| **EVENT** | Критичные события | По событию | `hydro/<mesh_id>/event/{node_id}` |
+| **DISCOVERY** | Регистрация узла | При старте + каждые 30 сек | `hydro/<mesh_id>/discovery` |
 
 ### Server → MQTT → ROOT → NODE:
 
 | Тип | Описание | Топик MQTT |
 |-----|----------|------------|
-| **COMMAND** | Команда узлу | `hydro/command/{node_id}` |
-| **CONFIG** | Конфигурация | `hydro/config/{node_id}` |
+| **COMMAND** | Команда узлу | `hydro/<mesh_id>/command/{node_id}` |
+| **CONFIG** | Конфигурация | `hydro/<mesh_id>/config/{node_id}` |
 
 ### Display → ROOT → Display:
 
@@ -516,7 +516,7 @@ I (10000) climate_ctrl: 📊 Telemetry: 24.5°C, 65%, 820ppm, 450lux
 4. ROOT получает в data_router:
    ├─ Парсит JSON
    ├─ Обновляет node_registry
-   └─ Публикует в MQTT: hydro/telemetry/climate_001
+   └─ Публикует в MQTT: hydro/<mesh_id>/telemetry/climate_001
 
 5. MQTT Broker получает и рассылает подписчикам:
    ├─ Backend MqttService (автоматическая регистрация узла)

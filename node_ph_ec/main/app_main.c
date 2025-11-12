@@ -21,6 +21,7 @@
 #include "mesh_protocol.h"
 #include "node_config.h"
 #include "mesh_config.h"  // Централизованная конфигурация
+#include "zone_config.h"
 
 // Компоненты pH/EC
 #include "ph_sensor.h"
@@ -41,6 +42,8 @@ static const char *TAG = "ph_ec_node";
 
 // Конфигурация узла
 static ph_ec_node_config_t s_node_config;
+static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
+static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 
 // Forward declarations
 static esp_err_t i2c_master_init(void);
@@ -76,6 +79,22 @@ void app_main(void)
              s_node_config.ph_target, s_node_config.ph_min, s_node_config.ph_max);
     ESP_LOGI(TAG, "  EC target: %.2f (%.2f-%.2f)",
              s_node_config.ec_target, s_node_config.ec_min, s_node_config.ec_max);
+
+    if (zone_config_init() != ESP_OK) {
+        ESP_LOGE(TAG, "zone_config_init failed, using UNCONFIGURED defaults");
+        strncpy(s_mesh_network_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_mesh_network_id) - 1);
+        strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
+    } else if (zone_config_load(s_mesh_network_id, sizeof(s_mesh_network_id),
+                                s_root_node_id, sizeof(s_root_node_id)) != ESP_OK) {
+        ESP_LOGW(TAG, "Zone config not found, defaulting to UNCONFIGURED");
+        strncpy(s_mesh_network_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_mesh_network_id) - 1);
+        strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
+    }
+    s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+    s_root_node_id[sizeof(s_root_node_id) - 1] = '\0';
+
+    ESP_LOGI(TAG, "  Zone context: mesh_id=%s, root_id=%s",
+             s_mesh_network_id, s_root_node_id);
     
     // [Step 3/9] I2C init - ОТКЛЮЧЁН ДЛЯ ТЕСТИРОВАНИЯ БЕЗ ДАТЧИКОВ
     ESP_LOGI(TAG, "[Step 3/9] I2C init - DISABLED (Mock mode)");
@@ -101,9 +120,12 @@ void app_main(void)
     
     // [Step 6/9] Mesh NODE mode init
     ESP_LOGI(TAG, "[Step 6/9] Mesh NODE mode init...");
+    const char *mesh_id_ptr = zone_config_validate(s_mesh_network_id)
+                                  ? s_mesh_network_id
+                                  : MESH_NETWORK_ID;
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = MESH_NETWORK_ID,
+        .mesh_id = mesh_id_ptr,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = 6,          // Макс подключений для NODE AP

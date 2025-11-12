@@ -127,7 +127,7 @@ class NodeApiTest extends TestCase
         $node = Node::factory()->create([
             'node_id' => 'node_update',
             'node_type' => 'climate',
-            'zone' => null,
+            'zone' => 'UNCONFIGURED',
         ]);
 
         $response = $this->putJson('/api/nodes/' . $node->node_id, [

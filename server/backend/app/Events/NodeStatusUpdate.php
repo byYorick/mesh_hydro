@@ -41,10 +41,10 @@ class NodeStatusUpdate implements ShouldBroadcast
             'node_type' => $this->node->node_type,
             'zone' => $this->node->zone,
             'online' => $this->node->isOnline(),
-            'last_seen_at' => $this->node->last_seen_at,
+            'last_seen_at' => $this->node->last_seen_at?->toIso8601String(),
             'status_color' => $this->node->status_color,
             'icon' => $this->node->icon,
-            'metadata' => $this->node->metadata,
+            'metadata' => $this->node->metadata ?? [],
         ];
     }
 }

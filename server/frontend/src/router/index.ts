@@ -20,6 +20,24 @@ const routes: any[] = [
     },
   },
   {
+    path: '/greenhouses',
+    name: 'Greenhouses',
+    component: () => import('@/views/Greenhouses.vue'),
+    meta: {
+      title: 'Теплицы',
+      icon: 'mdi-leaf-circle',
+    },
+  },
+  {
+    path: '/setup',
+    name: 'Setup',
+    component: () => import('@/views/Setup.vue'),
+    meta: {
+      title: 'Настройка узлов',
+      icon: 'mdi-access-point-plus',
+    },
+  },
+  {
     path: '/nodes/:nodeId',
     name: 'NodeDetail',
     component: () => import('@/views/NodeDetail.vue'),

@@ -4,10 +4,18 @@
 
 FROM node:18-alpine
 
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ENV NPM_CONFIG_REGISTRY=${NPM_REGISTRY}
+
 WORKDIR /app
 
 # Установка глобальных зависимостей
-RUN npm install -g glob
+RUN npm config set registry ${NPM_REGISTRY} \
+    && npm config set fetch-retry-maxtimeout 60000 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retries 5 \
+    && npm config set strict-ssl false \
+    && npm install -g glob
 
 # Копирование package files
 COPY package*.json ./

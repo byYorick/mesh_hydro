@@ -152,6 +152,23 @@ export default {
     return api.get(`/nodes/${nodeId}`)
   },
 
+  // New Nodes (Setup Flow)
+  getNewNodes() {
+    return api.get('/new-nodes')
+  },
+
+  getNewNode(macAddress: string) {
+    return api.get(`/new-nodes/${encodeURIComponent(macAddress)}`)
+  },
+
+  configureNewNode(macAddress: string, payload: Record<string, any>) {
+    return api.post(`/new-nodes/${encodeURIComponent(macAddress)}/configure`, payload)
+  },
+
+  deleteNewNode(macAddress: string) {
+    return api.delete(`/new-nodes/${encodeURIComponent(macAddress)}`)
+  },
+
   async createNode(nodeData) {
     console.log('API: Creating node with data:', nodeData)
     try {

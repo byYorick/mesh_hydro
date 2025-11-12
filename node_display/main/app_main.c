@@ -19,6 +19,7 @@
 #include "../../common/mesh_protocol/mesh_protocol.h"
 #include "../../common/node_config/node_config.h"
 #include "../../common/mesh_config/mesh_config.h"
+#include "../../common/zone_config/zone_config.h"
 
 static const char *TAG = "DISPLAY";
 
@@ -56,6 +57,8 @@ typedef struct {
 
 static display_node_config_t s_config;
 static uint32_t s_boot_time = 0;
+static char s_root_node_id[32] = {0};
+static char s_mesh_network_id[32] = {0};
 
 // Кэш данных узлов (последний RESPONSE от ROOT)
 typedef struct {
@@ -239,7 +242,7 @@ static void send_request_all_nodes(void) {
     
     // Создание REQUEST JSON
     char json_buf[256];
-    if (mesh_protocol_create_request(s_config.base.node_id, "all_nodes_data",
+    if (mesh_protocol_create_request(s_config.base.node_id, s_root_node_id, s_mesh_network_id, "all_nodes_data",
                                       json_buf, sizeof(json_buf))) {
         esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_buf, strlen(json_buf));
         
@@ -277,6 +280,8 @@ static void send_heartbeat(void) {
     cJSON_AddStringToObject(root, "type", "heartbeat");
     cJSON_AddStringToObject(root, "node_id", s_config.base.node_id);
     cJSON_AddStringToObject(root, "node_type", "display");
+    cJSON_AddStringToObject(root, "root_node_id", s_root_node_id);
+    cJSON_AddStringToObject(root, "mesh_network_id", s_mesh_network_id);
     
     char mac_str[18];
     snprintf(mac_str, sizeof(mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
@@ -421,8 +426,38 @@ void app_main(void) {
         node_config_save(&s_config, sizeof(s_config), "display_ns");
     }
     
+    if (zone_config_init() != ESP_OK) {
+        ESP_LOGE(TAG, "zone_config_init failed");
+        strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
+        strncpy(s_mesh_network_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_mesh_network_id) - 1);
+    } else if (zone_config_load(s_mesh_network_id, sizeof(s_mesh_network_id),
+                                s_root_node_id, sizeof(s_root_node_id)) != ESP_OK) {
+        ESP_LOGW(TAG, "zone_config not found, using defaults");
+        strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
+        strncpy(s_mesh_network_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_mesh_network_id) - 1);
+    }
+    s_root_node_id[sizeof(s_root_node_id) - 1] = '\0';
+    s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+
+    if (!zone_config_validate(s_root_node_id)) {
+        if (s_config.base.root_node_id[0] != '\0') {
+            strncpy(s_root_node_id, s_config.base.root_node_id, sizeof(s_root_node_id) - 1);
+            s_root_node_id[sizeof(s_root_node_id) - 1] = '\0';
+        } else {
+            strncpy(s_root_node_id, "root_setup", sizeof(s_root_node_id) - 1);
+            s_root_node_id[sizeof(s_root_node_id) - 1] = '\0';
+        }
+    }
+    if (!zone_config_validate(s_mesh_network_id)) {
+        if (node_config_get_mesh_network_id(s_mesh_network_id) != ESP_OK || s_mesh_network_id[0] == '\0') {
+            strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+            s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+        }
+    }
+    
     ESP_LOGI(TAG, "Loaded: %s (%s)", s_config.base.node_id, s_config.base.zone);
     ESP_LOGI(TAG, "Backlight: %d%%", s_config.backlight_brightness);
+    ESP_LOGI(TAG, "Context: root_node_id=%s mesh_network_id=%s", s_root_node_id, s_mesh_network_id);
     
     s_boot_time = (uint32_t)time(NULL);
     
@@ -451,9 +486,12 @@ void app_main(void) {
     
     // === Шаг 6: Инициализация Mesh (NODE режим) ===
     ESP_LOGI(TAG, "[Step 6/6] Initializing Mesh (NODE mode)...");
+    const char *mesh_id_ptr = zone_config_validate(s_mesh_network_id)
+                                  ? s_mesh_network_id
+                                  : MESH_NETWORK_ID;
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = MESH_NETWORK_ID,
+        .mesh_id = mesh_id_ptr,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = 6,

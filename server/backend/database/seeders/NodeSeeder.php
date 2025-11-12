@@ -4,16 +4,31 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Node;
+use App\Models\Greenhouse;
 
 class NodeSeeder extends Seeder
 {
     public function run(): void
     {
+        $greenhouse = Greenhouse::firstOrCreate(
+            ['code' => 'GH-LEGACY'],
+            [
+                'name' => 'Legacy Demo Greenhouse',
+                'location' => 'Демонстрационный комплекс',
+                'description' => 'Базовый набор узлов для тестов и дев-окружения',
+                'timezone' => 'Europe/Moscow',
+                'status' => 'active',
+                'mesh_group' => 'legacy_group',
+                'root_node_id' => 'root_001',
+            ]
+        );
+
         $nodes = [
             [
                 'node_id' => 'root_001',
                 'node_type' => 'root',
                 'zone' => 'Main',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:00',
                 'online' => true,
                 'last_seen_at' => now(),
@@ -43,9 +58,52 @@ class NodeSeeder extends Seeder
                 ],
             ],
             [
+                'node_id' => 'root_002',
+                'node_type' => 'root',
+                'zone' => 'Zone 2',
+                'root_node_id' => 'root_002',
+                'mac_address' => 'AA:BB:CC:DD:EE:10',
+                'online' => true,
+                'last_seen_at' => now(),
+                'config' => [
+                    'mqtt_broker' => 'localhost',
+                    'mqtt_port' => 1883,
+                    'interval' => 60,
+                ],
+                'metadata' => [
+                    'firmware' => '2.0.0',
+                    'hardware' => 'ESP32-S3',
+                    'mesh_network_id' => 'HYDRO1_ZONE2',
+                    'created_via' => 'seeder',
+                    'created_at' => now()->subDays(20)->toDateTimeString(),
+                ],
+            ],
+            [
+                'node_id' => 'root_003',
+                'node_type' => 'root',
+                'zone' => 'Zone 3',
+                'root_node_id' => 'root_003',
+                'mac_address' => 'AA:BB:CC:DD:EE:11',
+                'online' => true,
+                'last_seen_at' => now(),
+                'config' => [
+                    'mqtt_broker' => 'localhost',
+                    'mqtt_port' => 1883,
+                    'interval' => 60,
+                ],
+                'metadata' => [
+                    'firmware' => '2.0.0',
+                    'hardware' => 'ESP32-S3',
+                    'mesh_network_id' => 'HYDRO1_ZONE3',
+                    'created_via' => 'seeder',
+                    'created_at' => now()->subDays(15)->toDateTimeString(),
+                ],
+            ],
+            [
                 'node_id' => 'ph_001',
                 'node_type' => 'ph',
                 'zone' => 'Zone 1',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:01',
                 'online' => true,
                 'last_seen_at' => now(),
@@ -84,6 +142,7 @@ class NodeSeeder extends Seeder
                 'node_id' => 'ec_001',
                 'node_type' => 'ec',
                 'zone' => 'Zone 1',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:06',
                 'online' => true,
                 'last_seen_at' => now(),
@@ -123,6 +182,7 @@ class NodeSeeder extends Seeder
                 'node_id' => 'climate_001',
                 'node_type' => 'climate',
                 'zone' => 'Zone 1',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:02',
                 'online' => true,
                 'last_seen_at' => now(),
@@ -157,6 +217,7 @@ class NodeSeeder extends Seeder
                 'node_id' => 'relay_001',
                 'node_type' => 'relay',
                 'zone' => 'Zone 1',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:03',
                 'online' => false,
                 'last_seen_at' => now()->subMinutes(2),
@@ -190,6 +251,7 @@ class NodeSeeder extends Seeder
                 'node_id' => 'water_001',
                 'node_type' => 'water',
                 'zone' => 'Zone 2',
+                'root_node_id' => 'root_002',
                 'mac_address' => 'AA:BB:CC:DD:EE:04',
                 'online' => false,
                 'last_seen_at' => now()->subMinutes(10),
@@ -219,6 +281,7 @@ class NodeSeeder extends Seeder
                 'node_id' => 'display_001',
                 'node_type' => 'display',
                 'zone' => 'Zone 1',
+                'root_node_id' => 'root_001',
                 'mac_address' => 'AA:BB:CC:DD:EE:05',
                 'online' => false,
                 'last_seen_at' => now()->subMinutes(1),
@@ -248,7 +311,24 @@ class NodeSeeder extends Seeder
             ],
         ];
 
+        $zoneRootMap = [
+            'Main' => 'root_001',
+            'Zone 1' => 'root_001',
+            'Zone 2' => 'root_002',
+            'Zone 3' => 'root_003',
+        ];
+
         foreach ($nodes as $nodeData) {
+            if (!isset($nodeData['root_node_id']) && isset($zoneRootMap[$nodeData['zone'] ?? ''])) {
+                $nodeData['root_node_id'] = $zoneRootMap[$nodeData['zone']];
+            }
+
+            if (!isset($nodeData['root_node_id'])) {
+                $nodeData['root_node_id'] = $nodeData['node_id'];
+            }
+
+            $nodeData['greenhouse_id'] = $nodeData['greenhouse_id'] ?? $greenhouse->id;
+
             Node::updateOrCreate(
                 ['node_id' => $nodeData['node_id']],
                 $nodeData

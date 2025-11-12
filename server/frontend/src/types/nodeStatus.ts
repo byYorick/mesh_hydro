@@ -38,6 +38,8 @@ export interface Node {
   online: boolean
   last_seen_at: string | null
   zone?: string | null
+  greenhouse_id?: number | null
+  greenhouse_name?: string | null
   metadata?: Record<string, any> | null
   config?: Record<string, any> | null
   isPumpRunning?: boolean

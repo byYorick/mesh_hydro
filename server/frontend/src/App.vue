@@ -27,15 +27,75 @@
       <v-divider></v-divider>
 
       <!-- Navigation Menu -->
-      <v-list density="compact" nav>
-        <v-list-item
-          v-for="route in menuRoutes"
-          :key="route.name"
-          :to="{ name: route.name }"
-          :prepend-icon="route.meta.icon"
-          :title="route.meta.title"
-          :value="route.name"
-        ></v-list-item>
+      <v-list density="compact" nav v-model:opened="openedGroups">
+        <template v-for="item in menuTree" :key="item.name || item.title">
+          <v-list-group
+            v-if="item.children && item.children.length"
+            :value="item.name"
+            :active="isItemActive(item)"
+          >
+            <template #activator="{ props }">
+              <v-list-item
+                v-bind="props"
+                :to="item.to"
+                :prepend-icon="item.icon"
+                :title="item.title"
+                :value="item.name"
+                :active="isItemActive(item)"
+              />
+            </template>
+
+            <template v-for="child in item.children" :key="child.name || child.title">
+              <v-list-group
+                v-if="child.children && child.children.length"
+                :value="child.name"
+                class="ms-4"
+                :active="isItemActive(child)"
+              >
+                <template #activator="{ props: childProps }">
+                  <v-list-item
+                    v-bind="childProps"
+                    :to="child.to"
+                    :prepend-icon="child.icon"
+                    :title="child.title"
+                    :value="child.name"
+                    :active="isItemActive(child)"
+                  />
+                </template>
+
+                <v-list-item
+                  v-for="grandChild in child.children"
+                  :key="grandChild.name || grandChild.title"
+                  :to="grandChild.to"
+                  :prepend-icon="grandChild.icon"
+                  :title="grandChild.title"
+                  :value="grandChild.name"
+                  :active="isItemActive(grandChild)"
+                  class="ms-6"
+                />
+              </v-list-group>
+
+              <v-list-item
+                v-else
+                :to="child.to"
+                :prepend-icon="child.icon"
+                :title="child.title"
+                :value="child.name"
+                :active="isItemActive(child)"
+                class="ms-4"
+              />
+            </template>
+          </v-list-group>
+
+          <v-list-item
+            v-else
+            :to="item.to"
+            :prepend-icon="item.icon"
+            :title="item.title"
+            :value="item.name"
+            :active="isItemActive(item)"
+          />
+        </template>
       </v-list>
 
       <!-- Connection Status -->
@@ -68,6 +128,8 @@
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
+
+      <ZoneSelector class="mr-4 d-none d-sm-flex" />
 
       <!-- Critical Events Badge -->
       <v-badge
@@ -174,15 +236,80 @@
           <v-toolbar-title>Меню</v-toolbar-title>
         </v-toolbar>
 
-        <v-list>
-          <v-list-item
-            v-for="route in menuRoutes"
-            :key="route.name"
-            :to="{ name: route.name }"
-            :prepend-icon="route.meta.icon"
-            :title="route.meta.title"
-            @click="showMobileMenu = false"
-          ></v-list-item>
+        <v-list v-model:opened="openedGroups">
+          <template v-for="item in menuTree" :key="`mobile-${item.name || item.title}`">
+            <v-list-group
+              v-if="item.children && item.children.length"
+              :value="item.name"
+              :active="isItemActive(item)"
+            >
+              <template #activator="{ props }">
+                <v-list-item
+                  v-bind="props"
+                  :to="item.to"
+                  :prepend-icon="item.icon"
+                  :title="item.title"
+                  :value="item.name"
+                  :active="isItemActive(item)"
+                  @click="handleMobileSelect"
+                />
+              </template>
+
+              <template v-for="child in item.children" :key="`mobile-${child.name || child.title}`">
+                <v-list-group
+                  v-if="child.children && child.children.length"
+                  :value="child.name"
+                  class="ms-4"
+                  :active="isItemActive(child)"
+                >
+                  <template #activator="{ props: childProps }">
+                    <v-list-item
+                      v-bind="childProps"
+                      :to="child.to"
+                      :prepend-icon="child.icon"
+                      :title="child.title"
+                      :value="child.name"
+                      :active="isItemActive(child)"
+                      @click="handleMobileSelect"
+                    />
+                  </template>
+
+                  <v-list-item
+                    v-for="grandChild in child.children"
+                    :key="`mobile-${grandChild.name || grandChild.title}`"
+                    :to="grandChild.to"
+                    :prepend-icon="grandChild.icon"
+                    :title="grandChild.title"
+                    :value="grandChild.name"
+                    :active="isItemActive(grandChild)"
+                    class="ms-6"
+                    @click="handleMobileSelect"
+                  />
+                </v-list-group>
+
+                <v-list-item
+                  v-else
+                  :to="child.to"
+                  :prepend-icon="child.icon"
+                  :title="child.title"
+                  :value="child.name"
+                  :active="isItemActive(child)"
+                  class="ms-4"
+                  @click="handleMobileSelect"
+                />
+              </template>
+            </v-list-group>
+
+            <v-list-item
+              v-else
+              :to="item.to"
+              :prepend-icon="item.icon"
+              :title="item.title"
+              :value="item.name"
+              :active="isItemActive(item)"
+              @click="handleMobileSelect"
+            />
+          </template>
         </v-list>
       </v-card>
     </v-dialog>
@@ -192,15 +319,18 @@
   </v-app>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { RouteLocationRaw, RouteRecordNormalized } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { useEventsStore } from '@/stores/events'
+import ZoneSelector from '@/components/ZoneSelector.vue'
 import { useErrorsStore } from '@/stores/errors'
 import { useSettingsStore } from '@/stores/settings'
 import { useTelemetryStore } from '@/stores/telemetry'
+import { useSetupStore } from '@/stores/setup'
 import { useResponsive } from '@/composables/useResponsive'
 import { useOfflineMode } from '@/composables/useOfflineMode'
 import { usePopup } from '@/composables/usePopup'
@@ -217,6 +347,7 @@ const eventsStore = useEventsStore()
 const errorsStore = useErrorsStore()
 const settingsStore = useSettingsStore()
 const telemetryStore = useTelemetryStore()
+const setupStore = useSetupStore()
 const { isMobile } = useResponsive()
 const { isOnline, isOfflineMode } = useOfflineMode()
 const popup = usePopup()
@@ -227,10 +358,136 @@ const discoveryIndicator = ref(null)
 const mobileTab = ref('dashboard')
 const showMobileMenu = ref(false)
 
-// Filtered menu routes (exclude hidden ones)
-const menuRoutes = computed(() => {
-  return router.getRoutes().filter(r => r.meta.icon && r.meta.showInMenu !== false)
+const openedGroups = ref<string[]>([])
+
+type MenuItem = {
+  title: string
+  icon?: string
+  name?: string
+  to?: RouteLocationRaw
+  children?: MenuItem[]
+}
+
+const menuTree = computed<MenuItem[]>(() => {
+  const routeMap = new Map<string, RouteRecordNormalized>()
+
+  router.getRoutes().forEach(r => {
+    if (typeof r.name === 'string') {
+      routeMap.set(r.name, r)
+    }
+  })
+
+  const buildItem = (routeName: string, overrides: Partial<MenuItem> = {}): MenuItem | null => {
+    const routeConfig = routeMap.get(routeName)
+    if (!routeConfig || routeConfig.meta?.showInMenu === false) {
+      return null
+    }
+
+    if (typeof routeConfig.name !== 'string') {
+      return null
+    }
+
+    return {
+      title: overrides.title ?? (routeConfig.meta?.title as string) ?? routeName,
+      icon: overrides.icon ?? (routeConfig.meta?.icon as string | undefined),
+      name: routeConfig.name,
+      to: { name: routeConfig.name },
+      children: overrides.children ?? [],
+    }
+  }
+
+  const nodesChildren = ['Setup', 'Telemetry', 'Events', 'Analytics', 'Errors']
+    .map(name => buildItem(name))
+    .filter((item): item is MenuItem => item !== null)
+
+  const greenhousesChildren = ['Zones', 'GrowthPlanner']
+    .map(name => buildItem(name))
+    .filter((item): item is MenuItem => item !== null)
+
+  const items: MenuItem[] = []
+
+  const dashboard = buildItem('Dashboard')
+  if (dashboard) {
+    items.push(dashboard)
+  }
+
+  const nodes = buildItem('Nodes')
+  if (nodes) {
+    nodes.children = nodesChildren
+    items.push(nodes)
+  }
+
+  const greenhouses = buildItem('Greenhouses')
+  if (greenhouses) {
+    greenhouses.children = greenhousesChildren
+    items.push(greenhouses)
+  }
+
+  const presetLibrary = buildItem('PresetLibrary')
+  if (presetLibrary) {
+    items.push(presetLibrary)
+  }
+
+  const documentation = buildItem('Documentation')
+  if (documentation) {
+    items.push(documentation)
+  }
+
+  const settings = buildItem('Settings')
+  if (settings) {
+    items.push(settings)
+  }
+
+  return items
 })
+
+const findPathInTree = (items: MenuItem[], targetName: string | undefined, stack: MenuItem[] = []): MenuItem[] | null => {
+  if (!targetName) {
+    return null
+  }
+
+  for (const item of items) {
+    const currentPath = [...stack, item]
+
+    if (item.name === targetName) {
+      return currentPath
+    }
+
+    if (item.children && item.children.length) {
+      const childPath = findPathInTree(item.children, targetName, currentPath)
+      if (childPath) {
+        return childPath
+      }
+    }
+  }
+
+  return null
+}
+
+const isItemActive = (item: MenuItem): boolean => {
+  if (item.name && item.name === route.name) {
+    return true
+  }
+
+  return !!item.children?.some(child => isItemActive(child))
+}
+
+watch(
+  () => route.name,
+  (currentName) => {
+    const path = findPathInTree(menuTree.value, currentName)
+
+    if (!path) {
+      openedGroups.value = []
+      return
+    }
+
+    openedGroups.value = path
+    .filter((item): item is MenuItem & { name: string } => !!item.children?.length && !!item.name)
+    .map(item => item.name)
+  },
+  { immediate: true }
+)
 
 // Connection status text
 const connectionStatus = computed(() => {
@@ -257,7 +514,10 @@ const refreshData = async () => {
     // Последовательная загрузка с небольшими задержками для избежания throttling
     await nodesStore.fetchNodes()
     await new Promise(resolve => setTimeout(resolve, 100)) // 100ms задержка
-    
+
+    await setupStore.fetchNewNodes()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     await eventsStore.fetchEvents({ status: 'active' })
     await new Promise(resolve => setTimeout(resolve, 100)) // 100ms задержка
     
@@ -277,7 +537,7 @@ const refreshData = async () => {
 
 onMounted(async () => {
   // Setup global error handlers
-  const app = window.appInstance
+  const app = (window as any).appInstance
   if (app) {
     // Global error handler
     app.config.errorHandler = (err, instance, info) => {
@@ -317,13 +577,13 @@ onMounted(async () => {
   setupWebSocketListeners()
   
   // Catch unhandled promise rejections
-  window.addEventListener('unhandledrejection', (event) => {
+  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     console.error('🔴 UNHANDLED PROMISE REJECTION:', event.reason)
     popup.toast.error(`Необработанная ошибка: ${event.reason?.message || 'Неизвестная ошибка'}`)
   })
   
   // Catch uncaught errors
-  window.addEventListener('error', (event) => {
+  window.addEventListener('error', (event: ErrorEvent) => {
     console.error('🔴 UNCAUGHT ERROR:', event.error)
     popup.toast.error(`Системная ошибка: ${event.error?.message || 'Неизвестная ошибка'}`)
   })
@@ -333,13 +593,17 @@ onUnmounted(() => {
   // Cleanup WebSocket listeners
   if (echo) {
     echo.leave('hydro-system')
+    echo.leave('hydro-setup')
   }
+
+  setupStore.setRealtimeConnection(false)
 })
 
 // Setup WebSocket listeners for real-time updates
 function setupWebSocketListeners() {
   if (!echo) {
     console.warn('Echo not available, falling back to polling')
+    setupStore.setRealtimeConnection(false)
     // Подписываемся на fallback события
     setupFallbackListeners()
     return
@@ -347,6 +611,9 @@ function setupWebSocketListeners() {
 
   // Subscribe to hydro-system channel
   const channel = echo.channel('hydro-system')
+  const setupChannel = echo.channel('hydro-setup')
+
+  setupStore.setRealtimeConnection(true)
 
   // Listen for telemetry updates
   channel.listen('.telemetry.received', (data) => {
@@ -400,6 +667,28 @@ function setupWebSocketListeners() {
     if (discoveryIndicator.value) {
       discoveryIndicator.value.showDiscovery(data)
     }
+  })
+
+  // Listen for setup channel events
+  setupChannel.listen('.new-node.discovered', async (data) => {
+    console.log('🆕 Setup discovery event:', data)
+    await setupStore.handleDiscovered(data)
+    popup.toast.add({
+      level: 'info',
+      message: `Обнаружено устройство в режиме настройки (${data?.node_type || data?.mac_address})`,
+      data,
+    })
+  })
+
+  setupChannel.listen('.new-node.updated', (data) => {
+    console.log('🔁 Setup node updated:', data)
+    setupStore.handleUpdated(data)
+  })
+
+  setupChannel.listen('.new-node.configured', (data) => {
+    console.log('✅ Setup node configured:', data)
+    setupStore.handleConfigured(data)
+    popup.toast.success(`Узел ${data?.node_id || data?.mac_address} успешно настроен`)
   })
 
   // Listen for new events
@@ -460,8 +749,13 @@ function setupFallbackListeners() {
   console.log('🔧 Setting up fallback listeners for polling mode')
   
   // Listen for fallback polling events
-  window.addEventListener('echo:fallback', (event) => {
-    const { channel, event: eventName, data } = event.detail || {}
+  window.addEventListener('echo:fallback', (event: Event) => {
+    const { detail } = event as CustomEvent<{
+      channel?: string
+      event?: string
+      data?: unknown
+    }>
+    const { channel, event: eventName, data } = detail || {}
     
     if (channel === 'hydro.nodes' && eventName === 'NodeStatusChanged') {
       // data is an array of all nodes from polling
@@ -482,6 +776,10 @@ function setupFallbackListeners() {
       }
     }
   })
+}
+
+const handleMobileSelect = () => {
+  showMobileMenu.value = false
 }
 </script>
 

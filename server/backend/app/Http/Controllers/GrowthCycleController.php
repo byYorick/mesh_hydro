@@ -23,6 +23,10 @@ class GrowthCycleController extends Controller
             $query->where('zone_id', $request->zone_id);
         }
 
+        if ($request->filled('greenhouse_id')) {
+            $query->where('greenhouse_id', $request->integer('greenhouse_id'));
+        }
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -58,6 +62,7 @@ class GrowthCycleController extends Controller
             'preset_id' => 'required|exists:growth_presets,id',
             'plant_count' => 'nullable|integer|min:1',
             'notes' => 'nullable|string',
+            'greenhouse_id' => 'nullable|integer|exists:greenhouses,id',
         ]);
 
         // Проверка доступности зоны
@@ -70,6 +75,12 @@ class GrowthCycleController extends Controller
             ], 409);
         }
 
+        if (!empty($validated['greenhouse_id']) && $zone->greenhouse_id !== (int) $validated['greenhouse_id']) {
+            return response()->json([
+                'message' => 'Выбранная зона не принадлежит указанной теплице',
+            ], 422);
+        }
+
         $preset = GrowthPreset::with('stages', 'culture')->find($validated['preset_id']);
 
         DB::beginTransaction();
@@ -77,6 +88,7 @@ class GrowthCycleController extends Controller
             // Создать цикл
             $cycle = GrowthCycle::create([
                 'zone_id' => $validated['zone_id'],
+                'greenhouse_id' => $zone->greenhouse_id,
                 'preset_id' => $preset->id,
                 'culture_id' => $preset->culture_id,
                 'current_stage_id' => $preset->stages->first()->id,

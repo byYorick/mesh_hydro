@@ -9,6 +9,7 @@ use App\Models\Telemetry;
 use App\Models\Event;
 use App\Models\Command;
 use App\Models\NodeError;
+use App\Models\NewNode;
 use App\Services\NotificationThrottleService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -151,7 +152,7 @@ class MqttService
     {
         try {
             $data = json_decode($payload, true);
-            
+
             if (!$data || !isset($data['node_id'])) {
                 Log::warning("Invalid telemetry data", [
                     'topic' => $topic,
@@ -160,18 +161,19 @@ class MqttService
                 return;
             }
 
-            // Валидация node_type
+            $meshId = $this->resolveZone($topic, $data, 'telemetry', $data['node_id']);
+            if (!$meshId) {
+                return;
+            }
+
             $validTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root'];
             $nodeType = 'unknown';
-            
-            // Проверяем поле 'node_type' (приоритетно) или 'type'
             if (isset($data['node_type']) && in_array($data['node_type'], $validTypes)) {
                 $nodeType = $data['node_type'];
             } elseif (isset($data['type']) && in_array($data['type'], $validTypes)) {
                 $nodeType = $data['type'];
             }
 
-            // Сохранение телеметрии в БД
             $telemetry = Telemetry::create([
                 'node_id' => $data['node_id'],
                 'node_type' => $nodeType,
@@ -179,15 +181,12 @@ class MqttService
                 'received_at' => now(),
             ]);
 
-            // Broadcast real-time event
             event(new \App\Events\TelemetryReceived($telemetry));
 
-            // Обновление узла (или создание если новый)
             $node = Node::where('node_id', $data['node_id'])->first();
             $wasOnline = $node ? $node->online : false;
             $isNewNode = !$node;
-            
-            // Подготовка metadata
+
             $metadata = $node->metadata ?? [];
             if (isset($data['firmware'])) {
                 $metadata['firmware'] = $data['firmware'];
@@ -195,22 +194,31 @@ class MqttService
             if (isset($data['hardware'])) {
                 $metadata['hardware'] = $data['hardware'];
             }
-            // Обновляем MAC адрес (если пришёл в telemetry)
             if (isset($data['mac_address']) || isset($data['mac'])) {
                 $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'];
             }
-            
-            // Создание или обновление узла
+            if ($meshId) {
+                $metadata['mesh_network_id'] = $meshId;
+            }
+
             $updateData = [
                 'last_seen_at' => now(),
             ];
-            
-            // Обновляем поле mac_address в таблице nodes (если пришло)
+
+            if (isset($data['root_node_id']) && $data['root_node_id']) {
+                $updateData['root_node_id'] = $data['root_node_id'];
+            } elseif ($nodeType === 'root') {
+                $updateData['root_node_id'] = $data['node_id'];
+            }
+
+            if ($meshId) {
+                $updateData['zone'] = $meshId;
+            }
+
             if (isset($data['mac_address']) || isset($data['mac'])) {
                 $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
             }
-            
-            // Только для новых узлов или если node_type = 'unknown'
+
             if ($isNewNode) {
                 $updateData['node_type'] = $nodeType;
                 $updateData['metadata'] = array_merge([
@@ -218,37 +226,31 @@ class MqttService
                     'created_at' => now()->toIso8601String(),
                 ], $metadata);
             } else {
-                // Обновляем node_type если был 'unknown' (для исправления уже существующих узлов)
                 if ($node && $node->node_type === 'unknown' && $nodeType !== 'unknown') {
                     $updateData['node_type'] = $nodeType;
                     Log::info("Updating node_type from 'unknown' to '{$nodeType}'", [
                         'node_id' => $node->node_id
                     ]);
                 }
-                
-                // Обновляем только metadata для существующих
                 if (!empty($metadata)) {
                     $updateData['metadata'] = array_merge($node->metadata ?? [], $metadata);
                 }
             }
-            
+
             $node = Node::updateOrCreate(
                 ['node_id' => $data['node_id']],
                 $updateData
             );
-            
-            // Перезагружаем узел чтобы обновить last_seen_at в памяти
+
             $node->refresh();
 
-            // Обновляем online статус на основе isOnline() после обновления last_seen_at
             $wasOnline = $node->online;
             $isOnline = $node->isOnline();
-            
+
             if ($wasOnline !== $isOnline) {
                 $node->update(['online' => $isOnline]);
                 event(new \App\Events\NodeStatusChanged($node, $wasOnline, $isOnline));
-                
-                // Создаём событие в БД при переходе в офлайн
+
                 if ($wasOnline && !$isOnline) {
                     $statusEvent = Event::create([
                         'node_id' => $node->node_id,
@@ -260,19 +262,16 @@ class MqttService
                             'zone' => $node->zone,
                         ],
                     ]);
-                    
-                    // Broadcast событие через WebSocket
+
                     event(new \App\Events\EventCreated($statusEvent));
                 }
             } else {
-                // Даже если статус не изменился, отправляем обновление для UI
                 event(new \App\Events\NodeStatusUpdate($node));
             }
 
-            // Broadcast status change если изменился или новый узел
             if ($isNewNode) {
                 event(new \App\Events\NodeDiscovered($node));
-                
+
                 Log::info("New node auto-registered via MQTT", [
                     'node_id' => $node->node_id,
                     'node_type' => $node->node_type,
@@ -281,9 +280,10 @@ class MqttService
 
             Log::debug("Telemetry saved", [
                 'node_id' => $data['node_id'],
-                'type' => $nodeType
+                'type' => $nodeType,
+                'mesh_network_id' => $meshId,
             ]);
-            
+
         } catch (Exception $e) {
             Log::error("Telemetry handling error", [
                 'topic' => $topic,
@@ -299,12 +299,16 @@ class MqttService
     {
         try {
             $data = json_decode($payload, true);
-            
             if (!$data || !isset($data['node_id'])) {
                 Log::warning("Invalid event data", [
                     'topic' => $topic,
                     'payload' => $payload
                 ]);
+                return;
+            }
+
+            $meshId = $this->resolveZone($topic, $data, 'event', $data['node_id']);
+            if (!$meshId) {
                 return;
             }
 
@@ -314,11 +318,20 @@ class MqttService
             
             // Получаем узел для определения типа и получения метаданных
             $node = Node::where('node_id', $data['node_id'])->first();
+            if ($node) {
+                $meta = $node->metadata ?? [];
+                if (($meta['mesh_network_id'] ?? null) !== $meshId || $node->zone !== $meshId) {
+                    $meta['mesh_network_id'] = $meshId;
+                    $node->update(['metadata' => $meta, 'zone' => $meshId]);
+                    $node->refresh();
+                }
+            }
             $nodeType = $node ? $node->node_type : ($data['node_type'] ?? 'unknown');
             
             // Подготовка данных события с добавлением node_type
             $eventData = $data['data'] ?? [];
             $eventData['node_type'] = $nodeType;
+            $eventData['mesh_network_id'] = $meshId;
             
             // Если это событие насоса, создаем специальное сообщение
             // Проверяем по event_type или по наличию pump_id в данных
@@ -429,12 +442,28 @@ class MqttService
     {
         try {
             $data = json_decode($payload, true);
+            $topicZone = $this->extractZoneFromTopic($topic);
+
+            if (!$data) {
+                return;
+            }
+
+            if (($data['type'] ?? null) === 'heartbeat' && isset($data['mac_address'])) {
+                $handledBySetup = $this->processSetupHeartbeat($data, $topicZone);
+                if ($handledBySetup) {
+                    return;
+                }
+            }
             
-            if (!$data || !isset($data['node_id'])) {
+            if (!isset($data['node_id'])) {
                 return;
             }
 
             $nodeId = $data['node_id'];
+            $meshId = $this->resolveZone($topic, $data, 'heartbeat', $nodeId);
+            if (!$meshId) {
+                return;
+            }
             
             // Проверяем существует ли узел
             $node = Node::where('node_id', $nodeId)->first();
@@ -443,24 +472,27 @@ class MqttService
                 // АВТОПОИСК: Создаём новый узел автоматически
                 $nodeType = $this->detectNodeType($nodeId, $data);
                 
+                $metadata = [
+                    'discovered_at' => now()->toIso8601String(),
+                    'discovered_via' => 'heartbeat',
+                    'firmware' => $data['firmware'] ?? null,
+                    'hardware' => $data['hardware'] ?? null,
+                    'ip_address' => $data['ip'] ?? null,
+                    'heap_free' => $data['heap_free'] ?? null,
+                    'rssi_to_parent' => $data['rssi_to_parent'] ?? null,
+                    'uptime' => $data['uptime'] ?? null,
+                    'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
+                ];
+                $metadata['mesh_network_id'] = $meshId;
+
                 $node = Node::create([
                     'node_id' => $nodeId,
                     'node_type' => $nodeType,
-                    'zone' => 'Auto-discovered',
+                    'zone' => $meshId,
                     'last_seen_at' => now(),
                     'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
-                    'metadata' => [
-                        'discovered_at' => now()->toIso8601String(),
-                        'discovered_via' => 'heartbeat',
-                        'firmware' => $data['firmware'] ?? null,
-                        'hardware' => $data['hardware'] ?? null,
-                        'ip_address' => $data['ip'] ?? null,
-                        'heap_free' => $data['heap_free'] ?? null,
-                        'rssi_to_parent' => $data['rssi_to_parent'] ?? null,
-                        'uptime' => $data['uptime'] ?? null,
-                        // Сохраняем MAC адрес в метаданных
-                        'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
-                    ],
+                    'root_node_id' => $data['root_node_id'] ?? ($nodeType === 'root' ? $nodeId : null),
+                    'metadata' => $metadata,
                 ]);
                 
                 // Перезагружаем узел для корректного isOnline()
@@ -511,11 +543,20 @@ class MqttService
                 if (isset($data['mac_address']) || isset($data['mac'])) {
                     $metadata['mac_address'] = $data['mac_address'] ?? $data['mac'];
                 }
+                $metadata['mesh_network_id'] = $meshId;
                 
                 $updateData = [
                     'last_seen_at' => now(),
                     'metadata' => $metadata,
                 ];
+
+                if (!empty($data['root_node_id'])) {
+                    $updateData['root_node_id'] = $data['root_node_id'];
+                } elseif ($node->node_type === 'root') {
+                    $updateData['root_node_id'] = $node->node_id;
+                }
+
+                $updateData['zone'] = $meshId;
                 
                 // Обновляем также поле mac_address в таблице nodes (если пришло)
                 if (isset($data['mac_address']) || isset($data['mac'])) {
@@ -579,8 +620,39 @@ class MqttService
             ]);
             
             $data = json_decode($payload, true);
+            $isSetupTopic = str_starts_with($topic, 'hydro/setup/');
+            $meshId = null;
+
+            if (!$data) {
+                Log::warning("Invalid discovery data", [
+                    'topic' => $topic,
+                    'payload' => $payload,
+                    'json_error' => json_last_error_msg()
+                ]);
+                return;
+            }
+
+            if (!$isSetupTopic) {
+                $meshId = $this->resolveZone($topic, $data, 'discovery', $data['node_id'] ?? null);
+                if (!$meshId) {
+                    return;
+                }
+            }
+
+            // Обработка сообщений новой системы подключения узлов
+            if (isset($data['type'])) {
+                if ($data['type'] === 'discovery' && isset($data['mac_address'])) {
+                    $this->processSetupDiscovery($data, $meshId);
+                    return;
+                }
+
+                if ($data['type'] === 'config_confirmation') {
+                    $this->processSetupConfigConfirmation($data, $meshId);
+                    return;
+                }
+            }
             
-            if (!$data || !isset($data['node_id'])) {
+            if (!isset($data['node_id'])) {
                 Log::warning("Invalid discovery data", [
                     'topic' => $topic,
                     'payload' => $payload,
@@ -602,6 +674,9 @@ class MqttService
                 // ВСЕГДА обновляем last_seen_at при discovery (независимо от данных)
                 $metadata = $existingNode->metadata ?? [];
                 $metadata['last_discovery'] = now()->toIso8601String();
+                if ($meshId) {
+                    $metadata['mesh_network_id'] = $meshId;
+                }
                 
                 // Обновляем метаданные если пришли новые данные
                 if (isset($data['firmware'])) {
@@ -616,6 +691,9 @@ class MqttService
                 if (isset($data['ip'])) {
                     $metadata['ip_address'] = $data['ip'];
                 }
+                if (isset($data['mqtt_topic_prefix'])) {
+                    $metadata['mqtt_topic_prefix'] = $data['mqtt_topic_prefix'];
+                }
                 
                 $updateData = [
                     'metadata' => $metadata,
@@ -627,6 +705,14 @@ class MqttService
                     $updateData['mac_address'] = $data['mac_address'] ?? $data['mac'];
                 }
                 
+                if (!empty($data['root_node_id'])) {
+                    $updateData['root_node_id'] = $data['root_node_id'];
+                } elseif ($existingNode->node_type === 'root') {
+                    $updateData['root_node_id'] = $existingNode->node_id;
+                }
+
+                $updateData['zone'] = $meshId;
+
                 $existingNode->update($updateData);
                 
                 // Обновляем online статус на основе isOnline()
@@ -662,32 +748,36 @@ class MqttService
             // Используем node_type (тип узла), а не type (тип сообщения)
             $nodeType = $data['node_type'] ?? $this->detectNodeType($nodeId, $data);
             
+            $metadata = [
+                'discovered_at' => now()->toIso8601String(),
+                'discovered_via' => 'discovery_topic',
+                'firmware' => $data['firmware'] ?? null,
+                'hardware' => $data['hardware'] ?? null,
+                'ip_address' => $data['ip'] ?? null,
+                'sensors' => $data['sensors'] ?? [],
+                'capabilities' => $data['capabilities'] ?? [],
+                'heap_free' => $data['heap_free'] ?? null,
+                'heap_min' => $data['heap_min'] ?? null,
+                'heap_total' => $data['heap_total'] ?? null,
+                'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
+                'wifi_rssi' => $data['wifi_rssi'] ?? null,
+                'mesh_nodes' => $data['mesh_nodes'] ?? 0,
+                'flash_total' => $data['flash_total'] ?? null,
+                'flash_used' => $data['flash_used'] ?? null,
+            ];
+            $metadata['mesh_network_id'] = $meshId;
+            if (isset($data['mqtt_topic_prefix'])) {
+                $metadata['mqtt_topic_prefix'] = $data['mqtt_topic_prefix'];
+            }
+
             $node = Node::create([
                 'node_id' => $nodeId,
                 'node_type' => $nodeType,
-                'zone' => $data['zone'] ?? 'Auto-discovered',
+                'zone' => $meshId,
                 'last_seen_at' => now(),
                 'mac_address' => $data['mac_address'] ?? $data['mac'] ?? null,
-                'metadata' => [
-                    'discovered_at' => now()->toIso8601String(),
-                    'discovered_via' => 'discovery_topic',
-                    'firmware' => $data['firmware'] ?? null,
-                    'hardware' => $data['hardware'] ?? null,
-                    'ip_address' => $data['ip'] ?? null,
-                    'sensors' => $data['sensors'] ?? [],
-                    'capabilities' => $data['capabilities'] ?? [],
-                    // Информация о памяти
-                    'heap_free' => $data['heap_free'] ?? null,
-                    'heap_min' => $data['heap_min'] ?? null,
-                    'heap_total' => $data['heap_total'] ?? null,
-                    // Flash память
-                    'flash_total' => $data['flash_total'] ?? null,
-                    'flash_used' => $data['flash_used'] ?? null,
-                    // WiFi сигнал
-                    'wifi_rssi' => $data['wifi_rssi'] ?? null,
-                    // Mesh нод
-                    'mesh_nodes' => $data['mesh_nodes'] ?? 0,
-                ],
+                'root_node_id' => $data['root_node_id'] ?? ($nodeType === 'root' ? $nodeId : null),
+                'metadata' => $metadata,
             ]);
             
             // Перезагружаем узел для корректного isOnline()
@@ -729,6 +819,165 @@ class MqttService
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Обработка setup discovery
+     */
+    private function processSetupDiscovery(array $data, ?string $meshId = null): void
+    {
+        $mac = strtoupper($data['mac_address']);
+        $pin = $data['pin'] ?? $this->generateSetupPin($mac);
+        $tempMeshId = $data['temp_mesh_id'] ?? $this->generateTempMeshId($pin);
+        $isRoot = ($data['node_type'] ?? 'node') === 'root';
+
+        // Если узел уже зарегистрирован в основной таблице - игнорируем setup discovery
+        $nodeId = $data['node_id'] ?? null;
+        if ($nodeId && Node::where('node_id', $nodeId)->exists()) {
+            NewNode::where('mac_address', $mac)->delete();
+            return;
+        }
+
+        if (Node::where('mac_address', $mac)->exists()) {
+            NewNode::where('mac_address', $mac)->delete();
+            return;
+        }
+
+        $newNode = NewNode::firstOrNew(['mac_address' => $mac]);
+        $wasNew = !$newNode->exists;
+
+        $newNode->mac_address = $mac;
+        $newNode->node_type = $data['node_type'] ?? ($isRoot ? 'root' : 'node');
+        $newNode->is_root = $isRoot;
+        $newNode->pin = $pin;
+        $newNode->temp_mesh_id = $tempMeshId;
+        $newNode->status = $wasNew ? 'discovered' : $newNode->status;
+        $newNode->discovered_at = $newNode->discovered_at ?? now();
+        $newNode->last_heartbeat_at = now();
+
+        $metadata = array_filter([
+            'chip_model' => $data['chip_model'] ?? $data['chip'] ?? null,
+            'firmware_version' => $data['firmware_version'] ?? $data['firmware'] ?? null,
+            'ip_address' => $data['ip_address'] ?? $data['ip'] ?? null,
+            'rssi' => $data['rssi'] ?? $data['wifi_rssi'] ?? null,
+            'temp_mesh_id' => $tempMeshId,
+        ]);
+        if ($meshId) {
+            $metadata['mesh_network_id'] = $meshId;
+        }
+
+        $existingMetadata = $newNode->metadata ?? [];
+        $newNode->metadata = array_merge($existingMetadata, $metadata);
+
+        $newNode->save();
+
+        if ($wasNew) {
+            event(new \App\Events\NewNodeDiscovered($newNode));
+        } else {
+            event(new \App\Events\NewNodeUpdated($newNode));
+        }
+    }
+
+    /**
+     * Возвращает true, если heartbeat полностью обработан (setup режим)
+     * Возвращает false, если нужно продолжить обычную обработку (узел уже сконфигурирован)
+     */
+    private function processSetupHeartbeat(array $data, ?string $meshId = null): bool
+    {
+        $mac = strtoupper($data['mac_address']);
+        $newNode = NewNode::firstOrNew(['mac_address' => $mac]);
+
+        // Игнорируем heartbeat, если узел уже зарегистрирован в основной таблице
+        $nodeId = $data['node_id'] ?? null;
+        if ($nodeId && Node::where('node_id', $nodeId)->exists()) {
+            NewNode::where('mac_address', $mac)->delete();
+            return false;
+        }
+
+        if (Node::where('mac_address', $mac)->exists()) {
+            NewNode::where('mac_address', $mac)->delete();
+            return false;
+        }
+
+        if (!$newNode->exists) {
+            // Если heartbeat пришёл впервые без discovery, инициируем базовую запись
+            $newNode->node_type = $data['node_type'] ?? 'node';
+            $newNode->is_root = ($data['node_type'] ?? null) === 'root';
+            $newNode->pin = $this->generateSetupPin($mac);
+            $newNode->temp_mesh_id = $this->generateTempMeshId($newNode->pin);
+            $newNode->discovered_at = now();
+            $newNode->status = 'discovered';
+        }
+
+        $metadata = array_filter([
+            'firmware_version' => $data['firmware_version'] ?? $data['firmware'] ?? null,
+            'chip_model' => $data['chip_model'] ?? null,
+            'rssi' => $data['rssi'] ?? $data['wifi_rssi'] ?? null,
+            'uptime' => $data['uptime'] ?? null,
+        ]);
+        if ($meshId) {
+            $metadata['mesh_network_id'] = $meshId;
+        }
+
+        $existingMetadata = $newNode->metadata ?? [];
+        $newNode->metadata = array_merge($existingMetadata, $metadata);
+        $newNode->last_heartbeat_at = now();
+        $newNode->save();
+
+        event(new \App\Events\NewNodeUpdated($newNode));
+
+        return true;
+    }
+
+    private function processSetupConfigConfirmation(array $data, ?string $meshId = null): void
+    {
+        $mac = strtoupper($data['mac_address'] ?? ($data['mac'] ?? ''));
+        if (!$mac) {
+            return;
+        }
+
+        $newNode = NewNode::where('mac_address', $mac)->first();
+        if (!$newNode) {
+            return;
+        }
+
+        $status = $data['status'] ?? 'success';
+        if ($status !== 'success') {
+            $newNode->update(['status' => 'failed']);
+            event(new \App\Events\NewNodeUpdated($newNode));
+            return;
+        }
+
+        $nodeId = $data['node_id'] ?? null;
+        if (!$nodeId) {
+            return;
+        }
+
+        $attributes = [
+            'zone' => $data['zone'] ?? $meshId,
+            'root_node_id' => $data['root_node_id'] ?? null,
+            'metadata' => array_filter([
+                'mesh_id' => $data['mesh_id'] ?? $meshId,
+                'mqtt_topic_prefix' => $data['mqtt_topic_prefix'] ?? null,
+                'configured_at' => now()->toIso8601String(),
+            ]),
+            'config' => isset($data['config']) && is_array($data['config']) ? $data['config'] : null,
+        ];
+
+        $node = $newNode->confirmConfiguration($nodeId, $attributes);
+        event(new \App\Events\NewNodeConfigured($nodeId, $mac));
+        event(new \App\Events\NodeDiscovered($node));
+    }
+
+    private function generateSetupPin(string $mac): string
+    {
+        $hex = strtoupper(str_replace(':', '', $mac));
+        return substr(str_pad($hex, 6, '0', STR_PAD_LEFT), -6);
+    }
+
+    private function generateTempMeshId(string $pin): string
+    {
+        return 'HYDRO_' . $pin;
     }
 
     /**
@@ -833,22 +1082,35 @@ class MqttService
      */
     public function sendCommand(string $nodeId, string $command, array $params = [], ?int $commandId = null): void
     {
+        $node = Node::where('node_id', $nodeId)->first();
+        if (!$node) {
+            throw new Exception("Node not found: {$nodeId}");
+        }
+
+        $meshId = $node->zone ?? $node->metadata['mesh_network_id'] ?? null;
+        if (!$this->validateZone($meshId)) {
+            throw new Exception("Node {$nodeId} has invalid zone: {$meshId}");
+        }
+
         $payload = json_encode([
             'type' => 'command',
             'command_id' => $commandId,
             'node_id' => $nodeId,
+            'mesh_network_id' => $meshId,
+            'root_node_id' => $node->root_node_id,
             'command' => $command,
             'params' => $params,
             'timestamp' => time(),
         ]);
 
-        $topic = "hydro/command/{$nodeId}";
+        $topic = "hydro/{$meshId}/command/{$nodeId}";
         $this->publish($topic, $payload, 1);
         
         Log::info("Command sent", [
             'node_id' => $nodeId,
             'command' => $command,
-            'command_id' => $commandId
+            'command_id' => $commandId,
+            'zone' => $meshId,
         ]);
     }
 
@@ -857,17 +1119,32 @@ class MqttService
      */
     public function sendConfig(string $nodeId, array $config): void
     {
+        $node = Node::where('node_id', $nodeId)->first();
+        if (!$node) {
+            throw new Exception("Node not found: {$nodeId}");
+        }
+
+        $meshId = $node->zone ?? $node->metadata['mesh_network_id'] ?? null;
+        if (!$this->validateZone($meshId)) {
+            throw new Exception("Node {$nodeId} has invalid zone: {$meshId}");
+        }
+
         $payload = json_encode([
             'type' => 'config',
             'node_id' => $nodeId,
+            'mesh_network_id' => $meshId,
+            'root_node_id' => $node->root_node_id,
             'config' => $config,
             'timestamp' => time(),
         ]);
 
-        $topic = "hydro/config/{$nodeId}";
+        $topic = "hydro/{$meshId}/config/{$nodeId}";
         $this->publish($topic, $payload, 1);
         
-        Log::info("Config sent", ['node_id' => $nodeId]);
+        Log::info("Config sent", [
+            'node_id' => $nodeId,
+            'zone' => $meshId,
+        ]);
     }
 
     /**
@@ -937,6 +1214,11 @@ class MqttService
                     'topic' => $topic,
                     'payload' => $payload
                 ]);
+                return;
+            }
+
+            $meshId = $this->resolveZone($topic, $data, 'error', $data['node_id']);
+            if (!$meshId) {
                 return;
             }
 
@@ -1087,6 +1369,10 @@ class MqttService
 
             $nodeId = $data['node_id'];
             $config = $data['config'];
+            $meshId = $this->resolveZone($topic, $data, 'config_response', $nodeId);
+            if (!$meshId) {
+                return;
+            }
             
             // Проверка что config - это массив
             if (!is_array($config)) {
@@ -1132,9 +1418,13 @@ class MqttService
             // Обновление узла в БД
             $node = Node::where('node_id', $nodeId)->first();
             if ($node) {
+                $metadata = $node->metadata ?? [];
+                $metadata['mesh_network_id'] = $meshId;
                 $node->update([
                     'config' => $config,
-                    'last_seen_at' => now()
+                    'last_seen_at' => now(),
+                    'zone' => $meshId,
+                    'metadata' => $metadata,
                 ]);
                 
                 Log::info("📋 Node config updated in DB", ['node_id' => $nodeId]);
@@ -1321,6 +1611,87 @@ class MqttService
         
         // Для неизвестных типов узлов - возвращаем только номер
         return "#{$pumpId}";
+    }
+
+    /**
+     * Пытается определить mesh/zone из топика/пейлоада и валидирует её.
+     * Возвращает null если зону определить нельзя (сообщение нужно отклонить).
+     */
+    private function resolveZone(string $topic, array $data, string $context, ?string $nodeId = null): ?string
+    {
+        $zoneFromTopic = $this->extractZoneFromTopic($topic);
+
+        if ($zoneFromTopic && $this->validateZone($zoneFromTopic)) {
+            return $zoneFromTopic;
+        }
+
+        $payloadZone = $data['mesh_network_id']
+            ?? $data['mesh_id']
+            ?? $data['zone']
+            ?? null;
+
+        if ($payloadZone && $this->validateZone($payloadZone)) {
+            return $payloadZone;
+        }
+
+        Log::error("MQTT {$context} message rejected: missing valid zone", [
+            'topic' => $topic,
+            'node_id' => $nodeId,
+            'payload_zone' => $payloadZone ?? 'missing',
+        ]);
+
+        if ($context === 'heartbeat' && $nodeId) {
+            Event::create([
+                'node_id' => $nodeId,
+                'level' => Event::LEVEL_CRITICAL,
+                'message' => "Node sent {$context} without valid zone - REJECTED",
+                'data' => [
+                    'topic' => $topic,
+                    'payload_zone' => $payloadZone ?? 'missing',
+                ],
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Проверяет, что строка зоны соответствует требованиям.
+     */
+    private function validateZone(?string $zone): bool
+    {
+        if (!$zone) {
+            return false;
+        }
+
+        if (strtolower($zone) === 'setup' || strtoupper($zone) === 'UNCONFIGURED') {
+            return false;
+        }
+
+        $length = strlen($zone);
+        if ($length < 3 || $length > 31) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[a-zA-Z0-9_-]+$/', $zone);
+    }
+
+    /**
+     * Извлечение mesh/zone из MQTT-топика формата hydro/{mesh_id}/...
+     */
+    private function extractZoneFromTopic(string $topic): ?string
+    {
+        $parts = explode('/', $topic);
+        if (count($parts) >= 3 && $parts[0] === 'hydro') {
+            $zone = $parts[1];
+            if ($zone === 'setup') {
+                return null;
+            }
+
+            return $this->validateZone($zone) ? $zone : null;
+        }
+
+        return null;
     }
 }
 

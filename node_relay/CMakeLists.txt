@@ -4,6 +4,7 @@ set(EXTRA_COMPONENT_DIRS
     "${CMAKE_SOURCE_DIR}/../common/mesh_manager"
     "${CMAKE_SOURCE_DIR}/../common/mesh_protocol"
     "${CMAKE_SOURCE_DIR}/../common/actuator_base"
+    "${CMAKE_SOURCE_DIR}/../common/zone_config"
 )
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)

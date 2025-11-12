@@ -115,6 +115,34 @@ const localStorageMock = {
 }
 global.localStorage = localStorageMock
 
+// Polyfill DOMRect для Vuetify анимаций на happy-dom
+if (typeof window !== 'undefined' && !window.DOMRect) {
+  class DOMRectImpl {
+    constructor (x = 0, y = 0, width = 0, height = 0) {
+      this.x = x
+      this.y = y
+      this.width = width
+      this.height = height
+      this.top = y
+      this.left = x
+      this.right = x + width
+      this.bottom = y + height
+    }
+
+    static fromRect (rect = {}) {
+      return new DOMRectImpl(
+        rect.x ?? 0,
+        rect.y ?? 0,
+        rect.width ?? 0,
+        rect.height ?? 0
+      )
+    }
+  }
+
+  window.DOMRect = DOMRectImpl
+  global.DOMRect = DOMRectImpl
+}
+
 // Mock для CSS импортов через Vite
 // CSS файлы будут обработаны через Vite плагины
 

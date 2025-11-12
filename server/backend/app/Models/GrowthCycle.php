@@ -18,6 +18,7 @@ class GrowthCycle extends Model
 
     protected $fillable = [
         'zone_id',
+        'greenhouse_id',
         'preset_id',
         'culture_id',
         'current_stage_id',
@@ -42,7 +43,13 @@ class GrowthCycle extends Model
         'plant_count' => 'integer',
         'harvest_weight_kg' => 'decimal:3',
         'rating' => 'integer',
+        'greenhouse_id' => 'integer',
     ];
+
+    public function greenhouse(): BelongsTo
+    {
+        return $this->belongsTo(Greenhouse::class);
+    }
 
     /**
      * ⭐ ЗОНИРОВАНИЕ: Зона, в которой растёт цикл

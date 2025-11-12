@@ -25,9 +25,11 @@ declare module 'vue' {
     EventLog: typeof import('./src/components/EventLog.vue')['default']
     GlassCard: typeof import('./src/components/ui/GlassCard.vue')['default']
     GradientCard: typeof import('./src/components/ui/GradientCard.vue')['default']
+    GreenhouseWizard: typeof import('./src/components/greenhouse/GreenhouseWizard.vue')['default']
     GrowthPresetCard: typeof import('./src/components/growth/GrowthPresetCard.vue')['default']
     HelpTooltip: typeof import('./src/components/HelpTooltip.vue')['default']
     ManualPumpControl: typeof import('./src/components/node-config/ManualPumpControl.vue')['default']
+    NewNodeCard: typeof import('./src/components/setup/NewNodeCard.vue')['default']
     NodeCard: typeof import('./src/components/NodeCard.vue')['default']
     NodeDiscoveryIndicator: typeof import('./src/components/NodeDiscoveryIndicator.vue')['default']
     NodeHealthIndicator: typeof import('./src/components/NodeHealthIndicator.vue')['default']
@@ -46,6 +48,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScheduleManager: typeof import('./src/components/ScheduleManager.vue')['default']
+    SetupWizardDialog: typeof import('./src/components/setup/SetupWizardDialog.vue')['default']
     Sparkline: typeof import('./src/components/ui/Sparkline.vue')['default']
     StageTimeline: typeof import('./src/components/growth/StageTimeline.vue')['default']
     StatCard: typeof import('./src/components/ui/StatCard.vue')['default']
@@ -55,6 +58,6 @@ declare module 'vue' {
     UniversalPopup: typeof import('./src/components/ui/UniversalPopup.vue')['default']
     ZoneCard: typeof import('./src/components/zones/ZoneCard.vue')['default']
     ZoneDashboard: typeof import('./src/components/zones/ZoneDashboard.vue')['default']
-    ZoneSelector: typeof import('./src/components/growth/ZoneSelector.vue')['default']
+    ZoneSelector: typeof import('./src/components/ZoneSelector.vue')['default']
   }
 }

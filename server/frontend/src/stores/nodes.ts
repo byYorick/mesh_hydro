@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/services/api'
+import zonesApi from '@/services/zones-api'
 import { nodeStatusManager } from '@/services/NodeStatusManager'
 import type { Node } from '@/types/nodeStatus'
 
@@ -15,6 +16,13 @@ export const useNodesStore = defineStore('nodes', {
     // Get nodes by type
     nodesByType: (state) => (type: string) => {
       return state.nodes.filter(node => node.node_type === type)
+    },
+
+    nodesByGreenhouse: (state) => (greenhouseId: number | null) => {
+      if (greenhouseId == null) {
+        return state.nodes.filter(node => node.greenhouse_id == null)
+      }
+      return state.nodes.filter(node => node.greenhouse_id === greenhouseId)
     },
 
     // Get online nodes
@@ -58,12 +66,19 @@ export const useNodesStore = defineStore('nodes', {
   },
 
   actions: {
-    async fetchNodes(params = {}) {
+    async fetchNodes(params: Record<string, any> = {}) {
       this.loading = true
       this.error = null
       
       try {
-        this.nodes = await api.getNodes(params)
+        const { zone, ...rest } = params
+
+        if (zone) {
+          const { nodes } = await zonesApi.getZoneNodes(zone)
+          this.nodes = nodes.map((node: any) => normalizeZoneNode(node, zone))
+        } else {
+          this.nodes = await api.getNodes(rest)
+        }
         
         // Обновить статусы через менеджер
         this.nodes.forEach(node => {
@@ -216,8 +231,41 @@ export const useNodesStore = defineStore('nodes', {
         console.warn(`Node ${nodeId} not found for status update`)
       }
     },
+
+    setNodeGreenhouse(nodeId: string, greenhouseId: number | null, greenhouseName?: string | null) {
+      const node = this.nodes.find(n => n.node_id === nodeId)
+      if (node) {
+        node.greenhouse_id = greenhouseId ?? null
+        node.greenhouse_name = greenhouseName ?? null
+      }
+      if (this.selectedNode?.node_id === nodeId) {
+        this.selectedNode = {
+          ...this.selectedNode,
+          greenhouse_id: greenhouseId ?? null,
+          greenhouse_name: greenhouseName ?? null,
+        }
+      }
+    },
   },
 })
+
+function normalizeZoneNode(rawNode: any, fallbackZone: string | null): Node {
+  const lastTelemetry = rawNode.last_telemetry ?? rawNode.lastTelemetry ?? null
+  const metadata = rawNode.metadata ?? {}
+  const zone = rawNode.zone ?? fallbackZone ?? null
+
+  return {
+    ...rawNode,
+    zone,
+    online: Boolean(rawNode.online),
+    last_seen_at: rawNode.last_seen_at ?? null,
+    metadata,
+    last_telemetry: lastTelemetry,
+    last_data: rawNode.last_data ?? lastTelemetry?.data ?? {},
+    greenhouse_id: rawNode.greenhouse_id ?? metadata?.greenhouse_id ?? null,
+    greenhouse_name: rawNode.greenhouse_name ?? metadata?.greenhouse_name ?? null,
+  }
+}
 
 
 

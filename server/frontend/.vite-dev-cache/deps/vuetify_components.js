@@ -1,94 +1,10 @@
 import {
-  VTimeline,
-  VTimelineItem
-} from "./chunk-RJ74NEWF.js";
-import {
-  VSwitch
-} from "./chunk-SAAZXNVT.js";
-import {
-  VStepper,
-  VStepperActions,
-  VStepperHeader,
-  VStepperItem,
-  VStepperWindow,
-  VStepperWindowItem
-} from "./chunk-C7KCHVME.js";
-import "./chunk-4MMPKXON.js";
-import {
-  VTextarea
-} from "./chunk-RDESAGK2.js";
-import {
-  VSnackbar,
-  makeVSnackbarProps
-} from "./chunk-3U2BY2SG.js";
-import {
-  VRating
-} from "./chunk-U3KCYXCA.js";
-import "./chunk-VOIT7EPS.js";
-import "./chunk-OM3TP4DG.js";
-import {
-  VSheet,
-  makeVSheetProps
-} from "./chunk-5KG5FYFJ.js";
-import "./chunk-F6LZGKE2.js";
-import {
-  VExpansionPanel,
-  VExpansionPanelText,
-  VExpansionPanelTitle,
-  VExpansionPanels
-} from "./chunk-OSY6NP5R.js";
-import {
-  VForm
-} from "./chunk-IXUEJNUJ.js";
-import {
-  VCol,
-  VContainer,
-  VRow,
-  VSpacer
-} from "./chunk-56ZEH4AQ.js";
-import {
-  VMain
-} from "./chunk-M7CM5SCD.js";
-import {
-  VNavigationDrawer
-} from "./chunk-FTFPUU3J.js";
-import {
-  VToolbarItems
-} from "./chunk-DBDXJHBL.js";
-import {
-  VAlert,
-  VAlertTitle
-} from "./chunk-Z2B6MT4S.js";
-import {
-  VBadge
-} from "./chunk-B4OD3EQF.js";
-import {
-  VBottomNavigation
-} from "./chunk-TPZIKNMQ.js";
-import {
-  VCard,
-  VCardActions,
-  VCardItem,
-  VCardSubtitle,
-  VCardText,
-  VCardTitle
-} from "./chunk-JEN7EXYR.js";
-import {
-  VDialog,
-  makeVDialogProps
-} from "./chunk-D4UPUE7O.js";
-import {
-  VApp
-} from "./chunk-OG7NPJAR.js";
-import {
-  VAppBar,
-  VAppBarNavIcon,
-  VAppBarTitle
-} from "./chunk-S6AW6K6W.js";
-import {
-  VToolbar,
-  VToolbarTitle
-} from "./chunk-NHM4EHUA.js";
+  VTab,
+  VTabs,
+  VTabsWindow,
+  VTabsWindowItem
+} from "./chunk-RSV3PSEQ.js";
+import "./chunk-CZQTS6NA.js";
 import {
   VDataTable,
   VDataTableFooter,
@@ -100,48 +16,221 @@ import {
   VPagination,
   createPagination,
   createSort,
-  highlightResult,
   makeDataTableExpandProps,
   makeDataTableGroupProps,
   makeDataTablePaginateProps,
   makeDataTableSelectProps,
   makeDataTableSortProps,
-  makeFilterProps,
   provideExpanded,
   provideGroupBy,
   providePagination,
   provideSelection,
   provideSort,
-  useFilter,
   useGroupedItems,
   useOptions,
   usePaginatedItems,
   useSortedItems
-} from "./chunk-FBYU6KZ5.js";
+} from "./chunk-HWTZI3Q3.js";
+import {
+  VTimeline,
+  VTimelineItem
+} from "./chunk-VPQX6EZM.js";
+import "./chunk-F6LZGKE2.js";
+import {
+  VExpansionPanel,
+  VExpansionPanelText,
+  VExpansionPanelTitle,
+  VExpansionPanels
+} from "./chunk-DZG7I4UQ.js";
+import {
+  VRating
+} from "./chunk-ZMRLMBM2.js";
+import {
+  VTable
+} from "./chunk-ZXHJRP63.js";
+import {
+  VRadio
+} from "./chunk-CIUFIWKM.js";
+import {
+  VRadioGroup
+} from "./chunk-RC6KTZXD.js";
+import {
+  VSlider,
+  VSliderThumb,
+  VSliderTrack,
+  getOffset,
+  makeSliderProps,
+  useSlider,
+  useSteps
+} from "./chunk-R2DD6QU2.js";
+import {
+  VSwitch
+} from "./chunk-PQLK3GDQ.js";
+import {
+  VCombobox
+} from "./chunk-5ERMEZ7P.js";
+import {
+  VForm
+} from "./chunk-IXUEJNUJ.js";
+import "./chunk-OM3TP4DG.js";
+import {
+  VStepper,
+  VStepperActions,
+  VStepperHeader,
+  VStepperItem,
+  VStepperWindow,
+  VStepperWindowItem
+} from "./chunk-4XHVSXTU.js";
+import {
+  VWindow,
+  VWindowItem,
+  makeVWindowItemProps,
+  makeVWindowProps
+} from "./chunk-JOP4ETM4.js";
+import {
+  VSheet,
+  makeVSheetProps
+} from "./chunk-BJSWHGXW.js";
+import "./chunk-4MMPKXON.js";
+import {
+  VTextarea
+} from "./chunk-2GVDCPYR.js";
+import {
+  VSnackbar,
+  makeVSnackbarProps
+} from "./chunk-UH3SR2ZB.js";
+import {
+  VNavigationDrawer
+} from "./chunk-3XELG2BK.js";
+import {
+  VToolbarItems
+} from "./chunk-DBDXJHBL.js";
+import "./chunk-QV3QXWPM.js";
+import {
+  VAlert,
+  VAlertTitle
+} from "./chunk-7DQE3T2O.js";
+import "./chunk-VOIT7EPS.js";
+import {
+  VCard,
+  VCardActions,
+  VCardItem,
+  VCardSubtitle,
+  VCardText,
+  VCardTitle
+} from "./chunk-O3ORGBIT.js";
+import {
+  VDialog,
+  makeVDialogProps
+} from "./chunk-AHISJLYD.js";
+import {
+  VCol,
+  VContainer,
+  VRow,
+  VSpacer
+} from "./chunk-QRVK3UAI.js";
+import {
+  VMain
+} from "./chunk-JUUQ3AK6.js";
+import {
+  VApp
+} from "./chunk-OG7NPJAR.js";
+import {
+  VAppBar,
+  VAppBarNavIcon,
+  VAppBarTitle
+} from "./chunk-7TAOLNLB.js";
+import {
+  VToolbar,
+  VToolbarTitle
+} from "./chunk-XIBNBBKP.js";
+import {
+  VBadge
+} from "./chunk-PVGCF2IP.js";
+import {
+  VBottomNavigation
+} from "./chunk-ZZURAN2X.js";
+import "./chunk-MVBFAXEB.js";
+import {
+  VBtn,
+  makeVBtnProps
+} from "./chunk-XDRDSLAW.js";
+import {
+  VProgressCircular
+} from "./chunk-JKOC4S22.js";
+import {
+  makePositionProps,
+  usePosition
+} from "./chunk-NI2G2VTV.js";
+import {
+  VBtnGroup,
+  VBtnToggle
+} from "./chunk-SVNJIFIC.js";
+import {
+  VTooltip
+} from "./chunk-DPRFAH3K.js";
+import "./chunk-F3JGRVVN.js";
+import {
+  VSkeletonLoader
+} from "./chunk-76UULERT.js";
+import {
+  VAutocomplete
+} from "./chunk-XAVCWGA5.js";
+import {
+  makeFilterProps,
+  useFilter
+} from "./chunk-4ESU3YXO.js";
 import {
   VSelect,
-  VVirtualScroll,
-  makeSelectProps,
-  useMenuActivator,
-  useScrolling
-} from "./chunk-5YHMMBYW.js";
+  VVirtualScroll
+} from "./chunk-2MNCLAAD.js";
+import {
+  VCheckbox,
+  VCheckboxBtn
+} from "./chunk-ORCEITC6.js";
+import {
+  VSelectionControl,
+  VSelectionControlGroup
+} from "./chunk-NWW3IG4H.js";
 import {
   VTextField,
   makeVTextFieldProps
-} from "./chunk-RPAM7PSX.js";
+} from "./chunk-FVQVERU2.js";
 import {
   VCounter,
   VField,
   VFieldLabel,
   makeVFieldProps
-} from "./chunk-AN62RFVQ.js";
+} from "./chunk-DNY5ANWG.js";
 import {
-  VTable
-} from "./chunk-ZXHJRP63.js";
+  VInput,
+  VMessages,
+  makeFocusProps,
+  makeVInputProps,
+  makeValidationProps,
+  useFocus,
+  useValidation
+} from "./chunk-2ZUUQFWX.js";
+import {
+  VLabel
+} from "./chunk-T3H6SUKO.js";
+import {
+  useForm
+} from "./chunk-VIQOD4K4.js";
 import {
   VMenu,
   makeVMenuProps
-} from "./chunk-SJX2O6K2.js";
+} from "./chunk-WIGQLWUU.js";
+import {
+  VChip
+} from "./chunk-GIEBGRVU.js";
+import {
+  VChipGroup
+} from "./chunk-XQ3DB6ZS.js";
+import {
+  VSlideGroup,
+  VSlideGroupSymbol
+} from "./chunk-TYBF6HSO.js";
 import {
   VList,
   VListGroup,
@@ -155,20 +244,12 @@ import {
   makeVListGroupProps,
   makeVListItemProps,
   makeVListProps,
-  transformItem,
-  useItems,
   useListItems
-} from "./chunk-NKUFAYDR.js";
-import {
-  VChip
-} from "./chunk-P53DKHJO.js";
-import {
-  VChipGroup
-} from "./chunk-6NRX3GFF.js";
+} from "./chunk-MKPHXYMM.js";
 import "./chunk-7PGPWWXG.js";
 import {
   VAvatar
-} from "./chunk-M2VV5JXQ.js";
+} from "./chunk-S4W5YL43.js";
 import {
   VDivider
 } from "./chunk-CG57HRTQ.js";
@@ -176,143 +257,7 @@ import {
   VImg,
   VResponsive,
   makeVImgProps
-} from "./chunk-FG2WRM5T.js";
-import {
-  intersect_default
-} from "./chunk-5BZ3L7GI.js";
-import {
-  createDateRange,
-  useDate
-} from "./chunk-QSG7TW2B.js";
-import {
-  createLayout,
-  makeLayoutItemProps,
-  makeLayoutProps,
-  useLayoutItem
-} from "./chunk-UZFXVJER.js";
-import {
-  VCheckbox,
-  VCheckboxBtn
-} from "./chunk-VOV5EW3S.js";
-import {
-  VSelectionControl,
-  VSelectionControlGroup,
-  makeSelectionControlGroupProps,
-  makeVSelectionControlProps
-} from "./chunk-S3WVNKS4.js";
-import {
-  VInput,
-  VLabel,
-  VMessages,
-  makeFocusProps,
-  makeVInputProps,
-  makeValidationProps,
-  useFocus,
-  useValidation
-} from "./chunk-SL44GVRM.js";
-import {
-  useForm
-} from "./chunk-VIQOD4K4.js";
-import {
-  VTab,
-  VTabs,
-  VTabsWindow,
-  VTabsWindowItem
-} from "./chunk-RAKNBNTC.js";
-import {
-  VSlideGroup,
-  VSlideGroupSymbol
-} from "./chunk-PN2YWUZR.js";
-import "./chunk-3OOUJ4PC.js";
-import "./chunk-CZQTS6NA.js";
-import {
-  VWindow,
-  VWindowItem,
-  makeVWindowItemProps,
-  makeVWindowProps
-} from "./chunk-7NXNHQFM.js";
-import "./chunk-F3JGRVVN.js";
-import "./chunk-MVBFAXEB.js";
-import {
-  VBtn,
-  makeVBtnProps
-} from "./chunk-K7HKJTMU.js";
-import {
-  VProgressCircular
-} from "./chunk-BQCJYC4R.js";
-import {
-  useSsrBoot
-} from "./chunk-4R7HKKEK.js";
-import {
-  VBtnGroup,
-  VBtnToggle
-} from "./chunk-Y2LE6IQS.js";
-import {
-  makeGroupItemProps,
-  makeGroupProps,
-  useGroup,
-  useGroupItem
-} from "./chunk-Y35KG7NE.js";
-import {
-  LoaderSlot
-} from "./chunk-KJPETGFM.js";
-import {
-  VProgressLinear
-} from "./chunk-LVE7YGBS.js";
-import {
-  useIntersectionObserver
-} from "./chunk-UUXT5HMG.js";
-import {
-  makePositionProps,
-  usePosition
-} from "./chunk-NI2G2VTV.js";
-import {
-  makeLocationProps,
-  useLocation
-} from "./chunk-HCC5PZ53.js";
-import "./chunk-AI2K6XWQ.js";
-import {
-  makeBorderProps,
-  useBorder
-} from "./chunk-VCJMQSPR.js";
-import {
-  makeElevationProps,
-  useElevation
-} from "./chunk-DA2W7YPQ.js";
-import {
-  makeRoundedProps,
-  useRounded
-} from "./chunk-2NAJM3NP.js";
-import "./chunk-GSWLJLRT.js";
-import {
-  VDefaultsProvider
-} from "./chunk-7L4ZWQEP.js";
-import {
-  useResizeObserver
-} from "./chunk-SSWKVBM6.js";
-import {
-  VIcon
-} from "./chunk-D6BRSW2B.js";
-import {
-  makeSizeProps
-} from "./chunk-2UL4C4D2.js";
-import {
-  makeDensityProps,
-  useDensity
-} from "./chunk-BBMT6OHG.js";
-import {
-  makeTagProps
-} from "./chunk-FSWG3OMG.js";
-import {
-  ripple_default
-} from "./chunk-OKFONRWX.js";
-import {
-  IconValue,
-  VClassIcon,
-  VComponentIcon,
-  VLigatureIcon,
-  VSvgIcon
-} from "./chunk-JBMQ7ZRV.js";
+} from "./chunk-6ZUCJVNL.js";
 import {
   VDialogBottomTransition,
   VDialogTopTransition,
@@ -332,33 +277,82 @@ import {
   VSlideYTransition
 } from "./chunk-EJQAVRI3.js";
 import {
-  VTooltip
-} from "./chunk-4S4EU77M.js";
+  useSsrBoot
+} from "./chunk-4R7HKKEK.js";
+import {
+  LoaderSlot
+} from "./chunk-KVAXHZ2M.js";
+import {
+  VProgressLinear
+} from "./chunk-YLNLIV24.js";
+import {
+  useIntersectionObserver
+} from "./chunk-UUXT5HMG.js";
+import "./chunk-GSWLJLRT.js";
+import {
+  VDefaultsProvider
+} from "./chunk-7L4ZWQEP.js";
+import {
+  makeLocationProps,
+  useLocation
+} from "./chunk-HCC5PZ53.js";
+import {
+  VIcon
+} from "./chunk-KGUXEXV6.js";
+import {
+  makeSizeProps
+} from "./chunk-2UL4C4D2.js";
+import {
+  makeGroupItemProps,
+  makeGroupProps,
+  useGroup,
+  useGroupItem
+} from "./chunk-Y35KG7NE.js";
+import {
+  makeDensityProps,
+  useDensity
+} from "./chunk-BBMT6OHG.js";
+import {
+  makeBorderProps,
+  useBorder
+} from "./chunk-VCJMQSPR.js";
+import "./chunk-AI2K6XWQ.js";
+import {
+  makeRoundedProps,
+  useRounded
+} from "./chunk-2NAJM3NP.js";
+import {
+  makeTagProps
+} from "./chunk-FSWG3OMG.js";
+import {
+  forwardRefs
+} from "./chunk-QJKQQOXD.js";
 import {
   VOverlay,
   useHydration
-} from "./chunk-CCH6SIPQ.js";
+} from "./chunk-5VLVK5Q7.js";
+import "./chunk-PW3B2IAK.js";
 import {
   makeDelayProps,
   useDelay
 } from "./chunk-4TCNJUSY.js";
 import "./chunk-HHYKZRRR.js";
 import {
-  makeDisplayProps,
-  useDisplay
-} from "./chunk-YNJSP2GN.js";
+  intersect_default
+} from "./chunk-5BZ3L7GI.js";
 import {
-  forwardRefs
-} from "./chunk-QJKQQOXD.js";
-import "./chunk-PW3B2IAK.js";
+  MaybeTransition,
+  makeTransitionProps
+} from "./chunk-EL5URPNZ.js";
+import "./chunk-OKFONRWX.js";
 import {
   makeRouterProps,
   useLink
 } from "./chunk-EY3FJRW6.js";
 import {
-  MaybeTransition,
-  makeTransitionProps
-} from "./chunk-EL5URPNZ.js";
+  makeElevationProps,
+  useElevation
+} from "./chunk-DA2W7YPQ.js";
 import {
   makeDimensionProps,
   useDimension
@@ -367,6 +361,31 @@ import {
   useBackgroundColor,
   useTextColor
 } from "./chunk-XL4SHUX5.js";
+import {
+  createDateRange,
+  useDate
+} from "./chunk-QSG7TW2B.js";
+import {
+  createLayout,
+  makeLayoutItemProps,
+  makeLayoutProps,
+  useLayoutItem
+} from "./chunk-UZFXVJER.js";
+import "./chunk-3OOUJ4PC.js";
+import {
+  IconValue,
+  VClassIcon,
+  VComponentIcon,
+  VLigatureIcon,
+  VSvgIcon
+} from "./chunk-JBMQ7ZRV.js";
+import {
+  useResizeObserver
+} from "./chunk-SSWKVBM6.js";
+import {
+  makeDisplayProps,
+  useDisplay
+} from "./chunk-YNJSP2GN.js";
 import {
   provideLocale,
   useLocale,
@@ -388,13 +407,11 @@ import {
   HSVtoHex,
   HSVtoRGB,
   HexToHSV,
-  IN_BROWSER,
   PREFERS_REDUCED_MOTION,
   RGBtoCSS,
   RGBtoHSV,
   SUPPORTS_EYE_DROPPER,
   callEvent,
-  checkPrintable,
   clamp,
   consoleWarn,
   convertToUnit,
@@ -403,25 +420,19 @@ import {
   debounce,
   deepEqual,
   defineComponent,
-  ensureValidVNode,
   escapeForRegex,
   extractNumber,
   filterInputAttrs,
   focusChild,
   genericComponent,
   getContrast,
-  getDecimals,
   getEventCoordinates,
   getIndentLines,
   getPropertyFromItem,
   getScrollParent,
   has,
   humanReadableFileSize,
-  isComposingIgnoreKey,
-  keyValues,
   makeComponentProps,
-  matchesSelector,
-  noop,
   omit,
   parseColor,
   pick,
@@ -464,506 +475,6 @@ import {
   withDirectives
 } from "./chunk-ZS4T33C3.js";
 import "./chunk-DC5AMYBS.js";
-
-// node_modules/vuetify/lib/components/VAutocomplete/VAutocomplete.js
-import "/app/node_modules/vuetify/lib/components/VAutocomplete/VAutocomplete.css";
-var makeVAutocompleteProps = propsFactory({
-  autoSelectFirst: {
-    type: [Boolean, String]
-  },
-  clearOnSelect: Boolean,
-  search: String,
-  ...makeFilterProps({
-    filterKeys: ["title"]
-  }),
-  ...makeSelectProps(),
-  ...omit(makeVTextFieldProps({
-    modelValue: null,
-    role: "combobox"
-  }), ["validationValue", "dirty", "appendInnerIcon"]),
-  ...makeTransitionProps({
-    transition: false
-  })
-}, "VAutocomplete");
-var VAutocomplete = genericComponent()({
-  name: "VAutocomplete",
-  props: makeVAutocompleteProps(),
-  emits: {
-    "update:focused": (focused) => true,
-    "update:search": (value) => true,
-    "update:modelValue": (value) => true,
-    "update:menu": (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const {
-      t
-    } = useLocale();
-    const vTextFieldRef = ref();
-    const isFocused = shallowRef(false);
-    const isPristine = shallowRef(true);
-    const listHasFocus = shallowRef(false);
-    const vMenuRef = ref();
-    const vVirtualScrollRef = ref();
-    const selectionIndex = shallowRef(-1);
-    const {
-      items,
-      transformIn,
-      transformOut
-    } = useItems(props);
-    const {
-      textColorClasses,
-      textColorStyles
-    } = useTextColor(() => {
-      var _a2;
-      return (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.color;
-    });
-    const search = useProxiedModel(props, "search", "");
-    const model = useProxiedModel(props, "modelValue", [], (v) => transformIn(v === null ? [null] : wrapInArray(v)), (v) => {
-      const transformed = transformOut(v);
-      return props.multiple ? transformed : transformed[0] ?? null;
-    });
-    const counterValue = computed(() => {
-      return typeof props.counterValue === "function" ? props.counterValue(model.value) : typeof props.counterValue === "number" ? props.counterValue : model.value.length;
-    });
-    const form = useForm(props);
-    const {
-      filteredItems,
-      getMatches
-    } = useFilter(props, items, () => isPristine.value ? "" : search.value);
-    const displayItems = computed(() => {
-      if (props.hideSelected) {
-        return filteredItems.value.filter((filteredItem) => !model.value.some((s) => s.value === filteredItem.value));
-      }
-      return filteredItems.value;
-    });
-    const hasChips = computed(() => !!(props.chips || slots.chip));
-    const hasSelectionSlot = computed(() => hasChips.value || !!slots.selection);
-    const selectedValues = computed(() => model.value.map((selection) => selection.props.value));
-    const highlightFirst = computed(() => {
-      var _a2;
-      const selectFirst = props.autoSelectFirst === true || props.autoSelectFirst === "exact" && search.value === ((_a2 = displayItems.value[0]) == null ? void 0 : _a2.title);
-      return selectFirst && displayItems.value.length > 0 && !isPristine.value && !listHasFocus.value;
-    });
-    const menuDisabled = computed(() => props.hideNoData && !displayItems.value.length || form.isReadonly.value || form.isDisabled.value);
-    const _menu = useProxiedModel(props, "menu");
-    const menu = computed({
-      get: () => _menu.value,
-      set: (v) => {
-        var _a2;
-        if (_menu.value && !v && ((_a2 = vMenuRef.value) == null ? void 0 : _a2.ΨopenChildren.size)) return;
-        if (v && menuDisabled.value) return;
-        _menu.value = v;
-      }
-    });
-    const {
-      menuId,
-      ariaExpanded,
-      ariaControls,
-      ariaLabel
-    } = useMenuActivator(props, menu);
-    const listRef = ref();
-    const listEvents = useScrolling(listRef, vTextFieldRef);
-    function onClear(e) {
-      if (props.openOnClear) {
-        menu.value = true;
-      }
-      search.value = "";
-    }
-    function onMousedownControl() {
-      if (menuDisabled.value) return;
-      menu.value = true;
-    }
-    function onMousedownMenuIcon(e) {
-      if (menuDisabled.value) return;
-      if (isFocused.value) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      menu.value = !menu.value;
-    }
-    function onListKeydown(e) {
-      var _a2;
-      if (checkPrintable(e) || e.key === "Backspace") {
-        (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.focus();
-      }
-    }
-    function onKeydown(e) {
-      var _a2, _b, _c, _d, _e;
-      if (form.isReadonly.value) return;
-      const selectionStart = (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.selectionStart;
-      const length = model.value.length;
-      if (["Enter", "ArrowDown", "ArrowUp"].includes(e.key)) {
-        e.preventDefault();
-      }
-      if (["Enter", "ArrowDown"].includes(e.key)) {
-        menu.value = true;
-      }
-      if (["Escape"].includes(e.key)) {
-        menu.value = false;
-      }
-      if (highlightFirst.value && ["Enter", "Tab"].includes(e.key) && !model.value.some((_ref2) => {
-        let {
-          value
-        } = _ref2;
-        return value === displayItems.value[0].value;
-      })) {
-        select(displayItems.value[0]);
-      }
-      if (e.key === "ArrowDown" && highlightFirst.value) {
-        (_b = listRef.value) == null ? void 0 : _b.focus("next");
-      }
-      if (["Backspace", "Delete"].includes(e.key)) {
-        if (!props.multiple && hasSelectionSlot.value && model.value.length > 0 && !search.value) return select(model.value[0], false);
-        if (~selectionIndex.value) {
-          e.preventDefault();
-          const originalSelectionIndex = selectionIndex.value;
-          select(model.value[selectionIndex.value], false);
-          selectionIndex.value = originalSelectionIndex >= length - 1 ? length - 2 : originalSelectionIndex;
-        } else if (e.key === "Backspace" && !search.value) {
-          selectionIndex.value = length - 1;
-        }
-        return;
-      }
-      if (!props.multiple) return;
-      if (e.key === "ArrowLeft") {
-        if (selectionIndex.value < 0 && selectionStart && selectionStart > 0) return;
-        const prev = selectionIndex.value > -1 ? selectionIndex.value - 1 : length - 1;
-        if (model.value[prev]) {
-          selectionIndex.value = prev;
-        } else {
-          const searchLength = ((_c = search.value) == null ? void 0 : _c.length) ?? null;
-          selectionIndex.value = -1;
-          (_d = vTextFieldRef.value) == null ? void 0 : _d.setSelectionRange(searchLength, searchLength);
-        }
-      } else if (e.key === "ArrowRight") {
-        if (selectionIndex.value < 0) return;
-        const next = selectionIndex.value + 1;
-        if (model.value[next]) {
-          selectionIndex.value = next;
-        } else {
-          selectionIndex.value = -1;
-          (_e = vTextFieldRef.value) == null ? void 0 : _e.setSelectionRange(0, 0);
-        }
-      } else if (~selectionIndex.value && checkPrintable(e)) {
-        selectionIndex.value = -1;
-      }
-    }
-    function onChange(e) {
-      if (matchesSelector(vTextFieldRef.value, ":autofill") || matchesSelector(vTextFieldRef.value, ":-webkit-autofill")) {
-        const item = items.value.find((item2) => item2.title === e.target.value);
-        if (item) {
-          select(item);
-        }
-      }
-    }
-    function onAfterEnter() {
-      var _a2;
-      if (props.eager) {
-        (_a2 = vVirtualScrollRef.value) == null ? void 0 : _a2.calculateVisibleItems();
-      }
-    }
-    function onAfterLeave() {
-      var _a2;
-      if (isFocused.value) {
-        isPristine.value = true;
-        (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.focus();
-      }
-    }
-    function onFocusin(e) {
-      isFocused.value = true;
-      setTimeout(() => {
-        listHasFocus.value = true;
-      });
-    }
-    function onFocusout(e) {
-      listHasFocus.value = false;
-    }
-    function onUpdateModelValue(v) {
-      if (v == null || v === "" && !props.multiple && !hasSelectionSlot.value) model.value = [];
-    }
-    const isSelecting = shallowRef(false);
-    function select(item) {
-      let set = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : true;
-      if (!item || item.props.disabled) return;
-      if (props.multiple) {
-        const index = model.value.findIndex((selection) => (props.valueComparator || deepEqual)(selection.value, item.value));
-        const add = set == null ? !~index : set;
-        if (~index) {
-          const value = add ? [...model.value, item] : [...model.value];
-          value.splice(index, 1);
-          model.value = value;
-        } else if (add) {
-          model.value = [...model.value, item];
-        }
-        if (props.clearOnSelect) {
-          search.value = "";
-        }
-      } else {
-        const add = set !== false;
-        model.value = add ? [item] : [];
-        search.value = add && !hasSelectionSlot.value ? item.title : "";
-        nextTick(() => {
-          menu.value = false;
-          isPristine.value = true;
-        });
-      }
-    }
-    watch(isFocused, (val, oldVal) => {
-      var _a2;
-      if (val === oldVal) return;
-      if (val) {
-        isSelecting.value = true;
-        search.value = props.multiple || hasSelectionSlot.value ? "" : String(((_a2 = model.value.at(-1)) == null ? void 0 : _a2.props.title) ?? "");
-        isPristine.value = true;
-        nextTick(() => isSelecting.value = false);
-      } else {
-        if (!props.multiple && search.value == null) model.value = [];
-        menu.value = false;
-        search.value = "";
-        selectionIndex.value = -1;
-      }
-    });
-    watch(search, (val) => {
-      if (!isFocused.value || isSelecting.value) return;
-      if (val) menu.value = true;
-      isPristine.value = !val;
-    });
-    watch(menu, () => {
-      if (!props.hideSelected && menu.value && model.value.length) {
-        const index = displayItems.value.findIndex((item) => model.value.some((s) => item.value === s.value));
-        IN_BROWSER && window.requestAnimationFrame(() => {
-          var _a2;
-          index >= 0 && ((_a2 = vVirtualScrollRef.value) == null ? void 0 : _a2.scrollToIndex(index));
-        });
-      }
-    });
-    watch(items, (newVal, oldVal) => {
-      if (menu.value) return;
-      if (isFocused.value && !oldVal.length && newVal.length) {
-        menu.value = true;
-      }
-    });
-    useRender(() => {
-      const hasList = !!(!props.hideNoData || displayItems.value.length || slots["prepend-item"] || slots["append-item"] || slots["no-data"]);
-      const isDirty = model.value.length > 0;
-      const textFieldProps = VTextField.filterProps(props);
-      return createVNode(VTextField, mergeProps({
-        "ref": vTextFieldRef
-      }, textFieldProps, {
-        "modelValue": search.value,
-        "onUpdate:modelValue": [($event) => search.value = $event, onUpdateModelValue],
-        "focused": isFocused.value,
-        "onUpdate:focused": ($event) => isFocused.value = $event,
-        "validationValue": model.externalValue,
-        "counterValue": counterValue.value,
-        "dirty": isDirty,
-        "onChange": onChange,
-        "class": ["v-autocomplete", `v-autocomplete--${props.multiple ? "multiple" : "single"}`, {
-          "v-autocomplete--active-menu": menu.value,
-          "v-autocomplete--chips": !!props.chips,
-          "v-autocomplete--selection-slot": !!hasSelectionSlot.value,
-          "v-autocomplete--selecting-index": selectionIndex.value > -1
-        }, props.class],
-        "style": props.style,
-        "readonly": form.isReadonly.value,
-        "placeholder": isDirty ? void 0 : props.placeholder,
-        "onClick:clear": onClear,
-        "onMousedown:control": onMousedownControl,
-        "onKeydown": onKeydown,
-        "aria-expanded": ariaExpanded.value,
-        "aria-controls": ariaControls.value
-      }), {
-        ...slots,
-        default: () => createBaseVNode(Fragment, null, [createVNode(VMenu, mergeProps({
-          "id": menuId.value,
-          "ref": vMenuRef,
-          "modelValue": menu.value,
-          "onUpdate:modelValue": ($event) => menu.value = $event,
-          "activator": "parent",
-          "contentClass": "v-autocomplete__content",
-          "disabled": menuDisabled.value,
-          "eager": props.eager,
-          "maxHeight": 310,
-          "openOnClick": false,
-          "closeOnContentClick": false,
-          "transition": props.transition,
-          "onAfterEnter": onAfterEnter,
-          "onAfterLeave": onAfterLeave
-        }, props.menuProps), {
-          default: () => [hasList && createVNode(VList, mergeProps({
-            "ref": listRef,
-            "filterable": true,
-            "selected": selectedValues.value,
-            "selectStrategy": props.multiple ? "independent" : "single-independent",
-            "onMousedown": (e) => e.preventDefault(),
-            "onKeydown": onListKeydown,
-            "onFocusin": onFocusin,
-            "onFocusout": onFocusout,
-            "tabindex": "-1",
-            "selectable": true,
-            "aria-live": "polite",
-            "color": props.itemColor ?? props.color
-          }, listEvents, props.listProps), {
-            default: () => {
-              var _a2, _b, _c;
-              return [(_a2 = slots["prepend-item"]) == null ? void 0 : _a2.call(slots), !displayItems.value.length && !props.hideNoData && (((_b = slots["no-data"]) == null ? void 0 : _b.call(slots)) ?? createVNode(VListItem, {
-                "key": "no-data",
-                "title": t(props.noDataText)
-              }, null)), createVNode(VVirtualScroll, {
-                "ref": vVirtualScrollRef,
-                "renderless": true,
-                "items": displayItems.value,
-                "itemKey": "value"
-              }, {
-                default: (_ref3) => {
-                  var _a3, _b2, _c2;
-                  let {
-                    item,
-                    index,
-                    itemRef
-                  } = _ref3;
-                  const itemProps = mergeProps(item.props, {
-                    ref: itemRef,
-                    key: item.value,
-                    active: highlightFirst.value && index === 0 ? true : void 0,
-                    onClick: () => select(item, null)
-                  });
-                  if (item.type === "divider") {
-                    return ((_a3 = slots.divider) == null ? void 0 : _a3.call(slots, {
-                      props: item.raw,
-                      index
-                    })) ?? createVNode(VDivider, mergeProps(item.props, {
-                      "key": `divider-${index}`
-                    }), null);
-                  }
-                  if (item.type === "subheader") {
-                    return ((_b2 = slots.subheader) == null ? void 0 : _b2.call(slots, {
-                      props: item.raw,
-                      index
-                    })) ?? createVNode(VListSubheader, mergeProps(item.props, {
-                      "key": `subheader-${index}`
-                    }), null);
-                  }
-                  return ((_c2 = slots.item) == null ? void 0 : _c2.call(slots, {
-                    item,
-                    index,
-                    props: itemProps
-                  })) ?? createVNode(VListItem, mergeProps(itemProps, {
-                    "role": "option"
-                  }), {
-                    prepend: (_ref4) => {
-                      let {
-                        isSelected
-                      } = _ref4;
-                      return createBaseVNode(Fragment, null, [props.multiple && !props.hideSelected ? createVNode(VCheckboxBtn, {
-                        "key": item.value,
-                        "modelValue": isSelected,
-                        "ripple": false,
-                        "tabindex": "-1"
-                      }, null) : void 0, item.props.prependAvatar && createVNode(VAvatar, {
-                        "image": item.props.prependAvatar
-                      }, null), item.props.prependIcon && createVNode(VIcon, {
-                        "icon": item.props.prependIcon
-                      }, null)]);
-                    },
-                    title: () => {
-                      var _a4;
-                      return isPristine.value ? item.title : highlightResult("v-autocomplete", item.title, (_a4 = getMatches(item)) == null ? void 0 : _a4.title);
-                    }
-                  });
-                }
-              }), (_c = slots["append-item"]) == null ? void 0 : _c.call(slots)];
-            }
-          })]
-        }), model.value.map((item, index) => {
-          function onChipClose(e) {
-            e.stopPropagation();
-            e.preventDefault();
-            select(item, false);
-          }
-          const slotProps = {
-            "onClick:close": onChipClose,
-            onKeydown(e) {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              onChipClose(e);
-            },
-            onMousedown(e) {
-              e.preventDefault();
-              e.stopPropagation();
-            },
-            modelValue: true,
-            "onUpdate:modelValue": void 0
-          };
-          const hasSlot = hasChips.value ? !!slots.chip : !!slots.selection;
-          const slotContent = hasSlot ? ensureValidVNode(hasChips.value ? slots.chip({
-            item,
-            index,
-            props: slotProps
-          }) : slots.selection({
-            item,
-            index
-          })) : void 0;
-          if (hasSlot && !slotContent) return void 0;
-          return createBaseVNode("div", {
-            "key": item.value,
-            "class": normalizeClass(["v-autocomplete__selection", index === selectionIndex.value && ["v-autocomplete__selection--selected", textColorClasses.value]]),
-            "style": normalizeStyle(index === selectionIndex.value ? textColorStyles.value : {})
-          }, [hasChips.value ? !slots.chip ? createVNode(VChip, mergeProps({
-            "key": "chip",
-            "closable": props.closableChips,
-            "size": "small",
-            "text": item.title,
-            "disabled": item.props.disabled
-          }, slotProps), null) : createVNode(VDefaultsProvider, {
-            "key": "chip-defaults",
-            "defaults": {
-              VChip: {
-                closable: props.closableChips,
-                size: "small",
-                text: item.title
-              }
-            }
-          }, {
-            default: () => [slotContent]
-          }) : slotContent ?? createBaseVNode("span", {
-            "class": "v-autocomplete__selection-text"
-          }, [item.title, props.multiple && index < model.value.length - 1 && createBaseVNode("span", {
-            "class": "v-autocomplete__selection-comma"
-          }, [createTextVNode(",")])])]);
-        })]),
-        "append-inner": function() {
-          var _a2, _b;
-          for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-            args[_key] = arguments[_key];
-          }
-          return createBaseVNode(Fragment, null, [(_a2 = slots["append-inner"]) == null ? void 0 : _a2.call(slots, ...args), props.menuIcon ? createVNode(VIcon, {
-            "class": "v-autocomplete__menu-icon",
-            "color": (_b = vTextFieldRef.value) == null ? void 0 : _b.fieldIconColor,
-            "icon": props.menuIcon,
-            "onMousedown": onMousedownMenuIcon,
-            "onClick": noop,
-            "aria-label": ariaLabel.value,
-            "title": ariaLabel.value,
-            "tabindex": "-1"
-          }, null) : void 0]);
-        }
-      });
-    });
-    return forwardRefs({
-      isFocused,
-      isPristine,
-      menu,
-      search,
-      filteredItems,
-      select
-    }, vTextFieldRef);
-  }
-});
 
 // node_modules/vuetify/lib/components/VBanner/VBanner.js
 import "/app/node_modules/vuetify/lib/components/VBanner/VBanner.css";
@@ -2004,765 +1515,6 @@ var VColorPickerEdit = defineComponent({
 
 // node_modules/vuetify/lib/components/VColorPicker/VColorPickerPreview.js
 import "/app/node_modules/vuetify/lib/components/VColorPicker/VColorPickerPreview.css";
-
-// node_modules/vuetify/lib/components/VSlider/VSlider.js
-import "/app/node_modules/vuetify/lib/components/VSlider/VSlider.css";
-
-// node_modules/vuetify/lib/components/VSlider/VSliderThumb.js
-import "/app/node_modules/vuetify/lib/components/VSlider/VSliderThumb.css";
-
-// node_modules/vuetify/lib/components/VSlider/slider.js
-var VSliderSymbol = Symbol.for("vuetify:v-slider");
-function getOffset(e, el, direction) {
-  const vertical = direction === "vertical";
-  const rect = el.getBoundingClientRect();
-  const touch = "touches" in e ? e.touches[0] : e;
-  return vertical ? touch.clientY - (rect.top + rect.height / 2) : touch.clientX - (rect.left + rect.width / 2);
-}
-function getPosition(e, position) {
-  if ("touches" in e && e.touches.length) return e.touches[0][position];
-  else if ("changedTouches" in e && e.changedTouches.length) return e.changedTouches[0][position];
-  else return e[position];
-}
-var makeSliderProps = propsFactory({
-  disabled: {
-    type: Boolean,
-    default: null
-  },
-  error: Boolean,
-  readonly: {
-    type: Boolean,
-    default: null
-  },
-  max: {
-    type: [Number, String],
-    default: 100
-  },
-  min: {
-    type: [Number, String],
-    default: 0
-  },
-  step: {
-    type: [Number, String],
-    default: 0
-  },
-  thumbColor: String,
-  thumbLabel: {
-    type: [Boolean, String],
-    default: void 0,
-    validator: (v) => typeof v === "boolean" || v === "always"
-  },
-  thumbSize: {
-    type: [Number, String],
-    default: 20
-  },
-  showTicks: {
-    type: [Boolean, String],
-    default: false,
-    validator: (v) => typeof v === "boolean" || v === "always"
-  },
-  ticks: {
-    type: [Array, Object]
-  },
-  tickSize: {
-    type: [Number, String],
-    default: 2
-  },
-  color: String,
-  trackColor: String,
-  trackFillColor: String,
-  trackSize: {
-    type: [Number, String],
-    default: 4
-  },
-  direction: {
-    type: String,
-    default: "horizontal",
-    validator: (v) => ["vertical", "horizontal"].includes(v)
-  },
-  reverse: Boolean,
-  noKeyboard: Boolean,
-  ...makeRoundedProps(),
-  ...makeElevationProps({
-    elevation: 2
-  }),
-  ripple: {
-    type: Boolean,
-    default: true
-  }
-}, "Slider");
-var useSteps = (props) => {
-  const min = computed(() => parseFloat(props.min));
-  const max = computed(() => parseFloat(props.max));
-  const step = computed(() => Number(props.step) > 0 ? parseFloat(props.step) : 0);
-  const decimals = computed(() => Math.max(getDecimals(step.value), getDecimals(min.value)));
-  function roundValue(value) {
-    value = parseFloat(value);
-    if (step.value <= 0) return value;
-    const clamped = clamp(value, min.value, max.value);
-    const offset = min.value % step.value;
-    let newValue = Math.round((clamped - offset) / step.value) * step.value + offset;
-    if (clamped > newValue && newValue + step.value > max.value) {
-      newValue = max.value;
-    }
-    return parseFloat(Math.min(newValue, max.value).toFixed(decimals.value));
-  }
-  return {
-    min,
-    max,
-    step,
-    decimals,
-    roundValue
-  };
-};
-var useSlider = (_ref) => {
-  let {
-    props,
-    steps,
-    onSliderStart,
-    onSliderMove,
-    onSliderEnd,
-    getActiveThumb
-  } = _ref;
-  const form = useForm(props);
-  const {
-    isRtl
-  } = useRtl();
-  const isReversed = toRef(() => props.reverse);
-  const vertical = computed(() => props.direction === "vertical");
-  const indexFromEnd = computed(() => vertical.value !== isReversed.value);
-  const {
-    min,
-    max,
-    step,
-    decimals,
-    roundValue
-  } = steps;
-  const thumbSize = computed(() => parseInt(props.thumbSize, 10));
-  const tickSize = computed(() => parseInt(props.tickSize, 10));
-  const trackSize = computed(() => parseInt(props.trackSize, 10));
-  const numTicks = computed(() => (max.value - min.value) / step.value);
-  const thumbColor = computed(() => props.error || form.isDisabled.value ? void 0 : props.thumbColor ?? props.color);
-  const thumbLabelColor = computed(() => props.error || form.isDisabled.value ? void 0 : props.thumbColor);
-  const trackColor = computed(() => props.error || form.isDisabled.value ? void 0 : props.trackColor ?? props.color);
-  const trackFillColor = computed(() => props.error || form.isDisabled.value ? void 0 : props.trackFillColor ?? props.color);
-  const mousePressed = shallowRef(false);
-  const startOffset = shallowRef(0);
-  const trackContainerRef = ref();
-  const activeThumbRef = ref();
-  function parseMouseMove(e) {
-    var _a2;
-    const el = (_a2 = trackContainerRef.value) == null ? void 0 : _a2.$el;
-    if (!el) return;
-    const vertical2 = props.direction === "vertical";
-    const start = vertical2 ? "top" : "left";
-    const length = vertical2 ? "height" : "width";
-    const position2 = vertical2 ? "clientY" : "clientX";
-    const {
-      [start]: trackStart,
-      [length]: trackLength
-    } = el.getBoundingClientRect();
-    const clickOffset = getPosition(e, position2);
-    let clickPos = clamp((clickOffset - trackStart - startOffset.value) / trackLength) || 0;
-    if (vertical2 ? indexFromEnd.value : indexFromEnd.value !== isRtl.value) clickPos = 1 - clickPos;
-    return roundValue(min.value + clickPos * (max.value - min.value));
-  }
-  const handleStop = (e) => {
-    const value = parseMouseMove(e);
-    if (value != null) {
-      onSliderEnd({
-        value
-      });
-    }
-    mousePressed.value = false;
-    startOffset.value = 0;
-  };
-  const handleStart = (e) => {
-    const value = parseMouseMove(e);
-    activeThumbRef.value = getActiveThumb(e);
-    if (!activeThumbRef.value) return;
-    mousePressed.value = true;
-    if (activeThumbRef.value.contains(e.target)) {
-      startOffset.value = getOffset(e, activeThumbRef.value, props.direction);
-    } else {
-      startOffset.value = 0;
-      if (value != null) {
-        onSliderMove({
-          value
-        });
-      }
-    }
-    if (value != null) {
-      onSliderStart({
-        value
-      });
-    }
-    nextTick(() => {
-      var _a2;
-      return (_a2 = activeThumbRef.value) == null ? void 0 : _a2.focus();
-    });
-  };
-  const moveListenerOptions = {
-    passive: true,
-    capture: true
-  };
-  function onMouseMove(e) {
-    const value = parseMouseMove(e);
-    if (value != null) {
-      onSliderMove({
-        value
-      });
-    }
-  }
-  function onSliderMouseUp(e) {
-    e.stopPropagation();
-    e.preventDefault();
-    handleStop(e);
-    window.removeEventListener("mousemove", onMouseMove, moveListenerOptions);
-    window.removeEventListener("mouseup", onSliderMouseUp);
-  }
-  function onSliderTouchend(e) {
-    var _a2;
-    handleStop(e);
-    window.removeEventListener("touchmove", onMouseMove, moveListenerOptions);
-    (_a2 = e.target) == null ? void 0 : _a2.removeEventListener("touchend", onSliderTouchend);
-  }
-  function onSliderTouchstart(e) {
-    var _a2;
-    handleStart(e);
-    window.addEventListener("touchmove", onMouseMove, moveListenerOptions);
-    (_a2 = e.target) == null ? void 0 : _a2.addEventListener("touchend", onSliderTouchend, {
-      passive: false
-    });
-  }
-  function onSliderMousedown(e) {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    handleStart(e);
-    window.addEventListener("mousemove", onMouseMove, moveListenerOptions);
-    window.addEventListener("mouseup", onSliderMouseUp, {
-      passive: false
-    });
-  }
-  const position = (val) => {
-    const percentage = (val - min.value) / (max.value - min.value) * 100;
-    return clamp(isNaN(percentage) ? 0 : percentage, 0, 100);
-  };
-  const showTicks = toRef(() => props.showTicks);
-  const parsedTicks = computed(() => {
-    if (!showTicks.value) return [];
-    if (!props.ticks) {
-      return numTicks.value !== Infinity ? createRange(numTicks.value + 1).map((t) => {
-        const value = min.value + t * step.value;
-        return {
-          value,
-          position: position(value)
-        };
-      }) : [];
-    }
-    if (Array.isArray(props.ticks)) return props.ticks.map((t) => ({
-      value: t,
-      position: position(t),
-      label: t.toString()
-    }));
-    return Object.keys(props.ticks).map((key) => ({
-      value: parseFloat(key),
-      position: position(parseFloat(key)),
-      label: props.ticks[key]
-    }));
-  });
-  const hasLabels = computed(() => parsedTicks.value.some((_ref2) => {
-    let {
-      label
-    } = _ref2;
-    return !!label;
-  }));
-  const data = {
-    activeThumbRef,
-    color: toRef(() => props.color),
-    decimals,
-    disabled: form.isDisabled,
-    direction: toRef(() => props.direction),
-    elevation: toRef(() => props.elevation),
-    hasLabels,
-    isReversed,
-    indexFromEnd,
-    min,
-    max,
-    mousePressed,
-    noKeyboard: toRef(() => props.noKeyboard),
-    numTicks,
-    onSliderMousedown,
-    onSliderTouchstart,
-    parsedTicks,
-    parseMouseMove,
-    position,
-    readonly: form.isReadonly,
-    rounded: toRef(() => props.rounded),
-    roundValue,
-    showTicks,
-    startOffset,
-    step,
-    thumbSize,
-    thumbColor,
-    thumbLabelColor,
-    thumbLabel: toRef(() => props.thumbLabel),
-    ticks: toRef(() => props.ticks),
-    tickSize,
-    trackColor,
-    trackContainerRef,
-    trackFillColor,
-    trackSize,
-    vertical
-  };
-  provide(VSliderSymbol, data);
-  return data;
-};
-
-// node_modules/vuetify/lib/components/VSlider/VSliderThumb.js
-var makeVSliderThumbProps = propsFactory({
-  focused: Boolean,
-  max: {
-    type: Number,
-    required: true
-  },
-  min: {
-    type: Number,
-    required: true
-  },
-  modelValue: {
-    type: Number,
-    required: true
-  },
-  position: {
-    type: Number,
-    required: true
-  },
-  ripple: {
-    type: [Boolean, Object],
-    default: true
-  },
-  name: String,
-  noKeyboard: Boolean,
-  ...makeComponentProps()
-}, "VSliderThumb");
-var VSliderThumb = genericComponent()({
-  name: "VSliderThumb",
-  directives: {
-    vRipple: ripple_default
-  },
-  props: makeVSliderThumbProps(),
-  emits: {
-    "update:modelValue": (v) => true
-  },
-  setup(props, _ref) {
-    let {
-      slots,
-      emit
-    } = _ref;
-    const slider = inject(VSliderSymbol);
-    const {
-      isRtl,
-      rtlClasses
-    } = useRtl();
-    if (!slider) throw new Error("[Vuetify] v-slider-thumb must be used inside v-slider or v-range-slider");
-    const {
-      min,
-      max,
-      thumbColor,
-      thumbLabelColor,
-      step,
-      disabled,
-      thumbSize,
-      thumbLabel,
-      direction,
-      isReversed,
-      vertical,
-      readonly,
-      elevation,
-      mousePressed,
-      decimals,
-      indexFromEnd
-    } = slider;
-    const elevationProps = computed(() => !disabled.value ? elevation.value : void 0);
-    const {
-      elevationClasses
-    } = useElevation(elevationProps);
-    const {
-      textColorClasses,
-      textColorStyles
-    } = useTextColor(thumbColor);
-    const {
-      backgroundColorClasses,
-      backgroundColorStyles
-    } = useBackgroundColor(thumbLabelColor);
-    const {
-      pageup,
-      pagedown,
-      end,
-      home,
-      left,
-      right,
-      down,
-      up
-    } = keyValues;
-    const relevantKeys = [pageup, pagedown, end, home, left, right, down, up];
-    const multipliers = computed(() => {
-      if (step.value) return [1, 2, 3];
-      else return [1, 5, 10];
-    });
-    function parseKeydown(e, value) {
-      if (props.noKeyboard) return;
-      if (!relevantKeys.includes(e.key)) return;
-      e.preventDefault();
-      const _step = step.value || 0.1;
-      const steps = (max.value - min.value) / _step;
-      if ([left, right, down, up].includes(e.key)) {
-        const increase = vertical.value ? [isRtl.value ? left : right, isReversed.value ? down : up] : indexFromEnd.value !== isRtl.value ? [left, up] : [right, up];
-        const direction2 = increase.includes(e.key) ? 1 : -1;
-        const multiplier = e.shiftKey ? 2 : e.ctrlKey ? 1 : 0;
-        if (direction2 === -1 && value === max.value && !multiplier && !Number.isInteger(steps)) {
-          value = value - steps % 1 * _step;
-        } else {
-          value = value + direction2 * _step * multipliers.value[multiplier];
-        }
-      } else if (e.key === home) {
-        value = min.value;
-      } else if (e.key === end) {
-        value = max.value;
-      } else {
-        const direction2 = e.key === pagedown ? 1 : -1;
-        value = value - direction2 * _step * (steps > 100 ? steps / 10 : 10);
-      }
-      return Math.max(props.min, Math.min(props.max, value));
-    }
-    function onKeydown(e) {
-      const newValue = parseKeydown(e, props.modelValue);
-      newValue != null && emit("update:modelValue", newValue);
-    }
-    useRender(() => {
-      const positionPercentage = convertToUnit(indexFromEnd.value ? 100 - props.position : props.position, "%");
-      return createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-thumb", {
-          "v-slider-thumb--focused": props.focused,
-          "v-slider-thumb--pressed": props.focused && mousePressed.value
-        }, props.class, rtlClasses.value]),
-        "style": normalizeStyle([{
-          "--v-slider-thumb-position": positionPercentage,
-          "--v-slider-thumb-size": convertToUnit(thumbSize.value)
-        }, props.style]),
-        "role": "slider",
-        "tabindex": disabled.value ? -1 : 0,
-        "aria-label": props.name,
-        "aria-valuemin": min.value,
-        "aria-valuemax": max.value,
-        "aria-valuenow": props.modelValue,
-        "aria-readonly": !!readonly.value,
-        "aria-orientation": direction.value,
-        "onKeydown": !readonly.value ? onKeydown : void 0
-      }, [createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-thumb__surface", textColorClasses.value, elevationClasses.value]),
-        "style": normalizeStyle(textColorStyles.value)
-      }, null), withDirectives(createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-thumb__ripple", textColorClasses.value]),
-        "style": normalizeStyle(textColorStyles.value)
-      }, null), [[ripple_default, props.ripple, null, {
-        circle: true,
-        center: true
-      }]]), createVNode(VScaleTransition, {
-        "origin": "bottom center"
-      }, {
-        default: () => {
-          var _a2;
-          return [withDirectives(createBaseVNode("div", {
-            "class": "v-slider-thumb__label-container"
-          }, [createBaseVNode("div", {
-            "class": normalizeClass(["v-slider-thumb__label", backgroundColorClasses.value]),
-            "style": normalizeStyle(backgroundColorStyles.value)
-          }, [createBaseVNode("div", null, [((_a2 = slots["thumb-label"]) == null ? void 0 : _a2.call(slots, {
-            modelValue: props.modelValue
-          })) ?? props.modelValue.toFixed(step.value ? decimals.value : 1)]), createBaseVNode("div", {
-            "class": "v-slider-thumb__label-wedge"
-          }, null)])]), [[vShow, thumbLabel.value && props.focused || thumbLabel.value === "always"]])];
-        }
-      })]);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VSlider/VSliderTrack.js
-import "/app/node_modules/vuetify/lib/components/VSlider/VSliderTrack.css";
-var makeVSliderTrackProps = propsFactory({
-  start: {
-    type: Number,
-    required: true
-  },
-  stop: {
-    type: Number,
-    required: true
-  },
-  ...makeComponentProps()
-}, "VSliderTrack");
-var VSliderTrack = genericComponent()({
-  name: "VSliderTrack",
-  props: makeVSliderTrackProps(),
-  emits: {},
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    const slider = inject(VSliderSymbol);
-    if (!slider) throw new Error("[Vuetify] v-slider-track must be inside v-slider or v-range-slider");
-    const {
-      color,
-      parsedTicks,
-      rounded,
-      showTicks,
-      tickSize,
-      trackColor,
-      trackFillColor,
-      trackSize,
-      vertical,
-      min,
-      max,
-      indexFromEnd
-    } = slider;
-    const {
-      roundedClasses
-    } = useRounded(rounded);
-    const {
-      backgroundColorClasses: trackFillColorClasses,
-      backgroundColorStyles: trackFillColorStyles
-    } = useBackgroundColor(trackFillColor);
-    const {
-      backgroundColorClasses: trackColorClasses,
-      backgroundColorStyles: trackColorStyles
-    } = useBackgroundColor(trackColor);
-    const startDir = computed(() => `inset-${vertical.value ? "block" : "inline"}-${indexFromEnd.value ? "end" : "start"}`);
-    const endDir = computed(() => vertical.value ? "height" : "width");
-    const backgroundStyles = computed(() => {
-      return {
-        [startDir.value]: "0%",
-        [endDir.value]: "100%"
-      };
-    });
-    const trackFillWidth = computed(() => props.stop - props.start);
-    const trackFillStyles = computed(() => {
-      return {
-        [startDir.value]: convertToUnit(props.start, "%"),
-        [endDir.value]: convertToUnit(trackFillWidth.value, "%")
-      };
-    });
-    const computedTicks = computed(() => {
-      if (!showTicks.value) return [];
-      const ticks = vertical.value ? parsedTicks.value.slice().reverse() : parsedTicks.value;
-      return ticks.map((tick, index) => {
-        var _a2;
-        const directionValue = tick.value !== min.value && tick.value !== max.value ? convertToUnit(tick.position, "%") : void 0;
-        return createBaseVNode("div", {
-          "key": tick.value,
-          "class": normalizeClass(["v-slider-track__tick", {
-            "v-slider-track__tick--filled": tick.position >= props.start && tick.position <= props.stop,
-            "v-slider-track__tick--first": tick.value === min.value,
-            "v-slider-track__tick--last": tick.value === max.value
-          }]),
-          "style": {
-            [startDir.value]: directionValue
-          }
-        }, [(tick.label || slots["tick-label"]) && createBaseVNode("div", {
-          "class": "v-slider-track__tick-label"
-        }, [((_a2 = slots["tick-label"]) == null ? void 0 : _a2.call(slots, {
-          tick,
-          index
-        })) ?? tick.label])]);
-      });
-    });
-    useRender(() => {
-      return createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-track", roundedClasses.value, props.class]),
-        "style": normalizeStyle([{
-          "--v-slider-track-size": convertToUnit(trackSize.value),
-          "--v-slider-tick-size": convertToUnit(tickSize.value)
-        }, props.style])
-      }, [createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-track__background", trackColorClasses.value, {
-          "v-slider-track__background--opacity": !!color.value || !trackFillColor.value
-        }]),
-        "style": {
-          ...backgroundStyles.value,
-          ...trackColorStyles.value
-        }
-      }, null), createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-track__fill", trackFillColorClasses.value]),
-        "style": {
-          ...trackFillStyles.value,
-          ...trackFillColorStyles.value
-        }
-      }, null), showTicks.value && createBaseVNode("div", {
-        "class": normalizeClass(["v-slider-track__ticks", {
-          "v-slider-track__ticks--always-show": showTicks.value === "always"
-        }])
-      }, [computedTicks.value])]);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VSlider/VSlider.js
-var makeVSliderProps = propsFactory({
-  ...makeFocusProps(),
-  ...makeSliderProps(),
-  ...makeVInputProps(),
-  modelValue: {
-    type: [Number, String],
-    default: 0
-  }
-}, "VSlider");
-var VSlider = genericComponent()({
-  name: "VSlider",
-  props: makeVSliderProps(),
-  emits: {
-    "update:focused": (value) => true,
-    "update:modelValue": (v) => true,
-    start: (value) => true,
-    end: (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      slots,
-      emit
-    } = _ref;
-    const thumbContainerRef = ref();
-    const inputRef = ref();
-    const {
-      rtlClasses
-    } = useRtl();
-    const steps = useSteps(props);
-    const model = useProxiedModel(props, "modelValue", void 0, (value) => {
-      return steps.roundValue(value == null ? steps.min.value : value);
-    });
-    const {
-      min,
-      max,
-      mousePressed,
-      roundValue,
-      onSliderMousedown,
-      onSliderTouchstart,
-      trackContainerRef,
-      position,
-      hasLabels,
-      disabled,
-      readonly,
-      noKeyboard
-    } = useSlider({
-      props,
-      steps,
-      onSliderStart: () => {
-        emit("start", model.value);
-      },
-      onSliderEnd: (_ref2) => {
-        let {
-          value
-        } = _ref2;
-        const roundedValue = roundValue(value);
-        model.value = roundedValue;
-        emit("end", roundedValue);
-      },
-      onSliderMove: (_ref3) => {
-        let {
-          value
-        } = _ref3;
-        return model.value = roundValue(value);
-      },
-      getActiveThumb: () => {
-        var _a2;
-        return (_a2 = thumbContainerRef.value) == null ? void 0 : _a2.$el;
-      }
-    });
-    const {
-      isFocused,
-      focus,
-      blur
-    } = useFocus(props);
-    const trackStop = computed(() => position(model.value));
-    useRender(() => {
-      const inputProps = VInput.filterProps(props);
-      const hasPrepend = !!(props.label || slots.label || slots.prepend);
-      return createVNode(VInput, mergeProps({
-        "ref": inputRef,
-        "class": ["v-slider", {
-          "v-slider--has-labels": !!slots["tick-label"] || hasLabels.value,
-          "v-slider--focused": isFocused.value,
-          "v-slider--pressed": mousePressed.value,
-          "v-slider--disabled": props.disabled
-        }, rtlClasses.value, props.class],
-        "style": props.style
-      }, inputProps, {
-        "focused": isFocused.value
-      }), {
-        ...slots,
-        prepend: hasPrepend ? (slotProps) => {
-          var _a2, _b;
-          return createBaseVNode(Fragment, null, [((_a2 = slots.label) == null ? void 0 : _a2.call(slots, slotProps)) ?? (props.label ? createVNode(VLabel, {
-            "id": slotProps.id.value,
-            "class": "v-slider__label",
-            "text": props.label
-          }, null) : void 0), (_b = slots.prepend) == null ? void 0 : _b.call(slots, slotProps)]);
-        } : void 0,
-        default: (_ref4) => {
-          let {
-            id,
-            messagesId
-          } = _ref4;
-          return createBaseVNode("div", {
-            "class": "v-slider__container",
-            "onMousedown": !readonly.value ? onSliderMousedown : void 0,
-            "onTouchstartPassive": !readonly.value ? onSliderTouchstart : void 0
-          }, [createBaseVNode("input", {
-            "id": id.value,
-            "name": props.name || id.value,
-            "disabled": !!disabled.value,
-            "readonly": !!readonly.value,
-            "tabindex": "-1",
-            "value": model.value
-          }, null), createVNode(VSliderTrack, {
-            "ref": trackContainerRef,
-            "start": 0,
-            "stop": trackStop.value
-          }, {
-            "tick-label": slots["tick-label"]
-          }), createVNode(VSliderThumb, {
-            "ref": thumbContainerRef,
-            "aria-describedby": messagesId.value,
-            "focused": isFocused.value,
-            "noKeyboard": noKeyboard.value,
-            "min": min.value,
-            "max": max.value,
-            "modelValue": model.value,
-            "onUpdate:modelValue": (v) => model.value = v,
-            "position": trackStop.value,
-            "elevation": props.elevation,
-            "onFocus": focus,
-            "onBlur": blur,
-            "ripple": props.ripple,
-            "name": props.name
-          }, {
-            "thumb-label": slots["thumb-label"]
-          })]);
-        }
-      });
-    });
-    return forwardRefs({
-      focus: () => {
-        var _a2;
-        return (_a2 = thumbContainerRef.value) == null ? void 0 : _a2.$el.focus();
-      }
-    }, inputRef);
-  }
-});
-
-// node_modules/vuetify/lib/components/VColorPicker/VColorPickerPreview.js
 var makeVColorPickerPreviewProps = propsFactory({
   color: {
     type: Object
@@ -3476,563 +2228,6 @@ var VColorPicker = defineComponent({
   }
 });
 
-// node_modules/vuetify/lib/components/VCombobox/VCombobox.js
-import "/app/node_modules/vuetify/lib/components/VCombobox/VCombobox.css";
-var makeVComboboxProps = propsFactory({
-  alwaysFilter: Boolean,
-  autoSelectFirst: {
-    type: [Boolean, String]
-  },
-  clearOnSelect: {
-    type: Boolean,
-    default: true
-  },
-  delimiters: Array,
-  ...makeFilterProps({
-    filterKeys: ["title"]
-  }),
-  ...makeSelectProps({
-    hideNoData: true,
-    returnObject: true
-  }),
-  ...omit(makeVTextFieldProps({
-    modelValue: null,
-    role: "combobox"
-  }), ["validationValue", "dirty", "appendInnerIcon"]),
-  ...makeTransitionProps({
-    transition: false
-  })
-}, "VCombobox");
-var VCombobox = genericComponent()({
-  name: "VCombobox",
-  props: makeVComboboxProps(),
-  emits: {
-    "update:focused": (focused) => true,
-    "update:modelValue": (value) => true,
-    "update:search": (value) => true,
-    "update:menu": (value) => true
-  },
-  setup(props, _ref) {
-    var _a2;
-    let {
-      emit,
-      slots
-    } = _ref;
-    const {
-      t
-    } = useLocale();
-    const vTextFieldRef = ref();
-    const isFocused = shallowRef(false);
-    const isPristine = shallowRef(true);
-    const listHasFocus = shallowRef(false);
-    const vMenuRef = ref();
-    const vVirtualScrollRef = ref();
-    const selectionIndex = shallowRef(-1);
-    let cleared = false;
-    const {
-      items,
-      transformIn,
-      transformOut
-    } = useItems(props);
-    const {
-      textColorClasses,
-      textColorStyles
-    } = useTextColor(() => {
-      var _a3;
-      return (_a3 = vTextFieldRef.value) == null ? void 0 : _a3.color;
-    });
-    const model = useProxiedModel(props, "modelValue", [], (v) => transformIn(wrapInArray(v)), (v) => {
-      const transformed = transformOut(v);
-      return props.multiple ? transformed : transformed[0] ?? null;
-    });
-    const form = useForm(props);
-    const hasChips = computed(() => !!(props.chips || slots.chip));
-    const hasSelectionSlot = computed(() => hasChips.value || !!slots.selection);
-    const _search = shallowRef(!props.multiple && !hasSelectionSlot.value ? ((_a2 = model.value[0]) == null ? void 0 : _a2.title) ?? "" : "");
-    const search = computed({
-      get: () => {
-        return _search.value;
-      },
-      set: async (val) => {
-        var _a3;
-        _search.value = val ?? "";
-        if (!props.multiple && !hasSelectionSlot.value) {
-          model.value = [transformItem(props, val)];
-          nextTick(() => {
-            var _a4;
-            return (_a4 = vVirtualScrollRef.value) == null ? void 0 : _a4.scrollToIndex(0);
-          });
-        }
-        if (val && props.multiple && ((_a3 = props.delimiters) == null ? void 0 : _a3.length)) {
-          const signsToMatch = props.delimiters.map(escapeForRegex).join("|");
-          const values = val.split(new RegExp(`(?:${signsToMatch})+`));
-          if (values.length > 1) {
-            for (let v of values) {
-              v = v.trim();
-              if (v) {
-                select(transformItem(props, v));
-                await nextTick();
-              }
-            }
-            _search.value = "";
-          }
-        }
-        if (!val) selectionIndex.value = -1;
-        isPristine.value = !val;
-      }
-    });
-    const counterValue = computed(() => {
-      return typeof props.counterValue === "function" ? props.counterValue(model.value) : typeof props.counterValue === "number" ? props.counterValue : props.multiple ? model.value.length : search.value.length;
-    });
-    const {
-      filteredItems,
-      getMatches
-    } = useFilter(props, items, () => props.alwaysFilter || !isPristine.value ? search.value : "");
-    const displayItems = computed(() => {
-      if (props.hideSelected) {
-        return filteredItems.value.filter((filteredItem) => !model.value.some((s) => s.value === filteredItem.value));
-      }
-      return filteredItems.value;
-    });
-    const menuDisabled = computed(() => props.hideNoData && !displayItems.value.length || form.isReadonly.value || form.isDisabled.value);
-    const _menu = useProxiedModel(props, "menu");
-    const menu = computed({
-      get: () => _menu.value,
-      set: (v) => {
-        var _a3;
-        if (_menu.value && !v && ((_a3 = vMenuRef.value) == null ? void 0 : _a3.ΨopenChildren.size)) return;
-        if (v && menuDisabled.value) return;
-        _menu.value = v;
-      }
-    });
-    const {
-      menuId,
-      ariaExpanded,
-      ariaControls,
-      ariaLabel
-    } = useMenuActivator(props, menu);
-    watch(_search, (value) => {
-      if (cleared) {
-        nextTick(() => cleared = false);
-      } else if (isFocused.value && !menu.value) {
-        menu.value = true;
-      }
-      emit("update:search", value);
-    });
-    watch(model, (value) => {
-      var _a3;
-      if (!props.multiple && !hasSelectionSlot.value) {
-        _search.value = ((_a3 = value[0]) == null ? void 0 : _a3.title) ?? "";
-      }
-    });
-    const selectedValues = computed(() => model.value.map((selection) => selection.value));
-    const highlightFirst = computed(() => {
-      var _a3;
-      const selectFirst = props.autoSelectFirst === true || props.autoSelectFirst === "exact" && search.value === ((_a3 = displayItems.value[0]) == null ? void 0 : _a3.title);
-      return selectFirst && displayItems.value.length > 0 && !isPristine.value && !listHasFocus.value;
-    });
-    const listRef = ref();
-    const listEvents = useScrolling(listRef, vTextFieldRef);
-    function onClear(e) {
-      cleared = true;
-      nextTick(() => cleared = false);
-      if (props.openOnClear) {
-        menu.value = true;
-      }
-    }
-    function onMousedownControl() {
-      if (menuDisabled.value) return;
-      menu.value = true;
-    }
-    function onMousedownMenuIcon(e) {
-      if (menuDisabled.value) return;
-      if (isFocused.value) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      menu.value = !menu.value;
-    }
-    function onListKeydown(e) {
-      var _a3;
-      if (checkPrintable(e) || e.key === "Backspace") {
-        (_a3 = vTextFieldRef.value) == null ? void 0 : _a3.focus();
-      }
-    }
-    function onKeydown(e) {
-      var _a3, _b, _c, _d;
-      if (isComposingIgnoreKey(e) || form.isReadonly.value) return;
-      const selectionStart = (_a3 = vTextFieldRef.value) == null ? void 0 : _a3.selectionStart;
-      const length = model.value.length;
-      if (["Enter", "ArrowDown", "ArrowUp"].includes(e.key)) {
-        e.preventDefault();
-      }
-      if (["Enter", "ArrowDown"].includes(e.key)) {
-        menu.value = true;
-      }
-      if (["Escape"].includes(e.key)) {
-        menu.value = false;
-      }
-      if (["Enter", "Escape", "Tab"].includes(e.key)) {
-        if (highlightFirst.value && ["Enter", "Tab"].includes(e.key) && !model.value.some((_ref2) => {
-          let {
-            value
-          } = _ref2;
-          return value === displayItems.value[0].value;
-        })) {
-          select(filteredItems.value[0]);
-        }
-        isPristine.value = true;
-      }
-      if (e.key === "ArrowDown" && highlightFirst.value) {
-        (_b = listRef.value) == null ? void 0 : _b.focus("next");
-      }
-      if (e.key === "Enter" && search.value) {
-        select(transformItem(props, search.value));
-        if (hasSelectionSlot.value) _search.value = "";
-      }
-      if (["Backspace", "Delete"].includes(e.key)) {
-        if (!props.multiple && hasSelectionSlot.value && model.value.length > 0 && !search.value) return select(model.value[0], false);
-        if (~selectionIndex.value) {
-          e.preventDefault();
-          const originalSelectionIndex = selectionIndex.value;
-          select(model.value[selectionIndex.value], false);
-          selectionIndex.value = originalSelectionIndex >= length - 1 ? length - 2 : originalSelectionIndex;
-        } else if (e.key === "Backspace" && !search.value) {
-          selectionIndex.value = length - 1;
-        }
-        return;
-      }
-      if (!props.multiple) return;
-      if (e.key === "ArrowLeft") {
-        if (selectionIndex.value < 0 && selectionStart && selectionStart > 0) return;
-        const prev = selectionIndex.value > -1 ? selectionIndex.value - 1 : length - 1;
-        if (model.value[prev]) {
-          selectionIndex.value = prev;
-        } else {
-          selectionIndex.value = -1;
-          (_c = vTextFieldRef.value) == null ? void 0 : _c.setSelectionRange(search.value.length, search.value.length);
-        }
-      } else if (e.key === "ArrowRight") {
-        if (selectionIndex.value < 0) return;
-        const next = selectionIndex.value + 1;
-        if (model.value[next]) {
-          selectionIndex.value = next;
-        } else {
-          selectionIndex.value = -1;
-          (_d = vTextFieldRef.value) == null ? void 0 : _d.setSelectionRange(0, 0);
-        }
-      } else if (~selectionIndex.value && checkPrintable(e)) {
-        selectionIndex.value = -1;
-      }
-    }
-    function onAfterEnter() {
-      var _a3;
-      if (props.eager) {
-        (_a3 = vVirtualScrollRef.value) == null ? void 0 : _a3.calculateVisibleItems();
-      }
-    }
-    function onAfterLeave() {
-      var _a3;
-      if (isFocused.value) {
-        isPristine.value = true;
-        (_a3 = vTextFieldRef.value) == null ? void 0 : _a3.focus();
-      }
-    }
-    function select(item) {
-      let set = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : true;
-      if (!item || item.props.disabled) return;
-      if (props.multiple) {
-        const index = model.value.findIndex((selection) => (props.valueComparator || deepEqual)(selection.value, item.value));
-        const add = set == null ? !~index : set;
-        if (~index) {
-          const value = add ? [...model.value, item] : [...model.value];
-          value.splice(index, 1);
-          model.value = value;
-        } else if (add) {
-          model.value = [...model.value, item];
-        }
-        if (props.clearOnSelect) {
-          search.value = "";
-        }
-      } else {
-        const add = set !== false;
-        model.value = add ? [item] : [];
-        _search.value = add && !hasSelectionSlot.value ? item.title : "";
-        nextTick(() => {
-          menu.value = false;
-          isPristine.value = true;
-        });
-      }
-    }
-    function onFocusin(e) {
-      isFocused.value = true;
-      setTimeout(() => {
-        listHasFocus.value = true;
-      });
-    }
-    function onFocusout(e) {
-      listHasFocus.value = false;
-    }
-    function onUpdateModelValue(v) {
-      if (v == null || v === "" && !props.multiple && !hasSelectionSlot.value) model.value = [];
-    }
-    watch(isFocused, (val, oldVal) => {
-      if (val || val === oldVal) return;
-      selectionIndex.value = -1;
-      menu.value = false;
-      if (search.value) {
-        if (props.multiple) {
-          select(transformItem(props, search.value));
-          return;
-        }
-        if (!hasSelectionSlot.value) return;
-        if (model.value.some((_ref3) => {
-          let {
-            title
-          } = _ref3;
-          return title === search.value;
-        })) {
-          _search.value = "";
-        } else {
-          select(transformItem(props, search.value));
-        }
-      }
-    });
-    watch(menu, () => {
-      if (!props.hideSelected && menu.value && model.value.length) {
-        const index = displayItems.value.findIndex((item) => model.value.some((s) => (props.valueComparator || deepEqual)(s.value, item.value)));
-        IN_BROWSER && window.requestAnimationFrame(() => {
-          var _a3;
-          index >= 0 && ((_a3 = vVirtualScrollRef.value) == null ? void 0 : _a3.scrollToIndex(index));
-        });
-      }
-    });
-    watch(items, (newVal, oldVal) => {
-      if (menu.value) return;
-      if (isFocused.value && !oldVal.length && newVal.length) {
-        menu.value = true;
-      }
-    });
-    useRender(() => {
-      const hasList = !!(!props.hideNoData || displayItems.value.length || slots["prepend-item"] || slots["append-item"] || slots["no-data"]);
-      const isDirty = model.value.length > 0;
-      const textFieldProps = VTextField.filterProps(props);
-      return createVNode(VTextField, mergeProps({
-        "ref": vTextFieldRef
-      }, textFieldProps, {
-        "modelValue": search.value,
-        "onUpdate:modelValue": [($event) => search.value = $event, onUpdateModelValue],
-        "focused": isFocused.value,
-        "onUpdate:focused": ($event) => isFocused.value = $event,
-        "validationValue": model.externalValue,
-        "counterValue": counterValue.value,
-        "dirty": isDirty,
-        "class": ["v-combobox", {
-          "v-combobox--active-menu": menu.value,
-          "v-combobox--chips": !!props.chips,
-          "v-combobox--selection-slot": !!hasSelectionSlot.value,
-          "v-combobox--selecting-index": selectionIndex.value > -1,
-          [`v-combobox--${props.multiple ? "multiple" : "single"}`]: true
-        }, props.class],
-        "style": props.style,
-        "readonly": form.isReadonly.value,
-        "placeholder": isDirty ? void 0 : props.placeholder,
-        "onClick:clear": onClear,
-        "onMousedown:control": onMousedownControl,
-        "onKeydown": onKeydown,
-        "aria-expanded": ariaExpanded.value,
-        "aria-controls": ariaControls.value
-      }), {
-        ...slots,
-        default: () => createBaseVNode(Fragment, null, [createVNode(VMenu, mergeProps({
-          "id": menuId.value,
-          "ref": vMenuRef,
-          "modelValue": menu.value,
-          "onUpdate:modelValue": ($event) => menu.value = $event,
-          "activator": "parent",
-          "contentClass": "v-combobox__content",
-          "disabled": menuDisabled.value,
-          "eager": props.eager,
-          "maxHeight": 310,
-          "openOnClick": false,
-          "closeOnContentClick": false,
-          "transition": props.transition,
-          "onAfterEnter": onAfterEnter,
-          "onAfterLeave": onAfterLeave
-        }, props.menuProps), {
-          default: () => [hasList && createVNode(VList, mergeProps({
-            "ref": listRef,
-            "filterable": true,
-            "selected": selectedValues.value,
-            "selectStrategy": props.multiple ? "independent" : "single-independent",
-            "onMousedown": (e) => e.preventDefault(),
-            "selectable": true,
-            "onKeydown": onListKeydown,
-            "onFocusin": onFocusin,
-            "onFocusout": onFocusout,
-            "tabindex": "-1",
-            "aria-live": "polite",
-            "color": props.itemColor ?? props.color
-          }, listEvents, props.listProps), {
-            default: () => {
-              var _a3, _b, _c;
-              return [(_a3 = slots["prepend-item"]) == null ? void 0 : _a3.call(slots), !displayItems.value.length && !props.hideNoData && (((_b = slots["no-data"]) == null ? void 0 : _b.call(slots)) ?? createVNode(VListItem, {
-                "key": "no-data",
-                "title": t(props.noDataText)
-              }, null)), createVNode(VVirtualScroll, {
-                "ref": vVirtualScrollRef,
-                "renderless": true,
-                "items": displayItems.value,
-                "itemKey": "value"
-              }, {
-                default: (_ref4) => {
-                  var _a4, _b2, _c2;
-                  let {
-                    item,
-                    index,
-                    itemRef
-                  } = _ref4;
-                  const itemProps = mergeProps(item.props, {
-                    ref: itemRef,
-                    key: item.value,
-                    active: highlightFirst.value && index === 0 ? true : void 0,
-                    onClick: () => select(item, null)
-                  });
-                  if (item.type === "divider") {
-                    return ((_a4 = slots.divider) == null ? void 0 : _a4.call(slots, {
-                      props: item.raw,
-                      index
-                    })) ?? createVNode(VDivider, mergeProps(item.props, {
-                      "key": `divider-${index}`
-                    }), null);
-                  }
-                  if (item.type === "subheader") {
-                    return ((_b2 = slots.subheader) == null ? void 0 : _b2.call(slots, {
-                      props: item.raw,
-                      index
-                    })) ?? createVNode(VListSubheader, mergeProps(item.props, {
-                      "key": `subheader-${index}`
-                    }), null);
-                  }
-                  return ((_c2 = slots.item) == null ? void 0 : _c2.call(slots, {
-                    item,
-                    index,
-                    props: itemProps
-                  })) ?? createVNode(VListItem, mergeProps(itemProps, {
-                    "role": "option"
-                  }), {
-                    prepend: (_ref5) => {
-                      let {
-                        isSelected
-                      } = _ref5;
-                      return createBaseVNode(Fragment, null, [props.multiple && !props.hideSelected ? createVNode(VCheckboxBtn, {
-                        "key": item.value,
-                        "modelValue": isSelected,
-                        "ripple": false,
-                        "tabindex": "-1"
-                      }, null) : void 0, item.props.prependAvatar && createVNode(VAvatar, {
-                        "image": item.props.prependAvatar
-                      }, null), item.props.prependIcon && createVNode(VIcon, {
-                        "icon": item.props.prependIcon
-                      }, null)]);
-                    },
-                    title: () => {
-                      var _a5;
-                      return isPristine.value ? item.title : highlightResult("v-combobox", item.title, (_a5 = getMatches(item)) == null ? void 0 : _a5.title);
-                    }
-                  });
-                }
-              }), (_c = slots["append-item"]) == null ? void 0 : _c.call(slots)];
-            }
-          })]
-        }), model.value.map((item, index) => {
-          function onChipClose(e) {
-            e.stopPropagation();
-            e.preventDefault();
-            select(item, false);
-          }
-          const slotProps = {
-            "onClick:close": onChipClose,
-            onKeydown(e) {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              onChipClose(e);
-            },
-            onMousedown(e) {
-              e.preventDefault();
-              e.stopPropagation();
-            },
-            modelValue: true,
-            "onUpdate:modelValue": void 0
-          };
-          const hasSlot = hasChips.value ? !!slots.chip : !!slots.selection;
-          const slotContent = hasSlot ? ensureValidVNode(hasChips.value ? slots.chip({
-            item,
-            index,
-            props: slotProps
-          }) : slots.selection({
-            item,
-            index
-          })) : void 0;
-          if (hasSlot && !slotContent) return void 0;
-          return createBaseVNode("div", {
-            "key": item.value,
-            "class": normalizeClass(["v-combobox__selection", index === selectionIndex.value && ["v-combobox__selection--selected", textColorClasses.value]]),
-            "style": normalizeStyle(index === selectionIndex.value ? textColorStyles.value : {})
-          }, [hasChips.value ? !slots.chip ? createVNode(VChip, mergeProps({
-            "key": "chip",
-            "closable": props.closableChips,
-            "size": "small",
-            "text": item.title,
-            "disabled": item.props.disabled
-          }, slotProps), null) : createVNode(VDefaultsProvider, {
-            "key": "chip-defaults",
-            "defaults": {
-              VChip: {
-                closable: props.closableChips,
-                size: "small",
-                text: item.title
-              }
-            }
-          }, {
-            default: () => [slotContent]
-          }) : slotContent ?? createBaseVNode("span", {
-            "class": "v-combobox__selection-text"
-          }, [item.title, props.multiple && index < model.value.length - 1 && createBaseVNode("span", {
-            "class": "v-combobox__selection-comma"
-          }, [createTextVNode(",")])])]);
-        })]),
-        "append-inner": function() {
-          var _a3, _b;
-          for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-            args[_key] = arguments[_key];
-          }
-          return createBaseVNode(Fragment, null, [(_a3 = slots["append-inner"]) == null ? void 0 : _a3.call(slots, ...args), (!props.hideNoData || props.items.length) && props.menuIcon ? createVNode(VIcon, {
-            "class": "v-combobox__menu-icon",
-            "color": (_b = vTextFieldRef.value) == null ? void 0 : _b.fieldIconColor,
-            "icon": props.menuIcon,
-            "onMousedown": onMousedownMenuIcon,
-            "onClick": noop,
-            "aria-label": ariaLabel.value,
-            "title": ariaLabel.value,
-            "tabindex": "-1"
-          }, null) : void 0]);
-        }
-      });
-    });
-    return forwardRefs({
-      isFocused,
-      isPristine,
-      menu,
-      search,
-      selectionIndex,
-      filteredItems,
-      select
-    }, vTextFieldRef);
-  }
-});
-
 // node_modules/vuetify/lib/components/VConfirmEdit/VConfirmEdit.js
 var makeVConfirmEditProps = propsFactory({
   modelValue: null,
@@ -4147,7 +2342,7 @@ var makeDataIteratorItemsProps = propsFactory({
   },
   returnObject: Boolean
 }, "DataIterator-items");
-function transformItem2(props, item) {
+function transformItem(props, item) {
   const value = props.returnObject ? item : getPropertyFromItem(item, props.itemValue);
   const selectable = getPropertyFromItem(item, props.itemSelectable, true);
   return {
@@ -4160,7 +2355,7 @@ function transformItem2(props, item) {
 function transformItems(props, items) {
   const array = [];
   for (const item of items) {
-    array.push(transformItem2(props, item));
+    array.push(transformItem(props, item));
   }
   return array;
 }
@@ -7502,123 +5697,6 @@ var VParallax = genericComponent()({
   }
 });
 
-// node_modules/vuetify/lib/components/VRadio/VRadio.js
-var makeVRadioProps = propsFactory({
-  ...makeVSelectionControlProps({
-    falseIcon: "$radioOff",
-    trueIcon: "$radioOn"
-  })
-}, "VRadio");
-var VRadio = genericComponent()({
-  name: "VRadio",
-  props: makeVRadioProps(),
-  setup(props, _ref) {
-    let {
-      slots
-    } = _ref;
-    useRender(() => {
-      const controlProps = VSelectionControl.filterProps(props);
-      return createVNode(VSelectionControl, mergeProps(controlProps, {
-        "class": ["v-radio", props.class],
-        "style": props.style,
-        "type": "radio"
-      }), slots);
-    });
-    return {};
-  }
-});
-
-// node_modules/vuetify/lib/components/VRadioGroup/VRadioGroup.js
-import "/app/node_modules/vuetify/lib/components/VRadioGroup/VRadioGroup.css";
-var makeVRadioGroupProps = propsFactory({
-  height: {
-    type: [Number, String],
-    default: "auto"
-  },
-  ...makeVInputProps(),
-  ...omit(makeSelectionControlGroupProps(), ["multiple"]),
-  trueIcon: {
-    type: IconValue,
-    default: "$radioOn"
-  },
-  falseIcon: {
-    type: IconValue,
-    default: "$radioOff"
-  },
-  type: {
-    type: String,
-    default: "radio"
-  }
-}, "VRadioGroup");
-var VRadioGroup = genericComponent()({
-  name: "VRadioGroup",
-  inheritAttrs: false,
-  props: makeVRadioGroupProps(),
-  emits: {
-    "update:modelValue": (value) => true
-  },
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const uid = useId();
-    const id = computed(() => props.id || `radio-group-${uid}`);
-    const model = useProxiedModel(props, "modelValue");
-    const inputRef = ref();
-    useRender(() => {
-      const [rootAttrs, controlAttrs] = filterInputAttrs(attrs);
-      const inputProps = VInput.filterProps(props);
-      const controlProps = VSelectionControl.filterProps(props);
-      const label = slots.label ? slots.label({
-        label: props.label,
-        props: {
-          for: id.value
-        }
-      }) : props.label;
-      return createVNode(VInput, mergeProps({
-        "ref": inputRef,
-        "class": ["v-radio-group", props.class],
-        "style": props.style
-      }, rootAttrs, inputProps, {
-        "modelValue": model.value,
-        "onUpdate:modelValue": ($event) => model.value = $event,
-        "id": id.value
-      }), {
-        ...slots,
-        default: (_ref2) => {
-          let {
-            id: id2,
-            messagesId,
-            isDisabled,
-            isReadonly
-          } = _ref2;
-          return createBaseVNode(Fragment, null, [label && createVNode(VLabel, {
-            "id": id2.value
-          }, {
-            default: () => [label]
-          }), createVNode(VSelectionControlGroup, mergeProps(controlProps, {
-            "id": id2.value,
-            "aria-describedby": messagesId.value,
-            "defaultsTarget": "VRadio",
-            "trueIcon": props.trueIcon,
-            "falseIcon": props.falseIcon,
-            "type": props.type,
-            "disabled": isDisabled.value,
-            "readonly": isReadonly.value,
-            "aria-labelledby": label ? id2.value : void 0,
-            "multiple": false
-          }, controlAttrs, {
-            "modelValue": model.value,
-            "onUpdate:modelValue": ($event) => model.value = $event
-          }), slots)]);
-        }
-      });
-    });
-    return forwardRefs({}, inputRef);
-  }
-});
-
 // node_modules/vuetify/lib/components/VRangeSlider/VRangeSlider.js
 import "/app/node_modules/vuetify/lib/components/VSlider/VSlider.css";
 var makeVRangeSliderProps = propsFactory({
@@ -7830,129 +5908,6 @@ var VRangeSlider = genericComponent()({
         return (_a2 = startThumbRef.value) == null ? void 0 : _a2.$el.focus();
       }
     }, inputRef);
-  }
-});
-
-// node_modules/vuetify/lib/components/VSkeletonLoader/VSkeletonLoader.js
-import "/app/node_modules/vuetify/lib/components/VSkeletonLoader/VSkeletonLoader.css";
-var rootTypes = {
-  actions: "button@2",
-  article: "heading, paragraph",
-  avatar: "avatar",
-  button: "button",
-  card: "image, heading",
-  "card-avatar": "image, list-item-avatar",
-  chip: "chip",
-  "date-picker": "list-item, heading, divider, date-picker-options, date-picker-days, actions",
-  "date-picker-options": "text, avatar@2",
-  "date-picker-days": "avatar@28",
-  divider: "divider",
-  heading: "heading",
-  image: "image",
-  "list-item": "text",
-  "list-item-avatar": "avatar, text",
-  "list-item-two-line": "sentences",
-  "list-item-avatar-two-line": "avatar, sentences",
-  "list-item-three-line": "paragraph",
-  "list-item-avatar-three-line": "avatar, paragraph",
-  ossein: "ossein",
-  paragraph: "text@3",
-  sentences: "text@2",
-  subtitle: "text",
-  table: "table-heading, table-thead, table-tbody, table-tfoot",
-  "table-heading": "chip, text",
-  "table-thead": "heading@6",
-  "table-tbody": "table-row-divider@6",
-  "table-row-divider": "table-row, divider",
-  "table-row": "text@6",
-  "table-tfoot": "text@2, avatar@2",
-  text: "text"
-};
-function genBone(type) {
-  let children = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : [];
-  return createBaseVNode("div", {
-    "class": normalizeClass(["v-skeleton-loader__bone", `v-skeleton-loader__${type}`])
-  }, [children]);
-}
-function genBones(bone) {
-  const [type, length] = bone.split("@");
-  return Array.from({
-    length
-  }).map(() => genStructure(type));
-}
-function genStructure(type) {
-  let children = [];
-  if (!type) return children;
-  const bone = rootTypes[type];
-  if (type === bone) {
-  } else if (type.includes(",")) return mapBones(type);
-  else if (type.includes("@")) return genBones(type);
-  else if (bone.includes(",")) children = mapBones(bone);
-  else if (bone.includes("@")) children = genBones(bone);
-  else if (bone) children.push(genStructure(bone));
-  return [genBone(type, children)];
-}
-function mapBones(bones) {
-  return bones.replace(/\s/g, "").split(",").map(genStructure);
-}
-var makeVSkeletonLoaderProps = propsFactory({
-  boilerplate: Boolean,
-  color: String,
-  loading: Boolean,
-  loadingText: {
-    type: String,
-    default: "$vuetify.loading"
-  },
-  type: {
-    type: [String, Array],
-    default: "ossein"
-  },
-  ...makeDimensionProps(),
-  ...makeElevationProps(),
-  ...makeThemeProps()
-}, "VSkeletonLoader");
-var VSkeletonLoader = genericComponent()({
-  name: "VSkeletonLoader",
-  inheritAttrs: false,
-  props: makeVSkeletonLoaderProps(),
-  setup(props, _ref) {
-    let {
-      attrs,
-      slots
-    } = _ref;
-    const {
-      backgroundColorClasses,
-      backgroundColorStyles
-    } = useBackgroundColor(() => props.color);
-    const {
-      dimensionStyles
-    } = useDimension(props);
-    const {
-      elevationClasses
-    } = useElevation(props);
-    const {
-      themeClasses
-    } = provideTheme(props);
-    const {
-      t
-    } = useLocale();
-    const items = computed(() => genStructure(wrapInArray(props.type).join(",")));
-    useRender(() => {
-      var _a2;
-      const isLoading = !slots.default || props.loading;
-      const loadingProps = props.boilerplate || !isLoading ? {} : {
-        ariaLive: "polite",
-        ariaLabel: t(props.loadingText),
-        role: "alert"
-      };
-      return createBaseVNode(Fragment, null, [isLoading ? createBaseVNode("div", mergeProps({
-        "class": ["v-skeleton-loader", {
-          "v-skeleton-loader--boilerplate": props.boilerplate
-        }, themeClasses.value, backgroundColorClasses.value, elevationClasses.value],
-        "style": [backgroundColorStyles.value, dimensionStyles.value]
-      }, loadingProps, attrs), [items.value]) : (_a2 = slots.default) == null ? void 0 : _a2.call(slots)]);
-    });
-    return {};
   }
 });
 
@@ -8797,7 +6752,7 @@ var VTimePickerClock = genericComponent()({
     function handScale(value) {
       return isInner(value) ? innerRadiusScale.value : 1;
     }
-    function getPosition2(value) {
+    function getPosition(value) {
       const rotateRadians = props.rotate * Math.PI / 180;
       return {
         x: Math.sin((value - props.min) * degrees.value + rotateRadians) * handScale(value),
@@ -8813,7 +6768,7 @@ var VTimePickerClock = genericComponent()({
       const {
         x,
         y
-      } = getPosition2(i);
+      } = getPosition(i);
       return {
         left: `${Math.round(50 + x * 50)}%`,
         top: `${Math.round(50 + y * 50)}%`

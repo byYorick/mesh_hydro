@@ -169,6 +169,80 @@
                   <v-card-text>
                     <h3 class="mb-4">Конфигурация узла</h3>
 
+                    <v-alert
+                      v-if="isRootNode"
+                      type="info"
+                      variant="tonal"
+                      class="mb-4"
+                    >
+                      Для Root узла необходимо указать параметры mesh-сети и подключения к MQTT/Wi-Fi.
+                    </v-alert>
+
+                    <v-row v-if="isRootNode" class="mb-2">
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="newNode.config.mesh_id"
+                          label="Mesh Network ID *"
+                          variant="outlined"
+                          :rules="[rules.meshId]"
+                          hint="Пример: zone_greenhouse_1"
+                          persistent-hint
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="newNode.config.root_node_id"
+                          label="Root Node ID *"
+                          variant="outlined"
+                          :rules="[rules.required]"
+                          hint="Идентификатор узла в mesh-сети"
+                          persistent-hint
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+
+                    <v-row v-if="isRootNode" class="mb-2">
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="newNode.config.mqtt_broker_host"
+                          label="MQTT Host *"
+                          variant="outlined"
+                          :rules="[rules.host]"
+                          hint="Например: 192.168.1.100"
+                          persistent-hint
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model.number="newNode.config.mqtt_broker_port"
+                          label="MQTT Port *"
+                          type="number"
+                          variant="outlined"
+                          :rules="[rules.port]"
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+
+                    <v-row v-if="isRootNode" class="mb-6">
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="newNode.config.wifi_ssid"
+                          label="Wi-Fi SSID *"
+                          variant="outlined"
+                          :rules="[rules.required]"
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="newNode.config.wifi_password"
+                          label="Wi-Fi пароль *"
+                          variant="outlined"
+                          :type="'password'"
+                          :rules="[rules.required]"
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+
                     <!-- Common config -->
                     <v-text-field
                       v-model.number="newNode.config.interval"
@@ -441,6 +515,12 @@ const newNode = ref({
   description: '',
   config: {
     interval: 30,
+    mesh_id: '',
+    root_node_id: '',
+    mqtt_broker_host: '192.168.1.100',
+    mqtt_broker_port: 1883,
+    wifi_ssid: '',
+    wifi_password: '',
   },
   metadata: {},
 })
@@ -496,12 +576,24 @@ const rules = {
     const pattern = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i
     return pattern.test(v) || 'Неверный формат MAC адреса'
   },
+  meshId: v => {
+    if (!v) return 'Укажите mesh ID'
+    const pattern = /^[a-zA-Z0-9_-]+$/
+    return pattern.test(v) || 'Используйте буквы, цифры, - или _'
+  },
+  host: v => !!v || 'Укажите адрес брокера',
+  port: v => {
+    const num = Number(v)
+    return (num > 0 && num < 65536) || 'Порт 1-65535'
+  },
 }
 
 const suggestedPrefix = computed(() => {
   if (!newNode.value.node_type) return ''
   return `${newNode.value.node_type}_`
 })
+
+const isRootNode = computed(() => newNode.value.node_type === 'root')
 
 const canProceed = computed(() => {
   if (step.value === 1) {
@@ -515,8 +607,16 @@ const canProceed = computed(() => {
     return hasNodeId && hasZone
   }
   if (step.value === 3) {
-    // Шаг конфигурации - всегда можно продолжить
-    return true
+    if (!isRootNode.value) {
+      return true
+    }
+    const cfg = newNode.value.config
+    return !!cfg.mesh_id &&
+      !!cfg.root_node_id &&
+      !!cfg.mqtt_broker_host &&
+      !!cfg.mqtt_broker_port &&
+      !!cfg.wifi_ssid &&
+      !!cfg.wifi_password
   }
   // Шаг 4 - подтверждение
   return true
@@ -543,6 +643,16 @@ watch(dialog, (val) => {
 
 watch(step, (newVal, oldVal) => {
   console.log('Step changed:', oldVal, '→', newVal)
+})
+
+watch(() => newNode.value.node_id, (val, oldVal) => {
+  if (!isRootNode.value) return
+  if (!newNode.value.config.root_node_id || newNode.value.config.root_node_id === oldVal) {
+    newNode.value.config.root_node_id = val || ''
+  }
+  if (!newNode.value.config.mesh_id && val) {
+    newNode.value.config.mesh_id = val.replace(/[^a-zA-Z0-9_-]/g, '_')
+  }
 })
 
 watch(() => newNode.value.config, (config) => {
@@ -578,6 +688,16 @@ function selectNodeType(type) {
     newNode.value.config = {
       interval: 60,
       relay_count: 4,
+    }
+  } else if (type === 'root') {
+    newNode.value.config = {
+      interval: 30,
+      mesh_id: '',
+      root_node_id: '',
+      mqtt_broker_host: '192.168.1.100',
+      mqtt_broker_port: 1883,
+      wifi_ssid: '',
+      wifi_password: '',
     }
   } else {
     newNode.value.config = {
@@ -717,6 +837,12 @@ function resetForm() {
     description: '',
     config: {
       interval: 30,
+      mesh_id: '',
+      root_node_id: '',
+      mqtt_broker_host: '192.168.1.100',
+      mqtt_broker_port: 1883,
+      wifi_ssid: '',
+      wifi_password: '',
     },
     metadata: {},
   }

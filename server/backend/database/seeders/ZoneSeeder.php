@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Zone;
 use App\Models\Node;
+use App\Models\Greenhouse;
 
 class ZoneSeeder extends Seeder
 {
@@ -13,6 +14,19 @@ class ZoneSeeder extends Seeder
      */
     public function run(): void
     {
+        $greenhouse = Greenhouse::firstOrCreate(
+            ['code' => 'GH-LEGACY'],
+            [
+                'name' => 'Legacy Demo Greenhouse',
+                'location' => 'Основной комплекс',
+                'description' => 'Базовый набор зон и узлов для dev окружения',
+                'timezone' => 'Europe/Moscow',
+                'status' => 'active',
+                'mesh_group' => 'legacy_group',
+                'root_node_id' => 'root_001',
+            ]
+        );
+
         // ⚠️ Важно: Сначала создаем Root Nodes, потом зоны
 
         $rootNodes = [
@@ -41,6 +55,7 @@ class ZoneSeeder extends Seeder
                     'node_type' => 'root',
                     'root_node_id' => $rootData['node_id'], // Root сам себя
                     'zone' => $rootData['zone_name'], // Deprecated field
+                    'greenhouse_id' => $greenhouse->id,
                     'online' => true,
                     'last_seen_at' => now(),
                     'config' => [
@@ -70,6 +85,7 @@ class ZoneSeeder extends Seeder
                 'description' => 'NFT (Nutrient Film Technique) система для выращивания зелени и салатов. Проточная система с тонким слоем питательного раствора.',
                 'root_node_id' => 'root_001',
                 'mesh_network_id' => 'HYDRO1_ZONE1',
+                'greenhouse_id' => $greenhouse->id,
                 'mqtt_topic_prefix' => 'hydro/zone1/',
                 'location' => 'Комната 1',
                 'zone_type' => 'nft',
@@ -91,6 +107,7 @@ class ZoneSeeder extends Seeder
                 'description' => 'DWC (Deep Water Culture) система для выращивания крупных растений. Корни погружены в насыщенный кислородом питательный раствор.',
                 'root_node_id' => 'root_002',
                 'mesh_network_id' => 'HYDRO1_ZONE2',
+                'greenhouse_id' => $greenhouse->id,
                 'mqtt_topic_prefix' => 'hydro/zone2/',
                 'location' => 'Комната 2',
                 'zone_type' => 'dwc',
@@ -111,6 +128,7 @@ class ZoneSeeder extends Seeder
                 'description' => 'Система капельного полива для теплицы. Большой объем для промышленного выращивания томатов, огурцов и клубники.',
                 'root_node_id' => 'root_003',
                 'mesh_network_id' => 'HYDRO1_ZONE3',
+                'greenhouse_id' => $greenhouse->id,
                 'mqtt_topic_prefix' => 'hydro/zone3/',
                 'location' => 'Теплица секция A',
                 'zone_type' => 'drip',
@@ -154,6 +172,7 @@ class ZoneSeeder extends Seeder
                     [
                         'node_type' => $nodeType,
                         'root_node_id' => $zoneData['root_node_id'],
+                        'greenhouse_id' => $greenhouse->id,
                         'zone' => $zoneData['name'], // Deprecated field
                         'online' => rand(0, 10) > 2, // 80% онлайн
                         'last_seen_at' => now()->subMinutes(rand(1, 15)),

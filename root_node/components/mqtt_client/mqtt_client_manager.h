@@ -82,10 +82,11 @@ esp_err_t mqtt_client_manager_reconnect(void);
 /**
  * @brief Отправка discovery сообщения
  * 
- * Публикует информацию о ROOT узле в hydro/discovery
+ * Публикует информацию о ROOT узле в prefix/discovery
  * Используется при первом подключении и периодически для регистрации на сервере
  */
 void mqtt_client_manager_send_discovery(void);
+void mqtt_client_manager_send_heartbeat(void);
 
 /**
  * @brief ⭐ ЗОНИРОВАНИЕ: Установка MQTT Topic Prefix для зоны

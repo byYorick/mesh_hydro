@@ -25,6 +25,7 @@ class Node extends Model
         'node_id',        // "ph_ec_001", "climate_001"
         'node_type',      // "ph_ec", "climate", "relay", "water", "display", "root"
         'root_node_id',   // ⭐ НОВОЕ: "root_001" - привязка к Root Node
+        'greenhouse_id',
         'zone',           // Deprecated: "Zone 1", "Zone 2" (для обратной совместимости)
         'mac_address',    // "AA:BB:CC:DD:EE:FF"
         'online',         // true/false
@@ -41,6 +42,7 @@ class Node extends Model
         'last_seen_at' => 'datetime',
         'config' => 'array',
         'metadata' => 'array',
+        'greenhouse_id' => 'integer',
     ];
 
     /**
@@ -49,6 +51,11 @@ class Node extends Model
     public function rootNode(): BelongsTo
     {
         return $this->belongsTo(Node::class, 'root_node_id', 'node_id');
+    }
+
+    public function greenhouse(): BelongsTo
+    {
+        return $this->belongsTo(Greenhouse::class);
     }
 
     /**
@@ -62,11 +69,11 @@ class Node extends Model
     }
 
     /**
-     * ⭐ ЗОНИРОВАНИЕ: Зона узла (через root_node_id)
+     * ⭐ ЗОНИРОВАНИЕ: Связь с записью зоны по mesh_id (колонка zone)
      */
-    public function zone(): HasOne
+    public function zoneRelation(): BelongsTo
     {
-        return $this->hasOne(Zone::class, 'root_node_id', 'root_node_id');
+        return $this->belongsTo(Zone::class, 'zone', 'mesh_network_id');
     }
 
     /**

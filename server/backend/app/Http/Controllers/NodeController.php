@@ -37,9 +37,15 @@ class NodeController extends Controller
             }
         }
 
+        if ($request->filled('greenhouse_id')) {
+            $query->where('greenhouse_id', $request->integer('greenhouse_id'));
+        }
+
         // Оптимизированная загрузка узлов с последней телеметрией
         // Используем eager loading для избежания N+1 запросов
-        $nodes = $query->with('lastTelemetry')->get();
+        $nodes = $query
+            ->with(['lastTelemetry', 'greenhouse'])
+            ->get();
 
         // Добавление вычисляемых полей для каждого узла
         $nodes->each(function ($node) {
@@ -52,6 +58,7 @@ class NodeController extends Controller
             $node->last_telemetry = $node->lastTelemetry;
             // Также добавляем last_data для обратной совместимости
             $node->last_data = $node->lastTelemetry?->data;
+            $node->greenhouse_name = $node->greenhouse?->name;
         });
 
         return response()->json($nodes);
@@ -72,7 +79,8 @@ class NodeController extends Controller
             },
             'commands' => function ($query) {
                 $query->latest()->limit(20);
-            }
+            },
+            'greenhouse',
         ])
         ->where('node_id', $nodeId)
         ->firstOrFail();
@@ -84,6 +92,7 @@ class NodeController extends Controller
         
         // Добавляем last_telemetry для совместимости со старым форматом
         $node->last_telemetry = $node->lastTelemetry;
+        $node->greenhouse_name = $node->greenhouse?->name;
 
         return response()->json($node);
     }
@@ -293,9 +302,14 @@ class NodeController extends Controller
             'mac_address' => 'nullable|string|size:17',
             'config' => 'nullable|array',
             'metadata' => 'nullable|array',
+            'greenhouse_id' => 'nullable|integer|exists:greenhouses,id',
         ]);
 
         $node->update($validated);
+
+        if (array_key_exists('greenhouse_id', $validated)) {
+            $node->load('greenhouse');
+        }
 
         return response()->json([
             'success' => true,

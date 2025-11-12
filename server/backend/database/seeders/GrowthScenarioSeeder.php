@@ -24,7 +24,7 @@ class GrowthScenarioSeeder extends Seeder
 
                 $assigned = [];
                 foreach ($scenario['nodes'] as $node) {
-                    $created = $this->upsertChildNode($root->node_id, $node);
+                    $created = $this->upsertChildNode($root, $node);
                     $assigned[$node['role']] = $created->node_id;
                 }
 
@@ -256,6 +256,7 @@ class GrowthScenarioSeeder extends Seeder
                 'ssid' => 'HydroMeshDev',
                 'rssi' => -42,
             ],
+            'location' => $rootData['location'] ?? null,
         ], $rootData['metadata'] ?? []);
 
         return Node::updateOrCreate(
@@ -263,7 +264,7 @@ class GrowthScenarioSeeder extends Seeder
             [
                 'node_type' => 'root',
                 'root_node_id' => $rootData['node_id'],
-                'zone' => $rootData['location'] ?? null,
+                'zone' => $rootData['mesh_network_id'] ?? 'UNCONFIGURED',
                 'online' => true,
                 'last_seen_at' => now()->subMinutes(rand(1, 5)),
                 'config' => [
@@ -276,8 +277,12 @@ class GrowthScenarioSeeder extends Seeder
         );
     }
 
-    private function upsertChildNode(string $rootNodeId, array $nodeData): Node
+    private function upsertChildNode(Node $rootNode, array $nodeData): Node
     {
+        $meshId = $nodeData['mesh_network_id']
+            ?? $rootNode->zone
+            ?? ($rootNode->metadata['mesh_network_id'] ?? 'UNCONFIGURED');
+
         $defaults = [
             'online' => $nodeData['online'] ?? true,
             'last_seen_at' => $nodeData['last_seen_at'] ?? now()->subMinutes(rand(2, 25)),
@@ -292,8 +297,8 @@ class GrowthScenarioSeeder extends Seeder
             ['node_id' => $nodeData['node_id']],
             array_merge($defaults, [
                 'node_type' => $nodeData['type'],
-                'root_node_id' => $rootNodeId,
-                'zone' => $nodeData['zone_label'] ?? null,
+                'root_node_id' => $rootNode->node_id,
+                'zone' => $meshId,
             ])
         );
     }

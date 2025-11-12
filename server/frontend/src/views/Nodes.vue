@@ -22,7 +22,7 @@
 
     <!-- Filters -->
     <v-row>
-      <v-col cols="12" md="6">
+      <v-col cols="12" md="4">
         <v-text-field
           v-model="search"
           label="Поиск узлов"
@@ -33,7 +33,15 @@
         ></v-text-field>
       </v-col>
 
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="4">
+        <ZoneSelector
+          :show-refresh="true"
+          @change="handleZoneChange"
+          @loaded="handleZonesLoaded"
+        />
+      </v-col>
+
+      <v-col cols="12" md="2">
         <v-select
           v-model="filterType"
           :items="nodeTypes"
@@ -44,7 +52,7 @@
         ></v-select>
       </v-col>
 
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="2">
         <v-select
           v-model="filterStatus"
           :items="['online', 'offline']"
@@ -103,13 +111,16 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
+import { useZonesStore } from '@/stores/zones'
 import { useDebounce } from '@/composables/useDebounce'
 import NodeCard from '@/components/NodeCard.vue'
 import AddNodeDialog from '@/components/AddNodeDialog.vue'
+import ZoneSelector from '@/components/ZoneSelector.vue'
 import api from '@/services/api'
 
 const appStore = useAppStore()
 const nodesStore = useNodesStore()
+const zonesStore = useZonesStore()
 
 const search = ref('')
 const filterType = ref(null)
@@ -176,8 +187,34 @@ const filteredNodes = computed(() => {
 })
 
 onMounted(async () => {
-  await nodesStore.fetchNodes()
+  try {
+    await zonesStore.fetchZones()
+  } catch (error) {
+    console.error('Nodes.vue: failed to fetch zones', error)
+  }
+  await fetchNodesForCurrentZone()
 })
+
+async function fetchNodesForCurrentZone() {
+  const zone = zonesStore.selectedZone
+  try {
+    if (zone) {
+      await nodesStore.fetchNodes({ zone })
+    } else {
+      await nodesStore.fetchNodes()
+    }
+  } catch (error) {
+    console.error('Nodes.vue: fetchNodesForCurrentZone failed', error)
+  }
+}
+
+async function handleZoneChange() {
+  await fetchNodesForCurrentZone()
+}
+
+async function handleZonesLoaded() {
+  await fetchNodesForCurrentZone()
+}
 
 // Send command
 async function sendCommand(nodeId, { command, params }) {

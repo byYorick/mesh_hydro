@@ -10,6 +10,13 @@
 #include "cJSON.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+
+#define NODE_CONFIG_NODE_ID_MAX_LEN 32
+#define NODE_CONFIG_NODE_TYPE_LEN 16
+#define NODE_CONFIG_ROOT_ID_MAX_LEN 32
+#define NODE_CONFIG_ZONE_LEN 32
+#define NODE_CONFIG_MESH_ID_MAX_LEN 32
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,13 +24,13 @@ extern "C" {
 
 // ⭐ Базовая конфигурация (общая для всех узлов) - С ЗОНИРОВАНИЕМ
 typedef struct {
-    char node_id[32];             ///< Уникальный ID узла
-    char node_type[16];           ///< Тип узла (ph_ec, climate, etc)
-    char root_node_id[32];        ///< ⭐ ЗОНИРОВАНИЕ: ID Root Node (зоны)
-    char zone[32];                ///< [DEPRECATED] Зона/помещение (использовать root_node_id)
-    bool config_valid;            ///< Флаг валидности конфигурации
-    uint32_t config_version;      ///< Версия конфигурации
-    uint64_t last_updated;        ///< Время последнего обновления
+    char node_id[NODE_CONFIG_NODE_ID_MAX_LEN];
+    char node_type[NODE_CONFIG_NODE_TYPE_LEN];
+    char root_node_id[NODE_CONFIG_ROOT_ID_MAX_LEN];
+    char zone[NODE_CONFIG_ZONE_LEN];
+    bool config_valid;
+    uint32_t config_version;
+    uint64_t last_updated;
 } base_config_t;
 
 // PID параметры для насоса
@@ -196,6 +203,13 @@ typedef struct {
     uint32_t max_pump_time_ms;
     bool water_level_check;
 } water_node_config_t;
+
+bool node_config_is_configured(void);
+void node_config_generate_setup_pin(char *pin_out, size_t pin_size);
+void node_config_generate_temp_mesh_id(const char *pin, char *mesh_id_out, size_t mesh_id_size);
+esp_err_t node_config_get_router_credentials(char *ssid, size_t ssid_len, char *password, size_t password_len);
+esp_err_t node_config_set_router_credentials(const char *ssid, const char *password);
+esp_err_t node_config_mark_configured(bool configured);
 
 /**
  * @brief Инициализация NVS

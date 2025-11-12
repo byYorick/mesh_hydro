@@ -64,6 +64,7 @@ export interface GrowthCycle {
   zone_id: number
   preset_id: number
   culture_id: number
+  greenhouse_id?: number | null
   current_stage_id?: number
   started_at: string
   expected_harvest_at?: string
@@ -161,6 +162,18 @@ export const useGrowthStore = defineStore('growth', () => {
       byZone[cycle.zone_id].push(cycle)
     })
     return byZone
+  })
+
+  const cyclesByGreenhouse = computed(() => {
+    const byGreenhouse: Record<string, GrowthCycle[]> = {}
+    cycles.value.forEach(cycle => {
+      const key = cycle.greenhouse_id != null ? String(cycle.greenhouse_id) : 'unassigned'
+      if (!byGreenhouse[key]) {
+        byGreenhouse[key] = []
+      }
+      byGreenhouse[key].push(cycle)
+    })
+    return byGreenhouse
   })
 
   // Actions - Cultures
@@ -293,7 +306,13 @@ export const useGrowthStore = defineStore('growth', () => {
     }
   }
 
-  async function createCycle(cycleData: { zone_id: number; preset_id: number; plant_count?: number; notes?: string }) {
+  async function createCycle(cycleData: {
+    zone_id: number
+    preset_id: number
+    plant_count?: number
+    notes?: string
+    greenhouse_id?: number | null
+  }) {
     loading.value = true
     error.value = null
     
@@ -437,6 +456,7 @@ export const useGrowthStore = defineStore('growth', () => {
     activeCycles,
     completedCycles,
     cyclesByZone,
+    cyclesByGreenhouse,
     
     // Actions
     fetchCultures,

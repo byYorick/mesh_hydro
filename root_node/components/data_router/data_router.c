@@ -8,16 +8,19 @@
 #include "mesh_protocol.h"
 #include "node_registry.h"
 #include "mqtt_client_manager.h"
+#include "root_config.h"
+#include "zone_config.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_heap_caps.h"
 #include <string.h>
 
 static const char *TAG = "data_router";
 
-// MQTT топики
-#define MQTT_TOPIC_TELEMETRY    "hydro/telemetry"
-#define MQTT_TOPIC_EVENT        "hydro/event"
-#define MQTT_TOPIC_HEARTBEAT    "hydro/heartbeat"
+// Ограничения
+#define MAX_MESH_DATA_SIZE     2048
+
+// Удалено s_topic_prefix - используем zone_config и mesh_topic_format
 
 esp_err_t data_router_init(void) {
     ESP_LOGI(TAG, "Data Router initialized");
@@ -31,11 +34,28 @@ esp_err_t data_router_init(void) {
 
 void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, size_t len) {
     ESP_LOGI(TAG, "📥 Mesh data received: %d bytes from "MACSTR, len, MAC2STR(src_addr));
+
+    if (data == NULL) {
+        ESP_LOGE(TAG, "Received NULL data pointer");
+        return;
+    }
+
+    if (len == 0U) {
+        ESP_LOGW(TAG, "Received empty payload, dropping");
+        return;
+    }
+
+    if (len > MAX_MESH_DATA_SIZE) {
+        ESP_LOGE(TAG, "Payload too large: %u bytes (max %u). Dropping message.", (unsigned)len, (unsigned)MAX_MESH_DATA_SIZE);
+        return;
+    }
     
     // ВАЖНО: Создаём NULL-terminated копию для безопасного парсинга и публикации
     char *data_copy = malloc(len + 1);
     if (data_copy == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for data copy");
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        ESP_LOGE(TAG, "Failed to allocate memory for data copy (%u bytes). Free heap: %u", (unsigned)(len + 1), (unsigned)free_heap);
+        // TODO: Метрика/событие для отслеживания нехватки памяти
         return;
     }
     memcpy(data_copy, data, len);
@@ -47,8 +67,28 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
     memcpy(preview, data_copy, preview_len);
     ESP_LOGI(TAG, "   Data: %s%s", preview, (len > 100) ? "..." : "");
 
+    const char *json_error_pos = NULL;
+    if (!mesh_protocol_validate_structure(data_copy, &json_error_pos)) {
+        size_t error_offset = json_error_pos ? (size_t)(json_error_pos - data_copy) : len;
+        ESP_LOGE(TAG, "Invalid JSON structure (offset %u)", (unsigned)error_offset);
+
+        if (json_error_pos != NULL && error_offset < len) {
+            char context[33] = {0};
+            size_t remaining = len - error_offset;
+            size_t copy_len = remaining > 32 ? 32 : remaining;
+            for (size_t i = 0; i < copy_len; ++i) {
+                char c = json_error_pos[i];
+                context[i] = (c >= 32 && c <= 126) ? c : '?';
+            }
+            ESP_LOGE(TAG, "   Near: \"%s\"%s", context, (remaining > copy_len) ? "..." : "");
+        }
+
+        free(data_copy);
+        return;
+    }
+
     // Парсинг JSON (используем data_copy с '\0')
-    mesh_message_t msg;
+    mesh_message_t msg = {0};
     if (!mesh_protocol_parse(data_copy, &msg)) {
         ESP_LOGE(TAG, "❌ Failed to parse mesh message!");
         ESP_LOGE(TAG, "   Raw data: %s", data_copy);
@@ -57,6 +97,25 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
     }
     
     ESP_LOGI(TAG, "✅ Message parsed: type=%d, node_id=%s", msg.type, msg.node_id);
+
+    const char *our_mesh = zone_config_get_mesh_id();
+    if (!zone_config_validate(our_mesh)) {
+        ESP_LOGE(TAG, "Router mesh_id is not configured, dropping message");
+        mesh_protocol_free_message(&msg);
+        free(data_copy);
+        return;
+    }
+
+    if (msg.mesh_network_id[0] != '\0' &&
+        strcmp(msg.mesh_network_id, our_mesh) != 0) {
+        ESP_LOGW(TAG,
+                 "Message for different mesh ignored: msg.mesh_id=%s, ours=%s",
+                 msg.mesh_network_id,
+                 our_mesh);
+        mesh_protocol_free_message(&msg);
+        free(data_copy);
+        return;
+    }
 
     // Обновление реестра узлов (отметка последнего контакта)
     node_registry_update_last_seen(msg.node_id, src_addr);
@@ -69,12 +128,15 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             // Обновление данных в реестре
             node_registry_update_data(msg.node_id, msg.data);
             
-            // Отправка в MQTT с node_id в топике (для backend!)
+            // Отправка в MQTT с использованием mesh_topic_format
             if (mqtt_client_manager_is_connected()) {
-                char topic[64];
-                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_TELEMETRY, msg.node_id);
+                char topic[192];
+                if (!mesh_topic_format(topic, sizeof(topic), NULL,
+                                      "telemetry", msg.node_id)) {
+                    ESP_LOGE(TAG, "Failed to format telemetry topic");
+                    break;
+                }
                 
-                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
                 esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
                 if (err == ESP_OK) {
                     ESP_LOGI(TAG, "   ✓ Telemetry published to %s", topic);
@@ -91,10 +153,13 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             ESP_LOGI(TAG, "🔔 Event from %s → MQTT", msg.node_id);
             
             if (mqtt_client_manager_is_connected()) {
-                char topic[64];
-                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_EVENT, msg.node_id);
+                char topic[192];
+                if (!mesh_topic_format(topic, sizeof(topic), NULL,
+                                      "event", msg.node_id)) {
+                    ESP_LOGE(TAG, "Failed to format event topic");
+                    break;
+                }
                 
-                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
                 esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
                 if (err == ESP_OK) {
                     ESP_LOGI(TAG, "   ✓ Event published to %s", topic);
@@ -118,12 +183,15 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             ESP_LOGI(TAG, "💓 Heartbeat from %s → MQTT", msg.node_id);
             
             // Heartbeat обновляет только реестр (уже сделано выше)
-            // Отправка в MQTT с node_id в топике (для backend!)
+            // Отправка в MQTT с использованием mesh_topic_format
             if (mqtt_client_manager_is_connected()) {
-                char topic[64];
-                snprintf(topic, sizeof(topic), "%s/%s", MQTT_TOPIC_HEARTBEAT, msg.node_id);
+                char topic[192];
+                if (!mesh_topic_format(topic, sizeof(topic), NULL,
+                                      "heartbeat", msg.node_id)) {
+                    ESP_LOGE(TAG, "Failed to format heartbeat topic");
+                    break;
+                }
                 
-                // ИСПРАВЛЕНИЕ: используем data_copy с '\0' для правильного strlen()
                 esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
                 if (err == ESP_OK) {
                     ESP_LOGI(TAG, "   ✓ Heartbeat published to %s (len=%d)", topic, len);
@@ -150,7 +218,7 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
                     if (nodes_data) {
                         // Создание response сообщения
                         char response_buf[2048];
-                        if (mesh_protocol_create_response(msg.node_id, nodes_data,
+                        if (mesh_protocol_create_response(msg.node_id, msg.root_node_id, msg.mesh_network_id, nodes_data,
                                                           response_buf, sizeof(response_buf))) {
                             // Отправка обратно Display узлу
                             mesh_manager_send(src_addr, (uint8_t *)response_buf, strlen(response_buf));
@@ -169,8 +237,12 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
             // Это может быть config_response от pH/EC ноды
             // Публикуем в MQTT для backend
             if (mqtt_client_manager_is_connected()) {
-                char topic[64];
-                snprintf(topic, sizeof(topic), "hydro/config_response/%s", msg.node_id);
+                char topic[192];
+                if (!mesh_topic_format(topic, sizeof(topic), NULL,
+                                      "config_response", msg.node_id)) {
+                    ESP_LOGE(TAG, "Failed to format config_response topic");
+                    break;
+                }
                 
                 esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
                 if (err == ESP_OK) {
@@ -180,6 +252,27 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
                 }
             } else {
                 ESP_LOGW(TAG, "MQTT offline, config response dropped");
+            }
+            break;
+
+        case MESH_MSG_DISCOVERY:
+        case MESH_MSG_CONFIG_CONFIRMATION:
+            if (mqtt_client_manager_is_connected()) {
+                const char *type_str = (msg.type == MESH_MSG_DISCOVERY) ? "discovery" : "config_confirmation";
+                char topic[192];
+                if (!mesh_topic_format(topic, sizeof(topic), NULL,
+                                      "discovery", msg.node_id)) {
+                    ESP_LOGE(TAG, "Failed to format discovery topic");
+                    break;
+                }
+                esp_err_t err = mqtt_client_manager_publish(topic, data_copy);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "🔍 %s forwarded to MQTT (%s)", type_str, topic);
+                } else {
+                    ESP_LOGW(TAG, "✗ Failed to publish %s: %s", type_str, esp_err_to_name(err));
+                }
+            } else {
+                ESP_LOGW(TAG, "MQTT offline, discovery message dropped");
             }
             break;
 
@@ -195,38 +288,58 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
 void data_router_handle_mqtt_data(const char *topic, const char *data, int data_len) {
     ESP_LOGI(TAG, "MQTT data received: %s (%d bytes)", topic, data_len);
 
-    // Парсинг топика: hydro/command/{node_id} или hydro/config/{node_id}
-    char node_id[32] = {0};
-    bool is_command = (strstr(topic, "/command/") != NULL);
-    bool is_config = (strstr(topic, "/config/") != NULL);
+    // Ожидаем формат: hydro/{mesh_id}/{command|config}/{node_id}
+    char topic_copy[256];
+    strncpy(topic_copy, topic, sizeof(topic_copy) - 1);
+    topic_copy[sizeof(topic_copy) - 1] = '\0';
+    
+    char *saveptr;
+    char *part1 = strtok_r(topic_copy, "/", &saveptr);  // "hydro"
+    char *mesh_id = strtok_r(NULL, "/", &saveptr);      // mesh_id
+    char *action = strtok_r(NULL, "/", &saveptr);       // "command" or "config"
+    char *node_id = strtok_r(NULL, "/", &saveptr);      // node_id
+    
+    if (!part1 || strcmp(part1, "hydro") != 0 || !mesh_id || !action || !node_id) {
+        ESP_LOGW(TAG, "Invalid topic format: %s (expected hydro/{mesh_id}/{command|config}/{node_id})", topic);
+        return;
+    }
+    
+    // Проверка что mesh_id совпадает с нашим
+    const char *our_mesh = zone_config_get_mesh_id();
+    if (!zone_config_validate(our_mesh)) {
+        ESP_LOGE(TAG, "Router mesh_id not configured, cannot process MQTT data");
+        return;
+    }
 
-    if (is_command || is_config) {
-        // Извлечение node_id из топика
-        const char *slash = strrchr(topic, '/');
-        if (slash && strlen(slash + 1) > 0) {
-            strncpy(node_id, slash + 1, sizeof(node_id) - 1);
+    if (strcmp(mesh_id, our_mesh) != 0) {
+        ESP_LOGW(TAG, "Command for different mesh: %s (ours: %s) - ignoring", mesh_id, our_mesh);
+        return;
+    }
+    
+    // Проверка типа действия
+    bool is_command = strcmp(action, "command") == 0;
+    bool is_config = strcmp(action, "config") == 0;
+    
+    if (!is_command && !is_config) {
+        ESP_LOGW(TAG, "Unknown action: %s (expected command or config)", action);
+        return;
+    }
 
-            // Поиск узла в реестре
-            node_info_t *node = node_registry_get(node_id);
-            if (node && node->online) {
-                ESP_LOGI(TAG, "Forwarding %s to %s", 
-                         is_command ? "command" : "config", node_id);
+    // Поиск узла в реестре
+    node_info_t *node = node_registry_get(node_id);
+    if (node && node->online) {
+        ESP_LOGI(TAG, "Forwarding %s to %s in zone %s",
+                 is_command ? "command" : "config", node_id, mesh_id);
 
-                // Отправка через mesh
-                esp_err_t err = mesh_manager_send(node->mac_addr, 
-                                                  (const uint8_t *)data, data_len);
-                
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to send to node: %s", esp_err_to_name(err));
-                }
-            } else {
-                ESP_LOGW(TAG, "Node %s offline or not found, message dropped", node_id);
-            }
+        esp_err_t err = mesh_manager_send(node->mac_addr,
+                                          (const uint8_t *)data, data_len);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to send to node: %s", esp_err_to_name(err));
         } else {
-            ESP_LOGW(TAG, "Invalid topic format: %s", topic);
+            ESP_LOGI(TAG, "✓ %s forwarded to %s", is_command ? "Command" : "Config", node_id);
         }
     } else {
-        ESP_LOGW(TAG, "Unknown MQTT topic: %s", topic);
+        ESP_LOGW(TAG, "Node %s offline or not found, message dropped", node_id);
     }
 }
 
