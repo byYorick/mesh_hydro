@@ -12,6 +12,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class GreenhouseController extends Controller
 {
@@ -71,27 +73,16 @@ class GreenhouseController extends Controller
 
     public function store(StoreGreenhouseRequest $request): JsonResponse
     {
-        $validated = $request->validated();
+        $payload = $this->preparePayload($request->validated());
 
-        $rootNode = null;
-        if (!empty($validated['root_node_id'])) {
-            $rootNode = Node::where('node_id', $validated['root_node_id'])->firstOrFail();
-            if (!$rootNode->isRootNode()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Указанный узел не является Root Node',
-                ], 422);
-            }
-            $validated['root_node_mac'] = $validated['root_node_mac'] ?? $rootNode->mac_address;
-        }
+        $rootNode = $this->resolveRootNode($payload);
 
-        $validated['status'] = $validated['status'] ?? 'active';
-
-        $greenhouse = DB::transaction(function () use ($validated, $rootNode) {
-            $greenhouse = Greenhouse::create($validated);
+        $greenhouse = DB::transaction(function () use ($payload, $rootNode) {
+            $greenhouse = Greenhouse::create($payload);
 
             if ($rootNode) {
                 $rootNode->update(['greenhouse_id' => $greenhouse->id]);
+                $this->linkRootZoneToGreenhouse($rootNode, $greenhouse);
             }
 
             return $greenhouse;
@@ -462,13 +453,10 @@ class GreenhouseController extends Controller
             'id' => $greenhouse->id,
             'name' => $greenhouse->name,
             'code' => $greenhouse->code,
-            'location' => $greenhouse->location,
             'description' => $greenhouse->description,
-            'timezone' => $greenhouse->timezone,
             'status' => $greenhouse->status,
             'root_node_id' => $greenhouse->root_node_id,
             'root_node_mac' => $greenhouse->root_node_mac,
-            'mesh_group' => $greenhouse->mesh_group,
             'zone_count' => $greenhouse->zones_count ?? $greenhouse->zones()->count(),
             'node_count' => $greenhouse->nodes_count ?? $greenhouse->nodes()->count(),
             'active_cycle_count' => $greenhouse->active_cycle_count ?? $greenhouse->cycles()->where('status', 'active')->count(),
@@ -476,6 +464,7 @@ class GreenhouseController extends Controller
             'image_url' => $greenhouse->image_url,
             'created_at' => optional($greenhouse->created_at)->toIso8601String(),
             'updated_at' => optional($greenhouse->updated_at)->toIso8601String(),
+            'climate_profiles' => $greenhouse->settings['climate_profiles'] ?? null,
         ];
     }
 
@@ -483,9 +472,12 @@ class GreenhouseController extends Controller
     {
         $summary = $this->formatSummary($greenhouse);
 
+        $settings = $greenhouse->settings ?? [];
+
         $summary['tags'] = $greenhouse->tags ?? [];
-        $summary['settings'] = $greenhouse->settings ?? new \stdClass();
+        $summary['settings'] = $settings ?: new \stdClass();
         $summary['notes'] = $greenhouse->description;
+        $summary['climate_profiles'] = $settings['climate_profiles'] ?? [];
         $summary['zones'] = $greenhouse->relationLoaded('zones')
             ? $greenhouse->zones->map(function (Zone $zone) {
                 return [
@@ -515,6 +507,127 @@ class GreenhouseController extends Controller
             : [];
 
         return $summary;
+    }
+
+    /**
+     * Подготавливает данные для создания теплицы.
+     */
+    private function preparePayload(array $validated): array
+    {
+        $payload = $validated;
+
+        $payload['status'] = $payload['status'] ?? 'active';
+
+        $payload['settings'] = $this->prepareSettings($payload);
+
+        if (array_key_exists('tags', $payload) && is_array($payload['tags'])) {
+            $payload['tags'] = array_values($payload['tags']);
+        }
+
+        if (empty($payload['root_node_id'])) {
+            $payload['root_node_id'] = null;
+            $payload['root_node_mac'] = null;
+        } elseif (empty($payload['root_node_mac'])) {
+            $payload['root_node_mac'] = null;
+        }
+
+        unset($payload['climate_profiles'], $payload['location'], $payload['timezone'], $payload['mesh_group']);
+
+        return $payload;
+    }
+
+    /**
+     * Проверяет и возвращает root-узел для новой теплицы.
+     *
+     * @param array $payload Передается по ссылке для обновления MAC-адреса.
+     */
+    private function resolveRootNode(array &$payload): ?Node
+    {
+        if (empty($payload['root_node_id'])) {
+            return null;
+        }
+
+        $rootNode = Node::where('node_id', $payload['root_node_id'])->first();
+
+        if (!$rootNode) {
+            throw ValidationException::withMessages([
+                'root_node_id' => 'Указанный узел не найден в системе',
+            ]);
+        }
+
+        if (!$rootNode->isRootNode()) {
+            throw ValidationException::withMessages([
+                'root_node_id' => 'Указанный узел не является Root Node',
+            ]);
+        }
+
+        if ($rootNode->root_node_id && $rootNode->root_node_id !== $rootNode->node_id) {
+            throw ValidationException::withMessages([
+                'root_node_id' => 'Узел зарегистрирован как дочерний и не может быть назначен базовым',
+            ]);
+        }
+
+        if ($rootNode->greenhouse_id) {
+            throw ValidationException::withMessages([
+                'root_node_id' => 'Узел уже привязан к другой теплице. Сначала отвяжите его.',
+            ]);
+        }
+
+        $zone = $rootNode->zoneRelation;
+        if ($zone && $zone->greenhouse_id) {
+            throw ValidationException::withMessages([
+                'root_node_id' => 'Root Node уже используется в зоне, принадлежащей другой теплице.',
+            ]);
+        }
+
+        $payload['root_node_mac'] = $rootNode->mac_address ?: ($payload['root_node_mac'] ?? null);
+
+        return $rootNode;
+    }
+
+    /**
+     * Привязывает существующую зону root-узла к теплице, если она свободна.
+     */
+    private function linkRootZoneToGreenhouse(Node $rootNode, Greenhouse $greenhouse): void
+    {
+        $zone = $rootNode->zoneRelation;
+
+        if ($zone && !$zone->greenhouse_id) {
+            $zone->update(['greenhouse_id' => $greenhouse->id]);
+        }
+    }
+
+    private function prepareSettings(array $payload): array
+    {
+        $settings = $payload['settings'] ?? [];
+        $settings = is_array($settings) ? $settings : [];
+
+        if (!empty($payload['climate_profiles']) && is_array($payload['climate_profiles'])) {
+            $settings['climate_profiles'] = $this->decorateClimateProfiles($payload['climate_profiles']);
+        }
+
+        return $settings;
+    }
+
+    private function decorateClimateProfiles(array $profiles): array
+    {
+        return array_values(array_map(function (array $profile) {
+            $profile['id'] = $profile['id'] ?? (string) Str::uuid();
+
+            if (isset($profile['day']) && empty($profile['day'])) {
+                unset($profile['day']);
+            }
+
+            if (isset($profile['night']) && empty($profile['night'])) {
+                unset($profile['night']);
+            }
+
+            if (isset($profile['settings']) && empty($profile['settings'])) {
+                unset($profile['settings']);
+            }
+
+            return $profile;
+        }, $profiles));
     }
 }
 

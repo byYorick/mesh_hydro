@@ -22,14 +22,29 @@ class GreenhouseApiTest extends TestCase
         $payload = [
             'name' => 'Test Greenhouse',
             'code' => 'GH_TEST_CREATE',
+            'description' => 'Demo greenhouse for integration tests',
             'root_node_id' => $rootNode->node_id,
+            'climate_profiles' => [
+                [
+                    'name' => 'Leafy Greens',
+                    'notes' => 'Default profile',
+                    'day' => [
+                        'temperature' => 22.5,
+                        'humidity' => 65,
+                    ],
+                    'night' => [
+                        'temperature' => 18.0,
+                    ],
+                ],
+            ],
         ];
 
         $response = $this->postJson('/api/greenhouses', $payload);
 
         $response->assertCreated()
             ->assertJsonPath('data.name', 'Test Greenhouse')
-            ->assertJsonPath('data.root_node_id', 'root_test_1001');
+            ->assertJsonPath('data.root_node_id', 'root_test_1001')
+            ->assertJsonPath('data.climate_profiles.0.name', 'Leafy Greens');
 
         $greenhouseId = $response->json('data.id');
         $this->assertDatabaseHas('greenhouses', [
@@ -37,6 +52,10 @@ class GreenhouseApiTest extends TestCase
             'code' => 'GH_TEST_CREATE',
             'root_node_id' => 'root_test_1001',
         ]);
+
+        $greenhouse = Greenhouse::findOrFail($greenhouseId);
+        $this->assertEquals('Demo greenhouse for integration tests', $greenhouse->description);
+        $this->assertEquals('Leafy Greens', $greenhouse->settings['climate_profiles'][0]['name'] ?? null);
 
         $this->assertDatabaseHas('nodes', [
             'node_id' => 'root_test_1001',
@@ -59,6 +78,16 @@ class GreenhouseApiTest extends TestCase
         $greenhouse = Greenhouse::factory()->active()->create([
             'name' => 'Detail Greenhouse',
             'code' => 'GH_DETAIL_01',
+            'description' => 'Detailed description',
+            'settings' => [
+                'climate_profiles' => [
+                    [
+                        'id' => 'profile-1',
+                        'name' => 'Demo Profile',
+                        'day' => ['temperature' => 23],
+                    ],
+                ],
+            ],
         ]);
 
         $zone = Zone::factory()->forGreenhouse($greenhouse->id)->create();
@@ -75,6 +104,7 @@ class GreenhouseApiTest extends TestCase
                 ->where('data.name', 'Detail Greenhouse')
                 ->where('data.zone_count', 1)
                 ->where('data.node_count', 1)
+                ->where('data.climate_profiles.0.name', 'Demo Profile')
                 ->where('data.zones.0.id', $zone->id)
                 ->where('data.nodes.0.node_id', 'node_detail_01')
                 ->has('data.automation_rules')

@@ -4,8 +4,35 @@ import {
   Ripple,
   Touch,
   VTooltip
+<<<<<<< HEAD:server/frontend/.vite-dev-cache/deps_temp_b070ecd7/vuetify_directives.js
 } from "./chunk-WWE3GDMZ.js";
 import "./chunk-J63P4JPV.js";
+=======
+} from "./chunk-WVBB5INN.js";
+import {
+  ClickOutside
+} from "./chunk-CR33A2MN.js";
+import "./chunk-QH73RD4Y.js";
+import {
+  Touch
+} from "./chunk-F3JGRVVN.js";
+import "./chunk-PW3B2IAK.js";
+import "./chunk-EY3FJRW6.js";
+import "./chunk-YNJSP2GN.js";
+import {
+  Ripple
+} from "./chunk-OKFONRWX.js";
+import {
+  Intersect
+} from "./chunk-5BZ3L7GI.js";
+import "./chunk-QJKQQOXD.js";
+import "./chunk-EL5URPNZ.js";
+import "./chunk-WP3ESUMW.js";
+import "./chunk-XL4SHUX5.js";
+import "./chunk-TICGPC5M.js";
+import "./chunk-CEVB7HK3.js";
+import "./chunk-76O7CYX2.js";
+>>>>>>> ae23140955cb0e10bbc3f1fc4c4364b35bc7ad19:server/frontend/.vite-dev-cache/deps/vuetify_directives.js
 import {
   consoleError,
   isObject

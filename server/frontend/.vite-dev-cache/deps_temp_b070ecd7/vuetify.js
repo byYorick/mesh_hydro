@@ -11,12 +11,31 @@ import {
   useMask
 } from "./chunk-ZBU2O7LR.js";
 import {
+<<<<<<< HEAD:server/frontend/.vite-dev-cache/deps_temp_b070ecd7/vuetify.js
   IconSymbol,
   createIcons
 } from "./chunk-JBMQ7ZRV.js";
 import {
   DisplaySymbol,
   LocaleSymbol,
+=======
+  DisplaySymbol,
+  createDisplay,
+  useDisplay
+} from "./chunk-YNJSP2GN.js";
+import "./chunk-SSWKVBM6.js";
+import {
+  IconSymbol,
+  createIcons
+} from "./chunk-JBMQ7ZRV.js";
+import {
+  LocaleSymbol,
+  createLocale,
+  useLocale,
+  useRtl
+} from "./chunk-TICGPC5M.js";
+import {
+>>>>>>> ae23140955cb0e10bbc3f1fc4c4364b35bc7ad19:server/frontend/.vite-dev-cache/deps/vuetify.js
   ThemeSymbol,
   createDisplay,
   createLocale,
@@ -25,7 +44,12 @@ import {
   useLocale,
   useRtl,
   useTheme
+<<<<<<< HEAD:server/frontend/.vite-dev-cache/deps_temp_b070ecd7/vuetify.js
 } from "./chunk-J63P4JPV.js";
+=======
+} from "./chunk-CEVB7HK3.js";
+import "./chunk-76O7CYX2.js";
+>>>>>>> ae23140955cb0e10bbc3f1fc4c4364b35bc7ad19:server/frontend/.vite-dev-cache/deps/vuetify.js
 import {
   DefaultsSymbol,
   IN_BROWSER,
