@@ -1,0 +1,805 @@
+import {
+  VCheckboxBtn,
+  VMenu,
+  VVirtualScroll,
+  makeSelectProps,
+  useMenuActivator,
+  useScrolling
+} from "./chunk-DLAYRF3U.js";
+import {
+  VList,
+  VListItem,
+  VListSubheader,
+  transformItem,
+  useItems
+} from "./chunk-WUJOG347.js";
+import {
+  VChip
+} from "./chunk-FI3Y5EEI.js";
+import {
+  VDivider
+} from "./chunk-SLLJ7KFV.js";
+import {
+  VAvatar
+} from "./chunk-UD6WDZ7V.js";
+import {
+  VTextField,
+  makeVTextFieldProps
+} from "./chunk-DLPHPSMI.js";
+import {
+  useForm
+} from "./chunk-BDEDAWH5.js";
+import {
+  forwardRefs
+} from "./chunk-QJKQQOXD.js";
+import {
+  VIcon
+} from "./chunk-E7KYIGW2.js";
+import {
+  VDefaultsProvider
+} from "./chunk-IM5AFMW4.js";
+import {
+  makeTransitionProps
+} from "./chunk-FW5XEMPP.js";
+import {
+  useLocale
+} from "./chunk-4XYP7SZ4.js";
+import {
+  useTextColor
+} from "./chunk-Q6KC3LXY.js";
+import {
+  useProxiedModel
+} from "./chunk-7GPVUA6G.js";
+import {
+  IN_BROWSER,
+  checkPrintable,
+  deepEqual,
+  ensureValidVNode,
+  escapeForRegex,
+  genericComponent,
+  getPropertyFromItem,
+  isComposingIgnoreKey,
+  noop,
+  omit,
+  propsFactory,
+  useRender,
+  wrapInArray
+} from "./chunk-I5IG4TPY.js";
+import {
+  Fragment,
+  computed,
+  createBaseVNode,
+  createTextVNode,
+  createVNode,
+  mergeProps,
+  nextTick,
+  normalizeClass,
+  normalizeStyle,
+  ref,
+  shallowRef,
+  unref,
+  watch,
+  watchEffect
+} from "./chunk-ZS4T33C3.js";
+
+// node_modules/vuetify/lib/components/VCombobox/VCombobox.js
+import "/app/node_modules/vuetify/lib/components/VCombobox/VCombobox.css";
+
+// node_modules/vuetify/lib/composables/filter.js
+var defaultFilter = (value, query, item) => {
+  if (value == null || query == null) return -1;
+  if (!query.length) return 0;
+  value = value.toString().toLocaleLowerCase();
+  query = query.toString().toLocaleLowerCase();
+  const result = [];
+  let idx = value.indexOf(query);
+  while (~idx) {
+    result.push([idx, idx + query.length]);
+    idx = value.indexOf(query, idx + query.length);
+  }
+  return result.length ? result : -1;
+};
+function normaliseMatch(match, query) {
+  if (match == null || typeof match === "boolean" || match === -1) return;
+  if (typeof match === "number") return [[match, match + query.length]];
+  if (Array.isArray(match[0])) return match;
+  return [match];
+}
+var makeFilterProps = propsFactory({
+  customFilter: Function,
+  customKeyFilter: Object,
+  filterKeys: [Array, String],
+  filterMode: {
+    type: String,
+    default: "intersection"
+  },
+  noFilter: Boolean
+}, "filter");
+function filterItems(items, query, options) {
+  var _a;
+  const array = [];
+  const filter = (options == null ? void 0 : options.default) ?? defaultFilter;
+  const keys = (options == null ? void 0 : options.filterKeys) ? wrapInArray(options.filterKeys) : false;
+  const customFiltersLength = Object.keys((options == null ? void 0 : options.customKeyFilter) ?? {}).length;
+  if (!(items == null ? void 0 : items.length)) return array;
+  let lookAheadItem = null;
+  loop: for (let i = 0; i < items.length; i++) {
+    const [item, transformed = item] = wrapInArray(items[i]);
+    const customMatches = {};
+    const defaultMatches = {};
+    let match = -1;
+    if ((query || customFiltersLength > 0) && !(options == null ? void 0 : options.noFilter)) {
+      let hasOnlyCustomFilters = false;
+      if (typeof item === "object") {
+        if (item.type === "divider" || item.type === "subheader") {
+          if ((lookAheadItem == null ? void 0 : lookAheadItem.type) === "divider" && item.type === "subheader") {
+            array.push(lookAheadItem);
+          }
+          lookAheadItem = {
+            index: i,
+            matches: {},
+            type: item.type
+          };
+          continue;
+        }
+        const filterKeys = keys || Object.keys(transformed);
+        hasOnlyCustomFilters = filterKeys.length === customFiltersLength;
+        for (const key of filterKeys) {
+          const value = getPropertyFromItem(transformed, key);
+          const keyFilter = (_a = options == null ? void 0 : options.customKeyFilter) == null ? void 0 : _a[key];
+          match = keyFilter ? keyFilter(value, query, item) : filter(value, query, item);
+          if (match !== -1 && match !== false) {
+            if (keyFilter) customMatches[key] = normaliseMatch(match, query);
+            else defaultMatches[key] = normaliseMatch(match, query);
+          } else if ((options == null ? void 0 : options.filterMode) === "every") {
+            continue loop;
+          }
+        }
+      } else {
+        match = filter(item, query, item);
+        if (match !== -1 && match !== false) {
+          defaultMatches.title = normaliseMatch(match, query);
+        }
+      }
+      const defaultMatchesLength = Object.keys(defaultMatches).length;
+      const customMatchesLength = Object.keys(customMatches).length;
+      if (!defaultMatchesLength && !customMatchesLength) continue;
+      if ((options == null ? void 0 : options.filterMode) === "union" && customMatchesLength !== customFiltersLength && !defaultMatchesLength) continue;
+      if ((options == null ? void 0 : options.filterMode) === "intersection" && (customMatchesLength !== customFiltersLength || !defaultMatchesLength && customFiltersLength > 0 && !hasOnlyCustomFilters)) continue;
+    }
+    if (lookAheadItem) {
+      array.push(lookAheadItem);
+      lookAheadItem = null;
+    }
+    array.push({
+      index: i,
+      matches: {
+        ...defaultMatches,
+        ...customMatches
+      }
+    });
+  }
+  return array;
+}
+function useFilter(props, items, query, options) {
+  const filteredItems = shallowRef([]);
+  const filteredMatches = shallowRef(/* @__PURE__ */ new Map());
+  const transformedItems = computed(() => (options == null ? void 0 : options.transform) ? unref(items).map((item) => [item, options.transform(item)]) : unref(items));
+  watchEffect(() => {
+    const _query = typeof query === "function" ? query() : unref(query);
+    const strQuery = typeof _query !== "string" && typeof _query !== "number" ? "" : String(_query);
+    const results = filterItems(transformedItems.value, strQuery, {
+      customKeyFilter: {
+        ...props.customKeyFilter,
+        ...unref(options == null ? void 0 : options.customKeyFilter)
+      },
+      default: props.customFilter,
+      filterKeys: props.filterKeys,
+      filterMode: props.filterMode,
+      noFilter: props.noFilter
+    });
+    const originalItems = unref(items);
+    const _filteredItems = [];
+    const _filteredMatches = /* @__PURE__ */ new Map();
+    results.forEach((_ref) => {
+      let {
+        index,
+        matches
+      } = _ref;
+      const item = originalItems[index];
+      _filteredItems.push(item);
+      _filteredMatches.set(item.value, matches);
+    });
+    filteredItems.value = _filteredItems;
+    filteredMatches.value = _filteredMatches;
+  });
+  function getMatches(item) {
+    return filteredMatches.value.get(item.value);
+  }
+  return {
+    filteredItems,
+    filteredMatches,
+    getMatches
+  };
+}
+function highlightResult(name, text, matches) {
+  if (matches == null || !matches.length) return text;
+  return matches.map((match, i) => {
+    const start = i === 0 ? 0 : matches[i - 1][1];
+    const result = [createBaseVNode("span", {
+      "class": normalizeClass(`${name}__unmask`)
+    }, [text.slice(start, match[0])]), createBaseVNode("span", {
+      "class": normalizeClass(`${name}__mask`)
+    }, [text.slice(match[0], match[1])])];
+    if (i === matches.length - 1) {
+      result.push(createBaseVNode("span", {
+        "class": normalizeClass(`${name}__unmask`)
+      }, [text.slice(match[1])]));
+    }
+    return createBaseVNode(Fragment, null, [result]);
+  });
+}
+
+// node_modules/vuetify/lib/components/VCombobox/VCombobox.js
+var makeVComboboxProps = propsFactory({
+  alwaysFilter: Boolean,
+  autoSelectFirst: {
+    type: [Boolean, String]
+  },
+  clearOnSelect: {
+    type: Boolean,
+    default: true
+  },
+  delimiters: Array,
+  ...makeFilterProps({
+    filterKeys: ["title"]
+  }),
+  ...makeSelectProps({
+    hideNoData: true,
+    returnObject: true
+  }),
+  ...omit(makeVTextFieldProps({
+    modelValue: null,
+    role: "combobox"
+  }), ["validationValue", "dirty", "appendInnerIcon"]),
+  ...makeTransitionProps({
+    transition: false
+  })
+}, "VCombobox");
+var VCombobox = genericComponent()({
+  name: "VCombobox",
+  props: makeVComboboxProps(),
+  emits: {
+    "update:focused": (focused) => true,
+    "update:modelValue": (value) => true,
+    "update:search": (value) => true,
+    "update:menu": (value) => true
+  },
+  setup(props, _ref) {
+    var _a;
+    let {
+      emit,
+      slots
+    } = _ref;
+    const {
+      t
+    } = useLocale();
+    const vTextFieldRef = ref();
+    const isFocused = shallowRef(false);
+    const isPristine = shallowRef(true);
+    const listHasFocus = shallowRef(false);
+    const vMenuRef = ref();
+    const vVirtualScrollRef = ref();
+    const selectionIndex = shallowRef(-1);
+    let cleared = false;
+    const {
+      items,
+      transformIn,
+      transformOut
+    } = useItems(props);
+    const {
+      textColorClasses,
+      textColorStyles
+    } = useTextColor(() => {
+      var _a2;
+      return (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.color;
+    });
+    const model = useProxiedModel(props, "modelValue", [], (v) => transformIn(wrapInArray(v)), (v) => {
+      const transformed = transformOut(v);
+      return props.multiple ? transformed : transformed[0] ?? null;
+    });
+    const form = useForm(props);
+    const hasChips = computed(() => !!(props.chips || slots.chip));
+    const hasSelectionSlot = computed(() => hasChips.value || !!slots.selection);
+    const _search = shallowRef(!props.multiple && !hasSelectionSlot.value ? ((_a = model.value[0]) == null ? void 0 : _a.title) ?? "" : "");
+    const search = computed({
+      get: () => {
+        return _search.value;
+      },
+      set: async (val) => {
+        var _a2;
+        _search.value = val ?? "";
+        if (!props.multiple && !hasSelectionSlot.value) {
+          model.value = [transformItem(props, val)];
+          nextTick(() => {
+            var _a3;
+            return (_a3 = vVirtualScrollRef.value) == null ? void 0 : _a3.scrollToIndex(0);
+          });
+        }
+        if (val && props.multiple && ((_a2 = props.delimiters) == null ? void 0 : _a2.length)) {
+          const signsToMatch = props.delimiters.map(escapeForRegex).join("|");
+          const values = val.split(new RegExp(`(?:${signsToMatch})+`));
+          if (values.length > 1) {
+            for (let v of values) {
+              v = v.trim();
+              if (v) {
+                select(transformItem(props, v));
+                await nextTick();
+              }
+            }
+            _search.value = "";
+          }
+        }
+        if (!val) selectionIndex.value = -1;
+        isPristine.value = !val;
+      }
+    });
+    const counterValue = computed(() => {
+      return typeof props.counterValue === "function" ? props.counterValue(model.value) : typeof props.counterValue === "number" ? props.counterValue : props.multiple ? model.value.length : search.value.length;
+    });
+    const {
+      filteredItems,
+      getMatches
+    } = useFilter(props, items, () => props.alwaysFilter || !isPristine.value ? search.value : "");
+    const displayItems = computed(() => {
+      if (props.hideSelected) {
+        return filteredItems.value.filter((filteredItem) => !model.value.some((s) => s.value === filteredItem.value));
+      }
+      return filteredItems.value;
+    });
+    const menuDisabled = computed(() => props.hideNoData && !displayItems.value.length || form.isReadonly.value || form.isDisabled.value);
+    const _menu = useProxiedModel(props, "menu");
+    const menu = computed({
+      get: () => _menu.value,
+      set: (v) => {
+        var _a2;
+        if (_menu.value && !v && ((_a2 = vMenuRef.value) == null ? void 0 : _a2.ΨopenChildren.size)) return;
+        if (v && menuDisabled.value) return;
+        _menu.value = v;
+      }
+    });
+    const {
+      menuId,
+      ariaExpanded,
+      ariaControls,
+      ariaLabel
+    } = useMenuActivator(props, menu);
+    watch(_search, (value) => {
+      if (cleared) {
+        nextTick(() => cleared = false);
+      } else if (isFocused.value && !menu.value) {
+        menu.value = true;
+      }
+      emit("update:search", value);
+    });
+    watch(model, (value) => {
+      var _a2;
+      if (!props.multiple && !hasSelectionSlot.value) {
+        _search.value = ((_a2 = value[0]) == null ? void 0 : _a2.title) ?? "";
+      }
+    });
+    const selectedValues = computed(() => model.value.map((selection) => selection.value));
+    const highlightFirst = computed(() => {
+      var _a2;
+      const selectFirst = props.autoSelectFirst === true || props.autoSelectFirst === "exact" && search.value === ((_a2 = displayItems.value[0]) == null ? void 0 : _a2.title);
+      return selectFirst && displayItems.value.length > 0 && !isPristine.value && !listHasFocus.value;
+    });
+    const listRef = ref();
+    const listEvents = useScrolling(listRef, vTextFieldRef);
+    function onClear(e) {
+      cleared = true;
+      nextTick(() => cleared = false);
+      if (props.openOnClear) {
+        menu.value = true;
+      }
+    }
+    function onMousedownControl() {
+      if (menuDisabled.value) return;
+      menu.value = true;
+    }
+    function onMousedownMenuIcon(e) {
+      if (menuDisabled.value) return;
+      if (isFocused.value) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      menu.value = !menu.value;
+    }
+    function onListKeydown(e) {
+      var _a2;
+      if (checkPrintable(e) || e.key === "Backspace") {
+        (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.focus();
+      }
+    }
+    function onKeydown(e) {
+      var _a2, _b, _c, _d;
+      if (isComposingIgnoreKey(e) || form.isReadonly.value) return;
+      const selectionStart = (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.selectionStart;
+      const length = model.value.length;
+      if (["Enter", "ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+      }
+      if (["Enter", "ArrowDown"].includes(e.key)) {
+        menu.value = true;
+      }
+      if (["Escape"].includes(e.key)) {
+        menu.value = false;
+      }
+      if (["Enter", "Escape", "Tab"].includes(e.key)) {
+        if (highlightFirst.value && ["Enter", "Tab"].includes(e.key) && !model.value.some((_ref2) => {
+          let {
+            value
+          } = _ref2;
+          return value === displayItems.value[0].value;
+        })) {
+          select(filteredItems.value[0]);
+        }
+        isPristine.value = true;
+      }
+      if (e.key === "ArrowDown" && highlightFirst.value) {
+        (_b = listRef.value) == null ? void 0 : _b.focus("next");
+      }
+      if (e.key === "Enter" && search.value) {
+        select(transformItem(props, search.value));
+        if (hasSelectionSlot.value) _search.value = "";
+      }
+      if (["Backspace", "Delete"].includes(e.key)) {
+        if (!props.multiple && hasSelectionSlot.value && model.value.length > 0 && !search.value) return select(model.value[0], false);
+        if (~selectionIndex.value) {
+          e.preventDefault();
+          const originalSelectionIndex = selectionIndex.value;
+          select(model.value[selectionIndex.value], false);
+          selectionIndex.value = originalSelectionIndex >= length - 1 ? length - 2 : originalSelectionIndex;
+        } else if (e.key === "Backspace" && !search.value) {
+          selectionIndex.value = length - 1;
+        }
+        return;
+      }
+      if (!props.multiple) return;
+      if (e.key === "ArrowLeft") {
+        if (selectionIndex.value < 0 && selectionStart && selectionStart > 0) return;
+        const prev = selectionIndex.value > -1 ? selectionIndex.value - 1 : length - 1;
+        if (model.value[prev]) {
+          selectionIndex.value = prev;
+        } else {
+          selectionIndex.value = -1;
+          (_c = vTextFieldRef.value) == null ? void 0 : _c.setSelectionRange(search.value.length, search.value.length);
+        }
+      } else if (e.key === "ArrowRight") {
+        if (selectionIndex.value < 0) return;
+        const next = selectionIndex.value + 1;
+        if (model.value[next]) {
+          selectionIndex.value = next;
+        } else {
+          selectionIndex.value = -1;
+          (_d = vTextFieldRef.value) == null ? void 0 : _d.setSelectionRange(0, 0);
+        }
+      } else if (~selectionIndex.value && checkPrintable(e)) {
+        selectionIndex.value = -1;
+      }
+    }
+    function onAfterEnter() {
+      var _a2;
+      if (props.eager) {
+        (_a2 = vVirtualScrollRef.value) == null ? void 0 : _a2.calculateVisibleItems();
+      }
+    }
+    function onAfterLeave() {
+      var _a2;
+      if (isFocused.value) {
+        isPristine.value = true;
+        (_a2 = vTextFieldRef.value) == null ? void 0 : _a2.focus();
+      }
+    }
+    function select(item) {
+      let set = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : true;
+      if (!item || item.props.disabled) return;
+      if (props.multiple) {
+        const index = model.value.findIndex((selection) => (props.valueComparator || deepEqual)(selection.value, item.value));
+        const add = set == null ? !~index : set;
+        if (~index) {
+          const value = add ? [...model.value, item] : [...model.value];
+          value.splice(index, 1);
+          model.value = value;
+        } else if (add) {
+          model.value = [...model.value, item];
+        }
+        if (props.clearOnSelect) {
+          search.value = "";
+        }
+      } else {
+        const add = set !== false;
+        model.value = add ? [item] : [];
+        _search.value = add && !hasSelectionSlot.value ? item.title : "";
+        nextTick(() => {
+          menu.value = false;
+          isPristine.value = true;
+        });
+      }
+    }
+    function onFocusin(e) {
+      isFocused.value = true;
+      setTimeout(() => {
+        listHasFocus.value = true;
+      });
+    }
+    function onFocusout(e) {
+      listHasFocus.value = false;
+    }
+    function onUpdateModelValue(v) {
+      if (v == null || v === "" && !props.multiple && !hasSelectionSlot.value) model.value = [];
+    }
+    watch(isFocused, (val, oldVal) => {
+      if (val || val === oldVal) return;
+      selectionIndex.value = -1;
+      menu.value = false;
+      if (search.value) {
+        if (props.multiple) {
+          select(transformItem(props, search.value));
+          return;
+        }
+        if (!hasSelectionSlot.value) return;
+        if (model.value.some((_ref3) => {
+          let {
+            title
+          } = _ref3;
+          return title === search.value;
+        })) {
+          _search.value = "";
+        } else {
+          select(transformItem(props, search.value));
+        }
+      }
+    });
+    watch(menu, () => {
+      if (!props.hideSelected && menu.value && model.value.length) {
+        const index = displayItems.value.findIndex((item) => model.value.some((s) => (props.valueComparator || deepEqual)(s.value, item.value)));
+        IN_BROWSER && window.requestAnimationFrame(() => {
+          var _a2;
+          index >= 0 && ((_a2 = vVirtualScrollRef.value) == null ? void 0 : _a2.scrollToIndex(index));
+        });
+      }
+    });
+    watch(items, (newVal, oldVal) => {
+      if (menu.value) return;
+      if (isFocused.value && !oldVal.length && newVal.length) {
+        menu.value = true;
+      }
+    });
+    useRender(() => {
+      const hasList = !!(!props.hideNoData || displayItems.value.length || slots["prepend-item"] || slots["append-item"] || slots["no-data"]);
+      const isDirty = model.value.length > 0;
+      const textFieldProps = VTextField.filterProps(props);
+      return createVNode(VTextField, mergeProps({
+        "ref": vTextFieldRef
+      }, textFieldProps, {
+        "modelValue": search.value,
+        "onUpdate:modelValue": [($event) => search.value = $event, onUpdateModelValue],
+        "focused": isFocused.value,
+        "onUpdate:focused": ($event) => isFocused.value = $event,
+        "validationValue": model.externalValue,
+        "counterValue": counterValue.value,
+        "dirty": isDirty,
+        "class": ["v-combobox", {
+          "v-combobox--active-menu": menu.value,
+          "v-combobox--chips": !!props.chips,
+          "v-combobox--selection-slot": !!hasSelectionSlot.value,
+          "v-combobox--selecting-index": selectionIndex.value > -1,
+          [`v-combobox--${props.multiple ? "multiple" : "single"}`]: true
+        }, props.class],
+        "style": props.style,
+        "readonly": form.isReadonly.value,
+        "placeholder": isDirty ? void 0 : props.placeholder,
+        "onClick:clear": onClear,
+        "onMousedown:control": onMousedownControl,
+        "onKeydown": onKeydown,
+        "aria-expanded": ariaExpanded.value,
+        "aria-controls": ariaControls.value
+      }), {
+        ...slots,
+        default: () => createBaseVNode(Fragment, null, [createVNode(VMenu, mergeProps({
+          "id": menuId.value,
+          "ref": vMenuRef,
+          "modelValue": menu.value,
+          "onUpdate:modelValue": ($event) => menu.value = $event,
+          "activator": "parent",
+          "contentClass": "v-combobox__content",
+          "disabled": menuDisabled.value,
+          "eager": props.eager,
+          "maxHeight": 310,
+          "openOnClick": false,
+          "closeOnContentClick": false,
+          "transition": props.transition,
+          "onAfterEnter": onAfterEnter,
+          "onAfterLeave": onAfterLeave
+        }, props.menuProps), {
+          default: () => [hasList && createVNode(VList, mergeProps({
+            "ref": listRef,
+            "filterable": true,
+            "selected": selectedValues.value,
+            "selectStrategy": props.multiple ? "independent" : "single-independent",
+            "onMousedown": (e) => e.preventDefault(),
+            "selectable": true,
+            "onKeydown": onListKeydown,
+            "onFocusin": onFocusin,
+            "onFocusout": onFocusout,
+            "tabindex": "-1",
+            "aria-live": "polite",
+            "color": props.itemColor ?? props.color
+          }, listEvents, props.listProps), {
+            default: () => {
+              var _a2, _b, _c;
+              return [(_a2 = slots["prepend-item"]) == null ? void 0 : _a2.call(slots), !displayItems.value.length && !props.hideNoData && (((_b = slots["no-data"]) == null ? void 0 : _b.call(slots)) ?? createVNode(VListItem, {
+                "key": "no-data",
+                "title": t(props.noDataText)
+              }, null)), createVNode(VVirtualScroll, {
+                "ref": vVirtualScrollRef,
+                "renderless": true,
+                "items": displayItems.value,
+                "itemKey": "value"
+              }, {
+                default: (_ref4) => {
+                  var _a3, _b2, _c2;
+                  let {
+                    item,
+                    index,
+                    itemRef
+                  } = _ref4;
+                  const itemProps = mergeProps(item.props, {
+                    ref: itemRef,
+                    key: item.value,
+                    active: highlightFirst.value && index === 0 ? true : void 0,
+                    onClick: () => select(item, null)
+                  });
+                  if (item.type === "divider") {
+                    return ((_a3 = slots.divider) == null ? void 0 : _a3.call(slots, {
+                      props: item.raw,
+                      index
+                    })) ?? createVNode(VDivider, mergeProps(item.props, {
+                      "key": `divider-${index}`
+                    }), null);
+                  }
+                  if (item.type === "subheader") {
+                    return ((_b2 = slots.subheader) == null ? void 0 : _b2.call(slots, {
+                      props: item.raw,
+                      index
+                    })) ?? createVNode(VListSubheader, mergeProps(item.props, {
+                      "key": `subheader-${index}`
+                    }), null);
+                  }
+                  return ((_c2 = slots.item) == null ? void 0 : _c2.call(slots, {
+                    item,
+                    index,
+                    props: itemProps
+                  })) ?? createVNode(VListItem, mergeProps(itemProps, {
+                    "role": "option"
+                  }), {
+                    prepend: (_ref5) => {
+                      let {
+                        isSelected
+                      } = _ref5;
+                      return createBaseVNode(Fragment, null, [props.multiple && !props.hideSelected ? createVNode(VCheckboxBtn, {
+                        "key": item.value,
+                        "modelValue": isSelected,
+                        "ripple": false,
+                        "tabindex": "-1"
+                      }, null) : void 0, item.props.prependAvatar && createVNode(VAvatar, {
+                        "image": item.props.prependAvatar
+                      }, null), item.props.prependIcon && createVNode(VIcon, {
+                        "icon": item.props.prependIcon
+                      }, null)]);
+                    },
+                    title: () => {
+                      var _a4;
+                      return isPristine.value ? item.title : highlightResult("v-combobox", item.title, (_a4 = getMatches(item)) == null ? void 0 : _a4.title);
+                    }
+                  });
+                }
+              }), (_c = slots["append-item"]) == null ? void 0 : _c.call(slots)];
+            }
+          })]
+        }), model.value.map((item, index) => {
+          function onChipClose(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            select(item, false);
+          }
+          const slotProps = {
+            "onClick:close": onChipClose,
+            onKeydown(e) {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              onChipClose(e);
+            },
+            onMousedown(e) {
+              e.preventDefault();
+              e.stopPropagation();
+            },
+            modelValue: true,
+            "onUpdate:modelValue": void 0
+          };
+          const hasSlot = hasChips.value ? !!slots.chip : !!slots.selection;
+          const slotContent = hasSlot ? ensureValidVNode(hasChips.value ? slots.chip({
+            item,
+            index,
+            props: slotProps
+          }) : slots.selection({
+            item,
+            index
+          })) : void 0;
+          if (hasSlot && !slotContent) return void 0;
+          return createBaseVNode("div", {
+            "key": item.value,
+            "class": normalizeClass(["v-combobox__selection", index === selectionIndex.value && ["v-combobox__selection--selected", textColorClasses.value]]),
+            "style": normalizeStyle(index === selectionIndex.value ? textColorStyles.value : {})
+          }, [hasChips.value ? !slots.chip ? createVNode(VChip, mergeProps({
+            "key": "chip",
+            "closable": props.closableChips,
+            "size": "small",
+            "text": item.title,
+            "disabled": item.props.disabled
+          }, slotProps), null) : createVNode(VDefaultsProvider, {
+            "key": "chip-defaults",
+            "defaults": {
+              VChip: {
+                closable: props.closableChips,
+                size: "small",
+                text: item.title
+              }
+            }
+          }, {
+            default: () => [slotContent]
+          }) : slotContent ?? createBaseVNode("span", {
+            "class": "v-combobox__selection-text"
+          }, [item.title, props.multiple && index < model.value.length - 1 && createBaseVNode("span", {
+            "class": "v-combobox__selection-comma"
+          }, [createTextVNode(",")])])]);
+        })]),
+        "append-inner": function() {
+          var _a2, _b;
+          for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+            args[_key] = arguments[_key];
+          }
+          return createBaseVNode(Fragment, null, [(_a2 = slots["append-inner"]) == null ? void 0 : _a2.call(slots, ...args), (!props.hideNoData || props.items.length) && props.menuIcon ? createVNode(VIcon, {
+            "class": "v-combobox__menu-icon",
+            "color": (_b = vTextFieldRef.value) == null ? void 0 : _b.fieldIconColor,
+            "icon": props.menuIcon,
+            "onMousedown": onMousedownMenuIcon,
+            "onClick": noop,
+            "aria-label": ariaLabel.value,
+            "title": ariaLabel.value,
+            "tabindex": "-1"
+          }, null) : void 0]);
+        }
+      });
+    });
+    return forwardRefs({
+      isFocused,
+      isPristine,
+      menu,
+      search,
+      selectionIndex,
+      filteredItems,
+      select
+    }, vTextFieldRef);
+  }
+});
+
+export {
+  makeFilterProps,
+  useFilter,
+  highlightResult,
+  VCombobox
+};
+//# sourceMappingURL=chunk-TRB7JGY2.js.map

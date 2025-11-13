@@ -13,6 +13,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "oled_display.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "nvs_flash.h"
@@ -56,6 +57,7 @@ static TaskHandle_t s_setup_heartbeat_task = NULL;
 static char s_setup_pin[7] = {0};
 static char s_setup_mesh_id[32] = {0};
 static uint8_t s_setup_mesh_channel = 0;
+static bool s_setup_display_ready = false;
 static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 
@@ -79,6 +81,9 @@ static void send_setup_config_confirmation(void);
 static esp_err_t i2c_master_init(void);
 static void init_default_config(void);
 static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_t len);
+static void setup_display_init(const char *pin);
+static void setup_display_update(const char *pin, const char *mesh, const char *status);
+static void setup_display_deinit(void);
 
 void app_main(void)
 {
@@ -240,6 +245,91 @@ static void run_normal_mode(void)
     }
 }
 
+static void setup_display_init(const char *pin)
+{
+    if (s_setup_display_ready) {
+        setup_display_update(pin, NULL, NULL);
+        return;
+    }
+
+    const oled_display_config_t cfg = {
+        .i2c_port = I2C_MASTER_NUM,
+        .sda_pin = I2C_MASTER_SDA_IO,
+        .scl_pin = I2C_MASTER_SCL_IO,
+        .clk_speed_hz = I2C_MASTER_FREQ_HZ,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    if (oled_display_init(&cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "Setup display: OLED init failed");
+        return;
+    }
+
+    const oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 6,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(2000),
+    };
+
+    if (oled_display_start_task(&task_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "Setup display: task start failed");
+        oled_display_shutdown();
+        return;
+    }
+
+    oled_display_set_template(0, "SETUP MODE");
+    oled_display_set_template(1, "PIN  {pin}");
+    oled_display_set_template(2, "MESH {mesh}");
+    oled_display_set_template(3, "{status}");
+
+    s_setup_display_ready = true;
+    setup_display_update(pin, NULL, "Scanning mesh...");
+}
+
+static void setup_display_update(const char *pin, const char *mesh, const char *status)
+{
+    if (!s_setup_display_ready) {
+        setup_display_init(pin);
+        if (!s_setup_display_ready) {
+            return;
+        }
+    }
+
+    char pin_buf[16];
+    char mesh_buf[32];
+    char status_buf[32];
+
+    const char *pin_str = (pin && pin[0]) ? pin : "------";
+    const char *mesh_str = (mesh && mesh[0]) ? mesh : "SEARCHING";
+    const char *status_str = (status && status[0]) ? status : "Waiting...";
+
+    strlcpy(pin_buf, pin_str, sizeof(pin_buf));
+    strlcpy(mesh_buf, mesh_str, sizeof(mesh_buf));
+    strlcpy(status_buf, status_str, sizeof(status_buf));
+
+    oled_display_kv_t values[] = {
+        {.key = "pin", .value = pin_buf},
+        {.key = "mesh", .value = mesh_buf},
+        {.key = "status", .value = status_buf},
+    };
+
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void setup_display_deinit(void)
+{
+    if (!s_setup_display_ready) {
+        return;
+    }
+
+    oled_display_shutdown();
+    s_setup_display_ready = false;
+}
+
 static void run_setup_mode(void)
 {
     ESP_LOGW(TAG, "========================================");
@@ -252,6 +342,9 @@ static void run_setup_mode(void)
 
     ESP_LOGI(TAG, "Setup PIN: %s", s_setup_pin);
     ESP_LOGI(TAG, "Ищем временную mesh сеть с префиксом %s", SETUP_MESH_PREFIX);
+
+    setup_display_init(s_setup_pin);
+    setup_display_update(s_setup_pin, "SEARCHING", "Scanning mesh...");
 
     esp_err_t scan_err;
     uint32_t attempt = 0;
@@ -266,6 +359,7 @@ static void run_setup_mode(void)
     } while (scan_err != ESP_OK);
 
     ESP_LOGI(TAG, "Найдена сеть: %s (channel=%u)", s_setup_mesh_id, s_setup_mesh_channel);
+    setup_display_update(s_setup_pin, s_setup_mesh_id, "Connecting...");
 
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
@@ -295,6 +389,9 @@ static void run_setup_mode(void)
 
     if (send_setup_message("discovery", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
         ESP_LOGW(TAG, "Не удалось отправить discovery сообщение в mesh");
+        setup_display_update(s_setup_pin, s_setup_mesh_id, "Discovery failed");
+    } else {
+        setup_display_update(s_setup_pin, s_setup_mesh_id, "Await config...");
     }
 
     s_setup_active = true;
@@ -325,9 +422,11 @@ static void run_setup_mode(void)
     }
 
     ESP_LOGI(TAG, "Конфигурация получена. Перезапуск устройства...");
+    setup_display_update(s_setup_pin, s_setup_mesh_id, "Config received!");
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     mesh_manager_stop();
+    setup_display_deinit();
     esp_restart();
 }
 
@@ -340,6 +439,9 @@ static void setup_heartbeat_task(void *arg)
         }
         if (send_setup_message("heartbeat", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
             ESP_LOGW(TAG, "Не удалось отправить heartbeat в setup режиме");
+        }
+        if (s_setup_display_ready) {
+            oled_display_show_heartbeat(true);
         }
     }
 

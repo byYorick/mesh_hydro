@@ -26,10 +26,12 @@ static const char *TAG = "RootConfig";
 #define NVS_KEY_ZONE_NUMBER "zone_num"
 #define NVS_KEY_IS_CONFIGURED "configured"
 #define NVS_KEY_CONFIGURED_AT "conf_at"
+#define NVS_KEY_FORCE_SETUP "force_setup"
 
 // Глобальная конфигурация (кэш)
 static root_config_t g_root_config = {0};
 static bool g_initialized = false;
+static bool g_force_setup_requested = false;
 
 //================================================
 // Приватные функции
@@ -163,6 +165,11 @@ static esp_err_t load_config_from_nvs(void) {
     // Configured At
     nvs_get_u64(nvs_handle, NVS_KEY_CONFIGURED_AT, &g_root_config.configured_at);
 
+    // Force setup flag
+    uint8_t force_setup = 0;
+    nvs_get_u8(nvs_handle, NVS_KEY_FORCE_SETUP, &force_setup);
+    g_force_setup_requested = (force_setup == 1);
+
     nvs_close(nvs_handle);
     ensure_trailing_slash(g_root_config.mqtt_topic_prefix, sizeof(g_root_config.mqtt_topic_prefix));
     update_topic_prefix_for_mesh();
@@ -200,6 +207,7 @@ static void init_default_config(void) {
 
     g_root_config.zone_number = 1;
     g_root_config.is_configured = false;
+    g_force_setup_requested = false;
     
     ESP_LOGI(TAG, "⭐ Инициализирована дефолтная конфигурация зоны");
 }
@@ -586,6 +594,70 @@ void root_config_print(void) {
     ESP_LOGI(TAG, "║ Zone Name:         %-25s ║", g_root_config.zone_name[0] ? g_root_config.zone_name : "-");
     ESP_LOGI(TAG, "║ Zone Location:     %-25s ║", g_root_config.zone_location[0] ? g_root_config.zone_location : "-");
     ESP_LOGI(TAG, "║ Configured:        %-25s ║", g_root_config.is_configured ? "YES" : "NO");
+    ESP_LOGI(TAG, "║ Setup Requested:   %-25s ║", g_force_setup_requested ? "YES" : "NO");
     ESP_LOGI(TAG, "╚═══════════════════════════════════════════════╝");
+}
+
+esp_err_t root_config_request_setup(void)
+{
+    if (!g_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (g_force_setup_requested) {
+        return ESP_OK;
+    }
+
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = nvs_set_u8(nvs_handle, NVS_KEY_FORCE_SETUP, 1);
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs_handle);
+    }
+    nvs_close(nvs_handle);
+
+    if (err == ESP_OK) {
+        g_force_setup_requested = true;
+    }
+    return err;
+}
+
+bool root_config_is_setup_requested(void)
+{
+    if (!g_initialized) {
+        return false;
+    }
+    return g_force_setup_requested;
+}
+
+bool root_config_take_setup_request(void)
+{
+    if (!g_initialized) {
+        return false;
+    }
+    if (!g_force_setup_requested) {
+        return false;
+    }
+
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        esp_err_t set_err = nvs_set_u8(nvs_handle, NVS_KEY_FORCE_SETUP, 0);
+        if (set_err == ESP_OK) {
+            set_err = nvs_commit(nvs_handle);
+        }
+        if (set_err != ESP_OK) {
+            ESP_LOGW(TAG, "Не удалось сбросить флаг force_setup: %s", esp_err_to_name(set_err));
+        }
+        nvs_close(nvs_handle);
+    } else {
+        ESP_LOGW(TAG, "Не удалось открыть NVS для сброса force_setup: %s", esp_err_to_name(err));
+    }
+
+    g_force_setup_requested = false;
+    return true;
 }
 

@@ -183,6 +183,21 @@ esp_err_t root_config_reset(void);
  */
 void root_config_print(void);
 
+/**
+ * @brief Запрашивает переход в setup-режим при следующей перезагрузке
+ */
+esp_err_t root_config_request_setup(void);
+
+/**
+ * @brief Проверяет, запрошен ли setup-режим
+ */
+bool root_config_is_setup_requested(void);
+
+/**
+ * @brief Возвращает true, если был запрошен setup-режим, и сбрасывает флаг
+ */
+bool root_config_take_setup_request(void);
+
 #ifdef __cplusplus
 }
 #endif

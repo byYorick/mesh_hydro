@@ -16,5 +16,6 @@ idf_component_register(
         pump_controller
         pid_controller
         ph_manager
+        oled_display
 )
 

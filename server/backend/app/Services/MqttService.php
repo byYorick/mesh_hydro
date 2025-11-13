@@ -65,7 +65,7 @@ class MqttService
             } catch (\Throwable $cacheError) {
                 Log::warning('Failed to persist MQTT connection timestamp', ['error' => $cacheError->getMessage()]);
             }
-
+            
             Log::info('MQTT connected', [
                 'client_id' => $this->clientId,
                 'broker' => config('mqtt.host') . ':' . config('mqtt.port')

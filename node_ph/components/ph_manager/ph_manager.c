@@ -70,7 +70,7 @@ static void ph_display_show_heartbeat(void);
 #define PH_OLED_I2C_PORT   I2C_NUM_0
 #define PH_OLED_SDA_PIN    GPIO_NUM_8
 #define PH_OLED_SCL_PIN    GPIO_NUM_9
-#define PH_OLED_I2C_ADDR   0x73
+#define PH_OLED_I2C_ADDR   0x3C
 
 esp_err_t ph_manager_init(ph_node_config_t *config) {
     if (config == NULL) {
@@ -636,7 +636,7 @@ static void ph_display_init_once(void)
         .i2c_port = PH_OLED_I2C_PORT,
         .sda_pin = PH_OLED_SDA_PIN,
         .scl_pin = PH_OLED_SCL_PIN,
-        .clk_speed_hz = 400000,
+        .clk_speed_hz = 100000,
         .i2c_address = PH_OLED_I2C_ADDR,
         .width = 128,
         .height = 64,

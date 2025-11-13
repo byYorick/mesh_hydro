@@ -23,6 +23,7 @@
 #include "esp_app_desc.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
+#include "driver/gpio.h"
 
 // Common компоненты
 #include "mesh_manager.h"
@@ -64,11 +65,18 @@ static char s_setup_ap_ssid[32] = {0};
 #define ROOT_OLED_SDA_PIN   GPIO_NUM_8
 #define ROOT_OLED_SCL_PIN   GPIO_NUM_9
 
+#define ROOT_SETUP_BUTTON_PIN      GPIO_NUM_0
+#define ROOT_BUTTON_ACTIVE_LEVEL   0
+#define ROOT_BUTTON_POLL_MS        50
+#define ROOT_BUTTON_LONG_PRESS_MS  3000
+
 static bool s_root_display_ready = false;
 static int s_last_nodes_online = 0;
 static int8_t s_last_wifi_rssi = 0;
 static bool s_last_router_connected = false;
 static bool s_last_mqtt_connected = false;
+static TaskHandle_t s_button_task_handle = NULL;
+static bool s_setup_request_pending = false;
 
 static void run_setup_mode(void);
 static void run_normal_mode(void);
@@ -87,7 +95,12 @@ static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *
 static void root_display_show_heartbeat(void);
 static bool root_get_router_status(int8_t *rssi_out);
 static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint);
+static void root_display_show_setup_request(void);
+static void root_display_show_setup_error(const char *message);
 static void root_display_configure_normal(const char *mesh_id);
+static void root_button_init(void);
+static void root_button_task(void *arg);
+static void handle_setup_button_trigger(void);
 
 static void root_display_init(const root_config_t *cfg) {
     if (s_root_display_ready) {
@@ -207,6 +220,41 @@ static void root_display_show_setup(const char *ap_ssid, const char *pin, const 
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 }
 
+static void root_display_show_setup_request(void)
+{
+    if (!s_root_display_ready) {
+        return;
+    }
+
+    oled_display_set_template(0, "SETUP REQUEST");
+    oled_display_set_template(1, "Hold>3s done");
+    oled_display_set_template(2, "Rebooting...");
+    oled_display_set_template(3, "{status}");
+
+    oled_display_kv_t values[] = {
+        {.key = "status", .value = "Saving flag"},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void root_display_show_setup_error(const char *message)
+{
+    if (!s_root_display_ready) {
+        return;
+    }
+
+    oled_display_set_template(0, "SETUP ERROR");
+    oled_display_set_template(1, "{msg}");
+    oled_display_set_template(2, "Check logs");
+    oled_display_set_template(3, "Retry later");
+
+    const char *text = (message && message[0]) ? message : "NVS FAIL";
+    oled_display_kv_t values[] = {
+        {.key = "msg", .value = text},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
 static void root_display_configure_normal(const char *mesh_id) {
     if (!s_root_display_ready) {
         return;
@@ -225,6 +273,62 @@ static void root_display_configure_normal(const char *mesh_id) {
         {.key = "mqtt", .value = "WAIT"},
     };
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void root_button_init(void)
+{
+    gpio_config_t cfg = {
+        .pin_bit_mask = 1ULL << ROOT_SETUP_BUTTON_PIN,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&cfg);
+}
+
+static void handle_setup_button_trigger(void)
+{
+    if (s_setup_request_pending) {
+        return;
+    }
+    s_setup_request_pending = true;
+    ESP_LOGW(TAG, "Долгое нажатие кнопки: запрос перехода в setup режим");
+
+    root_display_show_setup_request();
+
+    esp_err_t err = root_config_request_setup();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Не удалось записать флаг setup в NVS: %s", esp_err_to_name(err));
+        root_display_show_setup_error("NVS ERROR");
+        s_setup_request_pending = false;
+        return;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+}
+
+static void root_button_task(void *arg)
+{
+    (void)arg;
+    uint32_t press_ms = 0;
+    const TickType_t delay_ticks = pdMS_TO_TICKS(ROOT_BUTTON_POLL_MS);
+
+    while (1) {
+        bool pressed = gpio_get_level(ROOT_SETUP_BUTTON_PIN) == ROOT_BUTTON_ACTIVE_LEVEL;
+        if (pressed) {
+            if (press_ms < ROOT_BUTTON_LONG_PRESS_MS) {
+                press_ms += ROOT_BUTTON_POLL_MS;
+            }
+            if (press_ms >= ROOT_BUTTON_LONG_PRESS_MS) {
+                handle_setup_button_trigger();
+            }
+        } else {
+            press_ms = 0;
+        }
+        vTaskDelay(delay_ticks);
+    }
 }
 
 /**
@@ -292,6 +396,12 @@ static void root_monitoring_task(void *arg) {
 void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(root_config_init());
+
+    if (root_config_take_setup_request()) {
+        ESP_LOGW(TAG, "Обнаружен запрос setup режима — запускаем настройку");
+        run_setup_mode();
+        return;
+    }
 
     bool zone_configured = root_config_is_zone_configured();
     bool node_ready = node_config_is_configured();
@@ -455,6 +565,13 @@ static void run_normal_mode(void) {
 
     const char *configured_mqtt_host = root_cfg.mqtt_host[0] ? root_cfg.mqtt_host : MQTT_BROKER_HOST;
     uint16_t configured_mqtt_port = root_cfg.mqtt_port ? root_cfg.mqtt_port : MQTT_BROKER_PORT;
+
+    root_button_init();
+    if (s_button_task_handle == NULL) {
+        if (xTaskCreate(root_button_task, "root_btn", 3072, NULL, 5, &s_button_task_handle) != pdPASS) {
+            ESP_LOGW(TAG, "Не удалось создать задачу кнопки setup");
+        }
+    }
 
     strncpy(s_mesh_id_buffer, root_cfg.mesh_network_id, sizeof(s_mesh_id_buffer) - 1);
     if (s_mesh_id_buffer[0] == '\0') {
