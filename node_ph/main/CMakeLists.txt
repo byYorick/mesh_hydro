@@ -5,6 +5,7 @@ idf_component_register(
         freertos
         esp_wifi
         nvs_flash
+        esp_app_format
         driver
         mesh_manager
         mesh_protocol

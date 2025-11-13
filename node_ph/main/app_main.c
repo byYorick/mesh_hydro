@@ -60,8 +60,8 @@ static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 
 // I2C конфигурация для ESP32 (стандартные пины)
-#define I2C_MASTER_SCL_IO   22
-#define I2C_MASTER_SDA_IO   21
+#define I2C_MASTER_SCL_IO   9
+#define I2C_MASTER_SDA_IO   8
 #define I2C_MASTER_FREQ_HZ  100000
 #define I2C_MASTER_NUM      I2C_NUM_0
 
@@ -529,22 +529,28 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
     const char *chip_model_str = "ESP32";
-    switch (chip_info.model) {
-        case ESP_CHIP_MODEL_ESP32:
-            chip_model_str = "ESP32";
-            break;
-        case ESP_CHIP_MODEL_ESP32S2:
-            chip_model_str = "ESP32-S2";
-            break;
-        case ESP_CHIP_MODEL_ESP32S3:
-            chip_model_str = "ESP32-S3";
-            break;
-        case ESP_CHIP_MODEL_ESP32C3:
-            chip_model_str = "ESP32-C3";
-            break;
-        default:
-            chip_model_str = "ESP32";
-            break;
+#if defined(ESP_CHIP_MODEL_ESP32) && (ESP_CHIP_MODEL_ESP32 >= 0)
+    if (chip_info.model == ESP_CHIP_MODEL_ESP32) {
+        chip_model_str = "ESP32";
+    } else
+#endif
+#if defined(ESP_CHIP_MODEL_ESP32S2) && (ESP_CHIP_MODEL_ESP32S2 >= 0)
+    if (chip_info.model == ESP_CHIP_MODEL_ESP32S2) {
+        chip_model_str = "ESP32-S2";
+    } else
+#endif
+#if defined(ESP_CHIP_MODEL_ESP32S3) && (ESP_CHIP_MODEL_ESP32S3 >= 0)
+    if (chip_info.model == ESP_CHIP_MODEL_ESP32S3) {
+        chip_model_str = "ESP32-S3";
+    } else
+#endif
+#if defined(ESP_CHIP_MODEL_ESP32C3) && (ESP_CHIP_MODEL_ESP32C3 >= 0)
+    if (chip_info.model == ESP_CHIP_MODEL_ESP32C3) {
+        chip_model_str = "ESP32-C3";
+    } else
+#endif
+    {
+        chip_model_str = "ESP32";
     }
     cJSON_AddStringToObject(root, "chip_model", chip_model_str);
 

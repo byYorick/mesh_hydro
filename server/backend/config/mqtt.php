@@ -1,5 +1,8 @@
 <?php
 
+$username = env('MQTT_USERNAME');
+$password = env('MQTT_PASSWORD');
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -10,8 +13,8 @@ return [
     'host' => env('MQTT_HOST', 'localhost'),
     'port' => env('MQTT_PORT', 1883),
     'client_id' => env('MQTT_CLIENT_ID', 'hydro_backend_' . uniqid()),
-    'username' => env('MQTT_USERNAME', null),
-    'password' => env('MQTT_PASSWORD', null),
+    'username' => is_string($username) && trim($username) === '' ? null : $username,
+    'password' => is_string($password) && trim($password) === '' ? null : $password,
     
     /*
     |--------------------------------------------------------------------------

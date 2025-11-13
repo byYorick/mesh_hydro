@@ -13,5 +13,6 @@ idf_component_register(
         node_config
         esp_wifi
         json
+        oled_display
 )
 

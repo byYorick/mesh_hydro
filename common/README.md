@@ -138,6 +138,7 @@ create_symlinks.bat   # Windows (от администратора)
 | **mesh_manager** | ✅ ГОТОВ | ROOT/NODE режимы, broadcast, callbacks |
 | **mesh_protocol** | ✅ ГОТОВ | 7 типов сообщений, парсинг/создание JSON |
 | **node_config** | ✅ ГОТОВ | NVS storage, JSON ↔ структуры, 4 типа узлов |
+| **oled_display** | ✅ НОВЫЙ | SSD1306 128x64, шаблонный вывод, heartbeat `<3` |
 | **ota_manager** | 🔄 TODO | OTA обновления |
 | **sensor_base** | 🔄 TODO | Базовый API для датчиков |
 | **actuator_base** | 🔄 TODO | Базовый API для исполнителей |

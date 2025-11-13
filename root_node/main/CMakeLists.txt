@@ -22,5 +22,6 @@ idf_component_register(
         node_config
         root_config
         zone_config
+        oled_display
 )
 

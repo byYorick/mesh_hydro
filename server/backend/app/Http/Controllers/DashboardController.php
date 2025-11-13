@@ -7,6 +7,9 @@ use App\Models\Event;
 use App\Models\Telemetry;
 use App\Models\Command;
 use Illuminate\Http\JsonResponse;
+use Carbon\Carbon;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 
@@ -125,6 +128,29 @@ class DashboardController extends Controller
 
         // Проверка MQTT - через последнюю активность (быстро, без socket проверки)
         $mqttStatus = 'disconnected';
+        $lastMqttConnection = null;
+        $mqttCacheStore = null;
+        try {
+            $mqttCacheStore = Cache::store('file');
+        } catch (\Throwable $cacheInitError) {
+            $mqttCacheStore = null;
+        }
+
+        if (!$mqttCacheStore) {
+            $defaultStoreName = config('cache.default');
+            if ($defaultStoreName && $defaultStoreName !== 'file') {
+                try {
+                    $mqttCacheStore = Cache::store($defaultStoreName);
+                } catch (\Throwable $fallbackError) {
+                    $mqttCacheStore = null;
+                }
+            }
+        }
+
+        if (!$mqttCacheStore) {
+            $mqttCacheStore = new Repository(new ArrayStore());
+        }
+
         try {
             // Проверяем, есть ли хотя бы одна телеметрия за последние 2 минуты (limit(1) быстрее чем count())
             $recentTelemetry = Telemetry::where('received_at', '>', now()->subMinutes(2))->limit(1)->exists();
@@ -132,6 +158,17 @@ class DashboardController extends Controller
             // Если есть свежая телеметрия - MQTT работает
             if ($recentTelemetry) {
                 $mqttStatus = 'connected';
+            } else {
+                $lastMqttConnection = $mqttCacheStore->get('mqtt.last_successful_connection');
+                if ($lastMqttConnection) {
+                    $lastConnectionAt = $lastMqttConnection instanceof Carbon
+                        ? $lastMqttConnection
+                        : Carbon::parse($lastMqttConnection);
+
+                    if ($lastConnectionAt->greaterThanOrEqualTo(now()->subMinutes(5))) {
+                        $mqttStatus = 'connected';
+                    }
+                }
             }
             // Если нет свежей телеметрии - считаем disconnected (без медленной socket проверки)
         } catch (\Exception $e) {
@@ -152,6 +189,11 @@ class DashboardController extends Controller
             'laravel_version' => app()->version(),
             'server_time' => now()->toDateTimeString(),
             'uptime' => $this->getServerUptime(),
+            'mqtt_last_connection' => $lastMqttConnection
+                ? ($lastMqttConnection instanceof Carbon
+                    ? $lastMqttConnection->toDateTimeString()
+                    : Carbon::parse($lastMqttConnection)->toDateTimeString())
+                : null,
         ];
 
         return response()->json([

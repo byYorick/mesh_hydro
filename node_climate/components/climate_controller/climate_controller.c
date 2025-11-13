@@ -12,6 +12,7 @@
 #include "node_config.h"
 #include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
 #include "zone_config.h"
+#include "oled_display.h"
 
 #include "esp_log.h"
 #include "esp_wifi.h"
@@ -22,6 +23,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+#include <stdio.h>
 
 static const char *TAG = "climate_ctrl";
 
@@ -32,6 +34,14 @@ static bool s_discovery_sent = false;
 static uint32_t s_boot_time = 0;
 static char s_root_node_id[32] = {0};
 static char s_mesh_network_id[32] = {0};
+static bool s_oled_ready = false;
+static float s_last_temp = 0.0f;
+static float s_last_humidity = 0.0f;
+static uint16_t s_last_co2 = 0;
+static uint16_t s_last_lux = 0;
+static int8_t s_last_rssi = 0;
+static bool s_last_mesh_connected = false;
+static bool s_display_has_data = false;
 
 // Forward declarations
 static void climate_main_task(void *arg);
@@ -43,6 +53,13 @@ static void send_event(mesh_event_level_t level, const char *message, float temp
 static void check_sensor_thresholds(float temp, float humidity, uint16_t co2);
 static esp_err_t read_all_sensors(float *temp, float *humidity, uint16_t *co2, uint16_t *lux);
 static int8_t get_rssi_to_parent(void);
+static void climate_display_init_once(void);
+static void climate_display_update(float temp, float humidity, uint16_t co2, uint16_t lux, bool mesh_connected, int8_t rssi);
+static void climate_display_show_state(bool mesh_connected);
+
+#define CLIMATE_OLED_I2C_PORT  I2C_NUM_1
+#define CLIMATE_OLED_SDA_PIN   GPIO_NUM_25
+#define CLIMATE_OLED_SCL_PIN   GPIO_NUM_26
 
 esp_err_t climate_controller_init(climate_node_config_t *config) {
     if (!config) {
@@ -76,6 +93,8 @@ esp_err_t climate_controller_init(climate_node_config_t *config) {
     ESP_LOGI(TAG, "Node ID: %s, Zone: %s", s_config->base.node_id, s_config->base.zone);
     ESP_LOGI(TAG, "Read interval: %d ms", s_config->read_interval_ms);
     ESP_LOGI(TAG, "Context: root_node_id=%s mesh_network_id=%s", s_root_node_id, s_mesh_network_id);
+
+    climate_display_init_once();
 
     return ESP_OK;
 }
@@ -364,6 +383,10 @@ static void send_heartbeat(void) {
     if (err == ESP_OK) {
         ESP_LOGD(TAG, "💓 Heartbeat sent (uptime=%lus, heap=%luB, RSSI=%d)", 
                  (unsigned long)uptime, (unsigned long)heap_free, rssi);
+        climate_display_show_state(true);
+        if (s_oled_ready) {
+            oled_display_show_heartbeat(true);
+        }
     }
     
     if (heartbeat_msg) {
@@ -373,14 +396,15 @@ static void send_heartbeat(void) {
 
 // Отправка телеметрии на ROOT с RSSI
 static void send_telemetry(float temp, float humidity, uint16_t co2, uint16_t lux) {
-    if (!mesh_manager_is_connected()) {
+    bool mesh_connected = mesh_manager_is_connected();
+    int8_t rssi = mesh_connected ? get_rssi_to_parent() : 0;
+
+    climate_display_update(temp, humidity, co2, lux, mesh_connected, rssi);
+
+    if (!mesh_connected) {
         ESP_LOGW(TAG, "Mesh offline, telemetry skipped");
-        // TODO: local buffer
         return;
     }
-
-    // Получение RSSI к родительскому узлу
-    int8_t rssi = get_rssi_to_parent();
 
     // Создание JSON
     cJSON *data = cJSON_CreateObject();
@@ -513,5 +537,120 @@ static void check_sensor_thresholds(float temp, float humidity, uint16_t co2) {
             humidity_warning_sent = false;
         }
     }
+}
+
+static void climate_display_init_once(void) {
+    if (s_oled_ready) {
+        return;
+    }
+
+    oled_display_config_t cfg = {
+        .i2c_port = CLIMATE_OLED_I2C_PORT,
+        .sda_pin = CLIMATE_OLED_SDA_PIN,
+        .scl_pin = CLIMATE_OLED_SCL_PIN,
+        .clk_speed_hz = 400000,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    if (oled_display_init(&cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED init failed");
+        return;
+    }
+
+    oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 6,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(1500),
+    };
+
+    if (oled_display_start_task(&task_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED task start failed");
+        return;
+    }
+
+    oled_display_set_template(0, "{node} {zone}");
+    oled_display_set_template(1, "T {temp}  H {hum}");
+    oled_display_set_template(2, "CO2 {co2}  Lux {lux}");
+    oled_display_set_template(3, "Mesh {mesh} RSSI {rssi}");
+
+    oled_display_kv_t init_values[] = {
+        {.key = "node", .value = s_config ? s_config->base.node_id : "climate"},
+        {.key = "zone", .value = (s_config && s_config->base.zone[0]) ? s_config->base.zone : "Zone"},
+        {.key = "temp", .value = "--"},
+        {.key = "hum", .value = "--"},
+        {.key = "co2", .value = "--"},
+        {.key = "lux", .value = "--"},
+        {.key = "mesh", .value = "INIT"},
+        {.key = "rssi", .value = "--"},
+    };
+    oled_display_queue_render(init_values, sizeof(init_values) / sizeof(init_values[0]), 0);
+
+    s_oled_ready = true;
+}
+
+static void climate_display_update(float temp, float humidity, uint16_t co2, uint16_t lux, bool mesh_connected, int8_t rssi) {
+    if (!s_oled_ready) {
+        return;
+    }
+
+    char temp_str[16];
+    char hum_str[16];
+    char co2_str[16];
+    char lux_str[16];
+    char mesh_str[16];
+    char rssi_str[16];
+
+    snprintf(temp_str, sizeof(temp_str), "%.1fC", temp);
+    snprintf(hum_str, sizeof(hum_str), "%.0f%%", humidity);
+    snprintf(co2_str, sizeof(co2_str), "%uppm", (unsigned)co2);
+    snprintf(lux_str, sizeof(lux_str), "%ulx", (unsigned)lux);
+    strlcpy(mesh_str, mesh_connected ? "ONLINE" : "OFFLINE", sizeof(mesh_str));
+
+    if (mesh_connected && rssi != 0) {
+        snprintf(rssi_str, sizeof(rssi_str), "%ddBm", rssi);
+    } else {
+        strlcpy(rssi_str, "--", sizeof(rssi_str));
+    }
+
+    const char *zone = (s_config && s_config->base.zone[0]) ? s_config->base.zone : "Zone";
+    const char *node_id = s_config ? s_config->base.node_id : "climate";
+
+    oled_display_kv_t values[] = {
+        {.key = "node", .value = node_id},
+        {.key = "zone", .value = zone},
+        {.key = "temp", .value = temp_str},
+        {.key = "hum", .value = hum_str},
+        {.key = "co2", .value = co2_str},
+        {.key = "lux", .value = lux_str},
+        {.key = "mesh", .value = mesh_str},
+        {.key = "rssi", .value = rssi_str},
+    };
+
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+
+    s_last_temp = temp;
+    s_last_humidity = humidity;
+    s_last_co2 = co2;
+    s_last_lux = lux;
+    s_last_rssi = rssi;
+    s_last_mesh_connected = mesh_connected;
+    s_display_has_data = true;
+}
+
+static void climate_display_show_state(bool mesh_connected) {
+    if (!s_oled_ready) {
+        return;
+    }
+
+    if (!s_display_has_data) {
+        climate_display_update(0.0f, 0.0f, 0, 0, mesh_connected, 0);
+        return;
+    }
+
+    climate_display_update(s_last_temp, s_last_humidity, s_last_co2, s_last_lux, mesh_connected, s_last_rssi);
 }
 

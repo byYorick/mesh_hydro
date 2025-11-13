@@ -39,6 +39,7 @@
 #include "climate_logic.h"
 #include "root_config.h"
 #include "setup_portal.h"
+#include "oled_display.h"
 
 static const char *TAG = "root_main";
 
@@ -57,6 +58,17 @@ static char s_temp_mesh_id[32] = {0};
 static char s_mesh_id_buffer[32] = {0};
 static char s_router_ssid_buffer[33] = {0};
 static char s_router_pass_buffer[65] = {0};
+static char s_setup_ap_ssid[32] = {0};
+
+#define ROOT_OLED_I2C_PORT  I2C_NUM_1
+#define ROOT_OLED_SDA_PIN   GPIO_NUM_8
+#define ROOT_OLED_SCL_PIN   GPIO_NUM_9
+
+static bool s_root_display_ready = false;
+static int s_last_nodes_online = 0;
+static int8_t s_last_wifi_rssi = 0;
+static bool s_last_router_connected = false;
+static bool s_last_mqtt_connected = false;
 
 static void run_setup_mode(void);
 static void run_normal_mode(void);
@@ -69,6 +81,151 @@ static void stop_config_http_server(void);
 static esp_err_t config_post_handler(httpd_req_t *req);
 static void schedule_restart_task(void *arg);
 static void send_config_confirmation_task(void *arg);
+static void root_display_init(const root_config_t *cfg);
+static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *mesh_id,
+                                bool router_connected, bool mqtt_connected);
+static void root_display_show_heartbeat(void);
+static bool root_get_router_status(int8_t *rssi_out);
+static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint);
+static void root_display_configure_normal(const char *mesh_id);
+
+static void root_display_init(const root_config_t *cfg) {
+    if (s_root_display_ready) {
+        return;
+    }
+
+    oled_display_config_t disp_cfg = {
+        .i2c_port = ROOT_OLED_I2C_PORT,
+        .sda_pin = ROOT_OLED_SDA_PIN,
+        .scl_pin = ROOT_OLED_SCL_PIN,
+        .clk_speed_hz = 400000,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    if (oled_display_init(&disp_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED init failed");
+        return;
+    }
+
+    oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 6,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(2000),
+    };
+
+    if (oled_display_start_task(&task_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED task start failed");
+        return;
+    }
+
+    s_root_display_ready = true;
+    root_display_configure_normal((cfg && cfg->mesh_network_id[0]) ? cfg->mesh_network_id : NULL);
+}
+
+static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *mesh_id,
+                                bool router_connected, bool mqtt_connected) {
+    if (!s_root_display_ready) {
+        return;
+    }
+
+    char wifi_buf[16];
+    if (router_connected && wifi_rssi <= 0) {
+        snprintf(wifi_buf, sizeof(wifi_buf), "%ddBm", wifi_rssi);
+    } else if (router_connected) {
+        snprintf(wifi_buf, sizeof(wifi_buf), "%ddBm", wifi_rssi);
+    } else {
+        strlcpy(wifi_buf, "--", sizeof(wifi_buf));
+    }
+
+    char nodes_buf[12];
+    snprintf(nodes_buf, sizeof(nodes_buf), "%d", online_nodes);
+
+    char router_buf[8];
+    strlcpy(router_buf, router_connected ? "OK" : "ERR", sizeof(router_buf));
+
+    char mqtt_buf[8];
+    strlcpy(mqtt_buf, mqtt_connected ? "OK" : "ERR", sizeof(mqtt_buf));
+
+    const char *mesh_value = (mesh_id && mesh_id[0]) ? mesh_id : "UNSET";
+
+    oled_display_kv_t values[] = {
+        {.key = "mesh", .value = mesh_value},
+        {.key = "wifi", .value = wifi_buf},
+        {.key = "nodes", .value = nodes_buf},
+        {.key = "router", .value = router_buf},
+        {.key = "mqtt", .value = mqtt_buf},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+
+    s_last_nodes_online = online_nodes;
+    s_last_wifi_rssi = wifi_rssi;
+    s_last_router_connected = router_connected;
+    s_last_mqtt_connected = mqtt_connected;
+}
+
+static void root_display_show_heartbeat(void) {
+    if (!s_root_display_ready) {
+        return;
+    }
+    oled_display_show_heartbeat(true);
+}
+
+static bool root_get_router_status(int8_t *rssi_out) {
+    wifi_ap_record_t ap_info;
+    esp_err_t err = esp_wifi_sta_get_ap_info(&ap_info);
+    if (err == ESP_OK) {
+        if (rssi_out) {
+            *rssi_out = ap_info.rssi;
+        }
+        return true;
+    }
+    if (rssi_out) {
+        *rssi_out = 0;
+    }
+    return false;
+}
+
+static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint) {
+    if (!s_root_display_ready) {
+        return;
+    }
+
+    oled_display_set_template(0, "SETUP MODE");
+    oled_display_set_template(1, "AP  {ap}");
+    oled_display_set_template(2, "PIN {pin}");
+    oled_display_set_template(3, "SSID {ssid}");
+
+    oled_display_kv_t values[] = {
+        {.key = "ap", .value = ap_ssid ? ap_ssid : "HYDRO_SETUP"},
+        {.key = "pin", .value = pin ? pin : "-----"},
+        {.key = "ssid", .value = (ssid_hint && ssid_hint[0]) ? ssid_hint : "use portal"},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void root_display_configure_normal(const char *mesh_id) {
+    if (!s_root_display_ready) {
+        return;
+    }
+
+    oled_display_set_template(0, "Mesh {mesh}");
+    oled_display_set_template(1, "WiFi {wifi}");
+    oled_display_set_template(2, "Nodes {nodes}");
+    oled_display_set_template(3, "R:{router} M:{mqtt}");
+
+    oled_display_kv_t values[] = {
+        {.key = "mesh", .value = (mesh_id && mesh_id[0]) ? mesh_id : "UNSET"},
+        {.key = "wifi", .value = "--"},
+        {.key = "nodes", .value = "0"},
+        {.key = "router", .value = "WAIT"},
+        {.key = "mqtt", .value = "WAIT"},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
 
 /**
  * @brief Задача мониторинга системы
@@ -91,13 +248,17 @@ static void root_monitoring_task(void *arg) {
         
         // Проверка таймаутов узлов
         node_registry_check_timeouts();
+
+        int registry_nodes = node_registry_get_count();
+        int8_t wifi_rssi = 0;
+        bool router_connected = root_get_router_status(&wifi_rssi);
+        bool mqtt_online = mqtt_client_manager_is_connected();
+        root_display_update(wifi_rssi, registry_nodes, s_mesh_id_buffer, router_connected, mqtt_online);
         
         // Логирование статуса каждые 30 секунд
         if (now_ms - last_log_ms > ROOT_MONITORING_INTERVAL_MS) {
             uint32_t free_heap = esp_get_free_heap_size();
             int mesh_nodes = mesh_manager_get_total_nodes();
-            int registry_nodes = node_registry_get_count();
-            bool mqtt_online = mqtt_client_manager_is_connected();
             bool fallback_active = climate_logic_is_fallback_active();
             
             ESP_LOGI(TAG, "========================================");
@@ -111,6 +272,7 @@ static void root_monitoring_task(void *arg) {
             // Отправка discovery сообщения (для регистрации на сервере)
             // Отправляем heartbeat (discovery уже был при запуске)
             mqtt_client_manager_send_heartbeat();
+            root_display_show_heartbeat();
             
             // Предупреждение при низкой памяти
             if (free_heap < 50000) {
@@ -159,9 +321,12 @@ static void run_setup_mode(void) {
     node_config_generate_setup_pin(s_current_pin, sizeof(s_current_pin));
     node_config_generate_temp_mesh_id(s_current_pin, s_temp_mesh_id, sizeof(s_temp_mesh_id));
 
-    char ap_ssid[32] = {0};
-    snprintf(ap_ssid, sizeof(ap_ssid), "HYDRO_SETUP_%s", s_current_pin);
+    memset(s_setup_ap_ssid, 0, sizeof(s_setup_ap_ssid));
+    snprintf(s_setup_ap_ssid, sizeof(s_setup_ap_ssid), "HYDRO_SETUP_%s", s_current_pin);
     const char *ap_password = "hydro2025";
+
+    root_display_init(NULL);
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Open 192.168.4.1");
 
     s_credentials_sem = xSemaphoreCreateBinary();
     if (!s_credentials_sem) {
@@ -170,7 +335,7 @@ static void run_setup_mode(void) {
     }
 
     setup_portal_config_t portal_cfg = {
-        .ap_ssid = ap_ssid,
+        .ap_ssid = s_setup_ap_ssid,
         .ap_password = ap_password,
         .on_credentials = setup_portal_credentials_cb,
         .user_ctx = NULL,
@@ -186,7 +351,7 @@ static void run_setup_mode(void) {
 
     ESP_LOGI(TAG, "========================================");
     ESP_LOGI(TAG, "🌐 Данные для подключения:");
-    ESP_LOGI(TAG, "  WiFi SSID:    %s", ap_ssid);
+    ESP_LOGI(TAG, "  WiFi SSID:    %s", s_setup_ap_ssid);
     ESP_LOGI(TAG, "  WiFi Pass:    %s", ap_password);
     ESP_LOGI(TAG, "  PIN (наклейка на устройстве): %s", s_current_pin);
     ESP_LOGI(TAG, "  Откройте в браузере: http://192.168.4.1");
@@ -285,6 +450,9 @@ static void run_normal_mode(void) {
         root_config_get(&root_cfg);
     }
 
+    root_display_init(&root_cfg);
+    root_display_configure_normal(s_mesh_id_buffer);
+
     const char *configured_mqtt_host = root_cfg.mqtt_host[0] ? root_cfg.mqtt_host : MQTT_BROKER_HOST;
     uint16_t configured_mqtt_port = root_cfg.mqtt_port ? root_cfg.mqtt_port : MQTT_BROKER_PORT;
 
@@ -373,6 +541,11 @@ static void run_normal_mode(void) {
     ESP_LOGI(TAG, "Mesh ID: %s", s_mesh_id_buffer);
     ESP_LOGI(TAG, "MQTT Broker: %s:%u", configured_mqtt_host, configured_mqtt_port);
     ESP_LOGI(TAG, "========================================");
+
+    int8_t initial_rssi = 0;
+    bool router_connected = root_get_router_status(&initial_rssi);
+    bool mqtt_online = mqtt_client_manager_is_connected();
+    root_display_update(initial_rssi, node_registry_get_count(), s_mesh_id_buffer, router_connected, mqtt_online);
     
     if (xTaskCreate(send_config_confirmation_task, "cfg_confirm", 4096, NULL, 4, NULL) != pdPASS) {
         ESP_LOGW(TAG, "Не удалось создать задачу отправки подтверждения конфигурации");
@@ -394,6 +567,8 @@ static void setup_portal_credentials_cb(const setup_portal_credentials_t *creden
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Не удалось сохранить WiFi credentials: %s", esp_err_to_name(err));
     }
+
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, credentials->ssid);
 
     node_config_mark_configured(false);
 
@@ -708,6 +883,8 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
     }
 
     node_config_mark_configured(true);
+
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Config saved");
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"success\":true}");

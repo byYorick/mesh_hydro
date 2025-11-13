@@ -13,10 +13,14 @@
 #include "node_config.h"
 #include "mesh_config.h"
 
+#include "driver/i2c.h"
+#include "esp_err.h"
+
 #include "esp_log.h"
 // #include "esp_task_wdt.h"  // Закомментировано для ESP-IDF v5.5
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -27,6 +31,31 @@ static TaskHandle_t s_main_task = NULL;
 static bool s_autonomous_mode = false;
 static char s_root_node_id[32] = {0};
 static char s_mesh_network_id[32] = {0};
+
+// OLED display state
+#define PH_EC_OLED_I2C_PORT  I2C_NUM_0
+#define PH_EC_OLED_SDA_PIN   GPIO_NUM_18
+#define PH_EC_OLED_SCL_PIN   GPIO_NUM_17
+
+static bool s_display_ready = false;
+static float s_display_last_ph = 0.0f;
+static float s_display_last_ec = 0.0f;
+static float s_display_last_temp = 0.0f;
+static connection_state_t s_display_last_state = CONN_STATE_ONLINE;
+
+// Forward declarations for OLED helpers
+static void display_init_once(void);
+static void display_shutdown(void);
+static void display_update(float ph, float ec, float temp, connection_state_t state);
+static void display_show_status(const char *status);
+static void display_show_emergency(const char *message, float value);
+static void display_render(float ph,
+                           float ec,
+                           float temp,
+                           connection_state_t state,
+                           const char *status_override,
+                           const char *mode_override);
+static const char *connection_state_to_str(connection_state_t state);
 
 // Forward declarations
 static void node_controller_main_task(void *arg);
@@ -67,6 +96,8 @@ esp_err_t node_controller_init(ph_ec_node_config_t *config) {
     ESP_LOGI(TAG, "Autonomous mode: %s", s_config->autonomous_enabled ? "ENABLED" : "DISABLED");
     ESP_LOGI(TAG, "Context: root_node_id=%s mesh_network_id=%s", s_root_node_id, s_mesh_network_id);
 
+    display_init_once();
+
     return ESP_OK;
 }
 
@@ -98,6 +129,8 @@ esp_err_t node_controller_stop(void) {
         s_main_task = NULL;
         ESP_LOGI(TAG, "Node Controller stopped");
     }
+
+    display_shutdown();
     return ESP_OK;
 }
 
@@ -119,7 +152,7 @@ static void node_controller_main_task(void *arg) {
 
         // 2. Обновление OLED
         connection_state_t conn_state = connection_monitor_get_state();
-        oled_display_update_main(ph, ec, temp, conn_state);
+        display_update(ph, ec, temp, conn_state);
 
         // 3. PID управление (ВСЕГДА работает, даже в автономном режиме!)
         run_pid_control(ph, ec);
@@ -190,7 +223,7 @@ static void on_connection_state_changed(connection_state_t new_state, connection
     switch (new_state) {
         case CONN_STATE_ONLINE:
             buzzer_led_set_mode(LED_MODE_GREEN);
-            oled_display_show_message("ONLINE");
+            display_show_status("ONLINE");
             if (old_state == CONN_STATE_AUTONOMOUS) {
                 ESP_LOGI(TAG, "Exiting autonomous mode");
                 node_controller_exit_autonomous();
@@ -199,12 +232,12 @@ static void on_connection_state_changed(connection_state_t new_state, connection
 
         case CONN_STATE_DEGRADED:
             buzzer_led_set_mode(LED_MODE_YELLOW_BLINK);
-            oled_display_show_message("DEGRADED");
+            display_show_status("DEGRADED");
             break;
 
         case CONN_STATE_AUTONOMOUS:
             buzzer_led_set_mode(LED_MODE_YELLOW_BLINK);
-            oled_display_show_message("AUTONOMOUS");
+            display_show_status("AUTONOMOUS");
             ESP_LOGW(TAG, "Entering autonomous mode");
             node_controller_enter_autonomous();
             buzzer_beep(2, 100, 200);  // 2 сигнала
@@ -213,6 +246,7 @@ static void on_connection_state_changed(connection_state_t new_state, connection
         case CONN_STATE_EMERGENCY:
             buzzer_led_set_mode(LED_MODE_RED_BLINK_FAST);
             buzzer_alarm();
+            display_show_status("EMERGENCY");
             break;
     }
 }
@@ -239,7 +273,7 @@ void node_controller_handle_config_update(cJSON *config_json) {
     ESP_LOGI(TAG, "Config updated and saved: pH=%.2f, EC=%.2f",
              s_config->ph_target, s_config->ec_target);
     
-    oled_display_show_message("Config Updated");
+    display_show_status("Config Updated");
 }
 
 void node_controller_enter_autonomous(void) {
@@ -261,10 +295,197 @@ void node_controller_handle_emergency(const char *message, float value) {
     // Визуальная индикация
     buzzer_led_set_mode(LED_MODE_RED_BLINK_FAST);
     buzzer_alarm();
-    oled_display_show_emergency(message, value);
+    display_show_emergency(message, value);
 
     // TODO: Агрессивная коррекция
     // TODO: Отправка SOS на ROOT (если online)
+}
+
+static void display_init_once(void)
+{
+    if (s_display_ready) {
+        return;
+    }
+    if (!s_config) {
+        return;
+    }
+
+    oled_display_config_t cfg = {
+        .i2c_port = PH_EC_OLED_I2C_PORT,
+        .sda_pin = PH_EC_OLED_SDA_PIN,
+        .scl_pin = PH_EC_OLED_SCL_PIN,
+        .clk_speed_hz = 400000,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    esp_err_t err = oled_display_init(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OLED init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 8,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(1500),
+    };
+
+    err = oled_display_start_task(&task_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OLED task start failed: %s", esp_err_to_name(err));
+        oled_display_shutdown();
+        return;
+    }
+
+    oled_display_set_template(0, "{node} {zone}");
+    oled_display_set_template(1, "pH {ph}  EC {ec}");
+    oled_display_set_template(2, "Temp {temp}  Mode {mode}");
+    oled_display_set_template(3, "{status}");
+
+    s_display_last_ph = 0.0f;
+    s_display_last_ec = 0.0f;
+    s_display_last_temp = 0.0f;
+    s_display_last_state = connection_monitor_get_state();
+
+    s_display_ready = true;
+
+    display_render(s_display_last_ph,
+                   s_display_last_ec,
+                   s_display_last_temp,
+                   s_display_last_state,
+                   "Display Ready",
+                   NULL);
+}
+
+static void display_shutdown(void)
+{
+    if (!s_display_ready) {
+        return;
+    }
+    oled_display_shutdown();
+    s_display_ready = false;
+}
+
+static void display_update(float ph, float ec, float temp, connection_state_t state)
+{
+    if (!s_display_ready) {
+        return;
+    }
+
+    display_render(ph, ec, temp, state, NULL, NULL);
+    s_display_last_ph = ph;
+    s_display_last_ec = ec;
+    s_display_last_temp = temp;
+    s_display_last_state = state;
+}
+
+static void display_show_status(const char *status)
+{
+    if (!s_display_ready || status == NULL) {
+        return;
+    }
+    display_render(s_display_last_ph,
+                   s_display_last_ec,
+                   s_display_last_temp,
+                   s_display_last_state,
+                   status,
+                   NULL);
+}
+
+static void display_show_emergency(const char *message, float value)
+{
+    if (!s_display_ready) {
+        return;
+    }
+
+    char status[32];
+    if (message) {
+        if (value != 0.0f) {
+            snprintf(status, sizeof(status), "%s %.2f", message, value);
+        } else {
+            strlcpy(status, message, sizeof(status));
+        }
+    } else {
+        strlcpy(status, "EMERGENCY", sizeof(status));
+    }
+
+    display_render(s_display_last_ph,
+                   s_display_last_ec,
+                   s_display_last_temp,
+                   CONN_STATE_EMERGENCY,
+                   status,
+                   "EMR");
+    s_display_last_state = CONN_STATE_EMERGENCY;
+}
+
+static void display_render(float ph,
+                           float ec,
+                           float temp,
+                           connection_state_t state,
+                           const char *status_override,
+                           const char *mode_override)
+{
+    if (!s_display_ready || !s_config) {
+        return;
+    }
+
+    char ph_str[16];
+    char ec_str[16];
+    char temp_str[16];
+    char mode_str[8];
+    char status_str[32];
+
+    snprintf(ph_str, sizeof(ph_str), "%.2f", ph);
+    snprintf(ec_str, sizeof(ec_str), "%.2f", ec);
+    snprintf(temp_str, sizeof(temp_str), "%.1fC", temp);
+
+    const char *mode_base = s_autonomous_mode ? "AUTO" : "RUN";
+    strlcpy(mode_str, mode_override ? mode_override : mode_base, sizeof(mode_str));
+
+    if (status_override) {
+        strlcpy(status_str, status_override, sizeof(status_str));
+    } else {
+        const char *state_str = connection_state_to_str(state);
+        snprintf(status_str, sizeof(status_str), "State %s", state_str);
+    }
+
+    const char *node_id = (s_config->base.node_id[0] != '\0') ? s_config->base.node_id : "ph_ec";
+    const char *zone = (s_config->base.zone[0] != '\0') ? s_config->base.zone : "Zone";
+
+    oled_display_kv_t values[] = {
+        {.key = "node", .value = node_id},
+        {.key = "zone", .value = zone},
+        {.key = "ph", .value = ph_str},
+        {.key = "ec", .value = ec_str},
+        {.key = "temp", .value = temp_str},
+        {.key = "mode", .value = mode_str},
+        {.key = "status", .value = status_str},
+    };
+
+    esp_err_t err = oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OLED render failed: %s", esp_err_to_name(err));
+    }
+}
+
+static const char *connection_state_to_str(connection_state_t state)
+{
+    switch (state) {
+        case CONN_STATE_ONLINE:
+            return "ONLINE";
+        case CONN_STATE_DEGRADED:
+            return "DEGRADED";
+        case CONN_STATE_AUTONOMOUS:
+            return "AUTONOMOUS";
+        case CONN_STATE_EMERGENCY:
+            return "EMERGENCY";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 // TODO: Заглушки для функций датчиков и PID

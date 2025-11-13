@@ -15,6 +15,7 @@ idf_component_register(
         mesh_config
         node_config
         json
+        oled_display
 )
 
 

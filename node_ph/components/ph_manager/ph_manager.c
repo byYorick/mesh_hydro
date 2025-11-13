@@ -6,23 +6,21 @@
 #include "ph_manager.h"
 #include "ph_sensor.h"
 #include "pump_controller.h"
-#include "pid_controller.h"
 #include "adaptive_pid.h"
 #include "pump_events.h"
 #include "mesh_manager.h"
 #include "mesh_protocol.h"
 #include "mesh_config.h"  // Для HEARTBEAT_INTERVAL_MS
 #include "zone_config.h"
+#include "../../../common/oled_display/oled_display.h"
 
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
-#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "cJSON.h"
 #include <string.h>
 #include <time.h>
-#include <math.h>
 
 static const char *TAG = "ph_mgr";
 
@@ -36,6 +34,14 @@ static bool s_emergency_mode = false;
 static bool s_autonomous_mode = false;
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
+static bool s_display_ready = false;
+static float s_display_last_ph = 0.0f;
+static float s_display_last_target = 0.0f;
+static uint32_t s_display_pump_up_ml = 0;
+static uint32_t s_display_pump_down_ml = 0;
+static bool s_display_last_mesh = false;
+static int8_t s_display_last_rssi = 0;
+static bool s_display_has_data = false;
 
 // Адаптивные PID контроллеры
 static adaptive_pid_t s_pid_ph_up;
@@ -56,6 +62,15 @@ static int8_t get_rssi_to_parent(void);
 static void read_sensor(void);
 static void control_ph(void);
 static void check_emergency_conditions(void);
+static void ph_display_init_once(void);
+static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi);
+static void ph_display_show_state(bool mesh_connected);
+static void ph_display_show_heartbeat(void);
+
+#define PH_OLED_I2C_PORT   I2C_NUM_0
+#define PH_OLED_SDA_PIN    GPIO_NUM_8
+#define PH_OLED_SCL_PIN    GPIO_NUM_9
+#define PH_OLED_I2C_ADDR   0x73
 
 esp_err_t ph_manager_init(ph_node_config_t *config) {
     if (config == NULL) {
@@ -134,6 +149,9 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
              s_config->base.node_id, s_config->ph_target);
     ESP_LOGI(TAG, "Zone context: mesh_id=%s, root_id=%s",
              s_mesh_network_id, s_root_node_id);
+
+    ph_display_init_once();
+    ph_display_update(s_current_ph, mesh_manager_is_connected(), mesh_manager_is_connected() ? get_rssi_to_parent() : 0);
     
     return ESP_OK;
 }
@@ -174,6 +192,18 @@ esp_err_t ph_manager_stop(void) {
     // Остановка всех насосов
     pump_controller_emergency_stop();
     
+    if (s_display_ready) {
+        oled_display_shutdown();
+        s_display_ready = false;
+        s_display_last_ph = 0.0f;
+        s_display_last_target = 0.0f;
+        s_display_pump_up_ml = 0;
+        s_display_pump_down_ml = 0;
+        s_display_last_mesh = false;
+        s_display_last_rssi = 0;
+        s_display_has_data = false;
+    }
+
     ESP_LOGI(TAG, "pH Manager stopped");
     return ESP_OK;
 }
@@ -193,6 +223,8 @@ esp_err_t ph_manager_set_emergency(bool enable) {
         ESP_LOGI(TAG, "Emergency mode deactivated");
     }
     
+    ph_display_show_state(mesh_manager_is_connected());
+
     return ESP_OK;
 }
 
@@ -313,12 +345,18 @@ static void send_discovery(void) {
 
 // Отправка telemetry
 static void send_telemetry(void) {
-    if (!mesh_manager_is_connected()) {
+    bool mesh_connected = mesh_manager_is_connected();
+    int8_t rssi = 0;
+
+    if (!mesh_connected) {
         s_autonomous_mode = true;
+        ph_display_update(s_current_ph, false, 0);
         return;
     }
-    
+
     s_autonomous_mode = false;
+    rssi = get_rssi_to_parent();
+    ph_display_update(s_current_ph, true, rssi);
     
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
@@ -352,7 +390,7 @@ static void send_telemetry(void) {
     cJSON_AddNumberToObject(data, "ph_target", s_config->ph_target);
     cJSON_AddNumberToObject(data, "pump_ph_up_ml", pump_controller_get_total_ml(PUMP_PH_UP));
     cJSON_AddNumberToObject(data, "pump_ph_down_ml", pump_controller_get_total_ml(PUMP_PH_DOWN));
-    cJSON_AddNumberToObject(data, "rssi_to_parent", get_rssi_to_parent());
+    cJSON_AddNumberToObject(data, "rssi_to_parent", rssi);
     cJSON_AddBoolToObject(data, "emergency", s_emergency_mode);
     cJSON_AddBoolToObject(data, "autonomous", s_autonomous_mode);
     cJSON_AddItemToObject(root, "data", data);
@@ -370,6 +408,7 @@ static void send_telemetry(void) {
 // Отправка heartbeat
 static void send_heartbeat(void) {
     if (!mesh_manager_is_connected()) {
+        ph_display_show_state(false);
         return;
     }
     
@@ -400,7 +439,11 @@ static void send_heartbeat(void) {
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
-        mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        esp_err_t err = mesh_manager_send_to_root((uint8_t *)json_str, strlen(json_str));
+        if (err == ESP_OK) {
+            ph_display_show_state(true);
+            ph_display_show_heartbeat();
+        }
         free(json_str);
     }
     
@@ -578,6 +621,139 @@ static void control_ph(void) {
     } else {
         ESP_LOGI(TAG, "[CONTROL] pH in range (%.2f = %.2f), no correction needed", s_current_ph, s_config->ph_target);
     }
+
+    bool mesh_connected = mesh_manager_is_connected();
+    ph_display_update(s_current_ph, mesh_connected, mesh_connected ? get_rssi_to_parent() : 0);
+}
+
+static void ph_display_init_once(void)
+{
+    if (s_display_ready) {
+        return;
+    }
+
+    const oled_display_config_t cfg = {
+        .i2c_port = PH_OLED_I2C_PORT,
+        .sda_pin = PH_OLED_SDA_PIN,
+        .scl_pin = PH_OLED_SCL_PIN,
+        .clk_speed_hz = 400000,
+        .i2c_address = PH_OLED_I2C_ADDR,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    if (oled_display_init(&cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED init failed");
+        return;
+    }
+
+    const oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 8,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(1500),
+    };
+
+    if (oled_display_start_task(&task_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED task start failed");
+        return;
+    }
+
+    oled_display_set_template(0, "{node} {zone}");
+    oled_display_set_template(1, "pH {ph} -> {target}");
+    oled_display_set_template(2, "Pump {pump_up}/{pump_down}ml");
+    oled_display_set_template(3, "{mode} Mesh {mesh} {rssi}");
+
+    s_display_ready = true;
+    ph_display_update(s_current_ph, mesh_manager_is_connected(), mesh_manager_is_connected() ? get_rssi_to_parent() : 0);
+}
+
+static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
+{
+    if (!s_display_ready) {
+        return;
+    }
+
+    char ph_str[16];
+    char target_str[16];
+    char pump_up_str[16];
+    char pump_down_str[16];
+    char mode_str[8];
+    char mesh_str[12];
+    char rssi_str[16];
+
+    snprintf(ph_str, sizeof(ph_str), "%.2f", ph_value);
+    float target = s_config ? s_config->ph_target : 0.0f;
+    snprintf(target_str, sizeof(target_str), "%.2f", target);
+
+    uint32_t pump_up = pump_controller_get_total_ml(PUMP_PH_UP);
+    uint32_t pump_down = pump_controller_get_total_ml(PUMP_PH_DOWN);
+    snprintf(pump_up_str, sizeof(pump_up_str), "%lu", (unsigned long)pump_up);
+    snprintf(pump_down_str, sizeof(pump_down_str), "%lu", (unsigned long)pump_down);
+
+    const char *mode = s_emergency_mode ? "EMR" : (s_autonomous_mode ? "AUTO" : "RUN");
+    strlcpy(mode_str, mode, sizeof(mode_str));
+    strlcpy(mesh_str, mesh_connected ? "ONLINE" : "OFFLINE", sizeof(mesh_str));
+    if (mesh_connected && rssi != 0) {
+        snprintf(rssi_str, sizeof(rssi_str), "%ddBm", rssi);
+    } else {
+        strlcpy(rssi_str, "--", sizeof(rssi_str));
+    }
+
+    const char *node_id = (s_config && s_config->base.node_id[0]) ? s_config->base.node_id : "ph";
+    const char *zone = (s_config && s_config->base.zone[0]) ? s_config->base.zone : "Zone";
+
+    oled_display_kv_t values[] = {
+        {.key = "node", .value = node_id},
+        {.key = "zone", .value = zone},
+        {.key = "ph", .value = ph_str},
+        {.key = "target", .value = target_str},
+        {.key = "pump_up", .value = pump_up_str},
+        {.key = "pump_down", .value = pump_down_str},
+        {.key = "mode", .value = mode_str},
+        {.key = "mesh", .value = mesh_str},
+        {.key = "rssi", .value = rssi_str},
+    };
+
+    esp_err_t err = oled_display_queue_render(values,
+                                              sizeof(values) / sizeof(values[0]),
+                                              0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OLED render failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    s_display_last_ph = ph_value;
+    s_display_last_target = target;
+    s_display_pump_up_ml = pump_up;
+    s_display_pump_down_ml = pump_down;
+    s_display_last_mesh = mesh_connected;
+    s_display_last_rssi = rssi;
+    s_display_has_data = true;
+}
+
+static void ph_display_show_state(bool mesh_connected)
+{
+    if (!s_display_ready) {
+        return;
+    }
+
+    float ph_value = s_display_has_data ? s_display_last_ph : s_current_ph;
+    int8_t rssi = mesh_connected ? get_rssi_to_parent() : s_display_last_rssi;
+
+    ph_display_update(ph_value, mesh_connected, rssi);
+}
+
+static void ph_display_show_heartbeat(void)
+{
+    if (!s_display_ready) {
+        return;
+    }
+    esp_err_t err = oled_display_show_heartbeat(true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OLED heartbeat failed: %s", esp_err_to_name(err));
+    }
 }
 
 // Отправка event сообщения с полными метаданными
@@ -619,8 +795,6 @@ static void send_event(mesh_event_level_t level, const char *message, float valu
     const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
     cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
     cJSON_AddStringToObject(root, "root_node_id", root_id);
-    const char *mesh_id = zone_config_validate(s_mesh_network_id) ? s_mesh_network_id : ZONE_CONFIG_UNCONFIGURED;
-    const char *root_id = (s_root_node_id[0] != '\0') ? s_root_node_id : ZONE_CONFIG_UNCONFIGURED;
     cJSON_AddStringToObject(root, "mesh_network_id", mesh_id);
     cJSON_AddStringToObject(root, "root_node_id", root_id);
     cJSON_AddStringToObject(root, "level", mesh_protocol_event_level_to_str(level));

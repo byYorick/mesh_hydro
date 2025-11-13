@@ -18,6 +18,7 @@ set(EXTRA_COMPONENT_DIRS
     "${CMAKE_SOURCE_DIR}/../common/mesh_manager"
     "${CMAKE_SOURCE_DIR}/../common/mesh_protocol"
     "${CMAKE_SOURCE_DIR}/../common/node_config"
+    "${CMAKE_SOURCE_DIR}/../common/oled_display" # подключай только если нужен дисплей
 )
 ```
 
@@ -241,8 +242,8 @@ idf_component_register(
 2. Symlinks создавай только если нужна видимость в IDE
 3. В каждом узле подключай только нужные компоненты:
    - ROOT: mesh_manager, mesh_protocol, node_config
-   - pH/EC: все компоненты
-   - Climate: mesh_manager, mesh_protocol, sensor_base
+   - pH/EC: mesh_manager, mesh_protocol, node_config, oled_display, sensor_base
+   - Climate: mesh_manager, mesh_protocol, sensor_base, oled_display (опционально)
    - Relay: mesh_manager, mesh_protocol, actuator_base
 
 ---

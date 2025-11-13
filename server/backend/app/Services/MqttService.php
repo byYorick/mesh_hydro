@@ -37,20 +37,35 @@ class MqttService
     public function connect(): void
     {
         try {
+            $username = config('mqtt.username');
+            $password = config('mqtt.password');
+
             $settings = (new ConnectionSettings())
-                ->setUsername(config('mqtt.username'))
-                ->setPassword(config('mqtt.password'))
                 ->setKeepAliveInterval(config('mqtt.keep_alive', 60))
                 ->setLastWillTopic('hydro/server/status')
                 ->setLastWillMessage('offline')
                 ->setLastWillQualityOfService(1)
                 ->setRetainLastWill(true);
 
+            if (is_string($username) && trim($username) !== '') {
+                $settings->setUsername($username);
+            }
+
+            if (is_string($password) && trim($password) !== '') {
+                $settings->setPassword($password);
+            }
+
             $this->mqtt->connect($settings, true);
             
             // Публикуем статус сервера
             $this->publish('hydro/server/status', 'online', 1, true);
             
+            try {
+                Cache::store('file')->put('mqtt.last_successful_connection', now(), 600);
+            } catch (\Throwable $cacheError) {
+                Log::warning('Failed to persist MQTT connection timestamp', ['error' => $cacheError->getMessage()]);
+            }
+
             Log::info('MQTT connected', [
                 'client_id' => $this->clientId,
                 'broker' => config('mqtt.host') . ':' . config('mqtt.port')

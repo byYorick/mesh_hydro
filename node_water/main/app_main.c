@@ -29,6 +29,7 @@
 #include "node_config.h"
 #include "zone_config.h"
 #include "cJSON.h"
+#include "oled_display.h"
 
 static const char *TAG = "water_node";
 
@@ -47,6 +48,13 @@ static uint8_t s_setup_mesh_channel = 0;
 static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 
+#define WATER_OLED_I2C_PORT  I2C_NUM_0
+#define WATER_OLED_SDA_PIN   GPIO_NUM_8
+#define WATER_OLED_SCL_PIN   GPIO_NUM_9
+
+static bool s_oled_ready = false;
+static uint64_t s_oled_start_us = 0;
+
 static void run_setup_mode(void);
 static void run_normal_mode(void);
 static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint8_t *channel_out);
@@ -55,6 +63,9 @@ static void setup_heartbeat_task(void *arg);
 static esp_err_t handle_write_config_command(cJSON *params);
 static void send_setup_config_confirmation(void);
 static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_t len);
+static void water_oled_init(void);
+static void water_oled_update(const char *mode_label);
+static void water_oled_show_heartbeat(void);
 
 void app_main(void)
 {
@@ -103,6 +114,9 @@ static void run_normal_mode(void)
     ESP_LOGI(TAG, "Zone context: mesh_id=%s, root_id=%s",
              s_mesh_network_id, s_root_node_id);
 
+    water_oled_init();
+    water_oled_update("BOOT");
+
     char mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
     if (zone_config_validate(s_mesh_network_id)) {
         strncpy(mesh_network_id, s_mesh_network_id, sizeof(mesh_network_id) - 1);
@@ -127,10 +141,12 @@ static void run_normal_mode(void)
     ESP_ERROR_CHECK(mesh_manager_start());
 
     ESP_LOGI(TAG, "Mesh started (%s)", mesh_config.mesh_id);
+    water_oled_update("RUN");
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(60000));
         ESP_LOGI(TAG, "Status: Mesh=%s", mesh_manager_is_connected() ? "ONLINE" : "OFFLINE");
+        water_oled_update("RUN");
     }
 }
 
@@ -146,6 +162,9 @@ static void run_setup_mode(void)
     strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
     memset(s_setup_pin, 0, sizeof(s_setup_pin));
     node_config_generate_setup_pin(s_setup_pin, sizeof(s_setup_pin));
+
+    water_oled_init();
+    water_oled_update("SETUP");
 
     ESP_LOGI(TAG, "Setup PIN: %s", s_setup_pin);
 
@@ -177,6 +196,8 @@ static void run_setup_mode(void)
     mesh_manager_register_recv_cb(on_mesh_data_received);
     ESP_ERROR_CHECK(mesh_manager_start());
 
+    water_oled_update("SETUP");
+
     const int max_wait_ms = 20000;
     int waited_ms = 0;
     while (!mesh_manager_is_connected() && waited_ms < max_wait_ms) {
@@ -191,6 +212,7 @@ static void run_setup_mode(void)
     if (send_setup_message("discovery", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
         ESP_LOGW(TAG, "Failed to send discovery message");
     }
+    water_oled_update("SETUP");
 
     s_setup_active = true;
     if (xTaskCreate(setup_heartbeat_task, "setup_heartbeat", 4096, NULL, 5, &s_setup_heartbeat_task) != pdPASS) {
@@ -415,6 +437,11 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
     esp_err_t err = mesh_manager_send_to_root((const uint8_t *)payload, strlen(payload));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send %s: %s", type, esp_err_to_name(err));
+    } else {
+        water_oled_update(s_is_setup_mode ? "SETUP" : "RUN");
+        if (strcmp(type, "heartbeat") == 0) {
+            water_oled_show_heartbeat();
+        }
     }
 
     free(payload);
@@ -531,6 +558,8 @@ static esp_err_t handle_write_config_command(cJSON *params)
         ESP_LOGE(TAG, "Failed to mark node configured: %s", esp_err_to_name(err));
         return err;
     }
+
+    water_oled_update("CONFIG");
 
     s_is_setup_mode = false;
     send_setup_config_confirmation();
@@ -660,4 +689,105 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
 
     mesh_protocol_free_message(&msg);
     free(data_copy);
+}
+
+static void water_oled_init(void)
+{
+    if (s_oled_ready) {
+        return;
+    }
+
+    oled_display_config_t cfg = {
+        .i2c_port = WATER_OLED_I2C_PORT,
+        .sda_pin = WATER_OLED_SDA_PIN,
+        .scl_pin = WATER_OLED_SCL_PIN,
+        .clk_speed_hz = 400000,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    if (oled_display_init(&cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED init failed");
+        return;
+    }
+
+    oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 6,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(1500),
+    };
+
+    if (oled_display_start_task(&task_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "OLED task start failed");
+        return;
+    }
+
+    s_oled_ready = true;
+    s_oled_start_us = esp_timer_get_time();
+
+    oled_display_set_template(0, "{node}");
+    oled_display_set_template(1, "{zone}");
+    oled_display_set_template(2, "Mesh {mesh} RSSI {rssi}");
+    oled_display_set_template(3, "{mode} Up {uptime}");
+
+    water_oled_update("BOOT");
+}
+
+static void water_oled_update(const char *mode_label)
+{
+    if (!s_oled_ready) {
+        return;
+    }
+
+    bool mesh_connected = mesh_manager_is_connected();
+    int8_t rssi = mesh_manager_get_parent_rssi();
+
+    char mesh_str[16];
+    char rssi_str[16];
+    char mode_str[16];
+    char uptime_str[16];
+
+    strlcpy(mesh_str, mesh_connected ? "ONLINE" : "OFFLINE", sizeof(mesh_str));
+    if (mesh_connected && rssi != 0) {
+        snprintf(rssi_str, sizeof(rssi_str), "%ddBm", rssi);
+    } else {
+        strlcpy(rssi_str, "--", sizeof(rssi_str));
+    }
+
+    const char *mode_src = mode_label ? mode_label : (s_is_setup_mode ? "SETUP" : "RUN");
+    strlcpy(mode_str, mode_src, sizeof(mode_str));
+
+    uint64_t uptime_us = esp_timer_get_time() - s_oled_start_us;
+    uint32_t uptime_s = (uint32_t)(uptime_us / 1000000ULL);
+    if (uptime_s < 600) {
+        snprintf(uptime_str, sizeof(uptime_str), "%us", (unsigned)uptime_s);
+    } else if (uptime_s < 3600) {
+        snprintf(uptime_str, sizeof(uptime_str), "%um", (unsigned)(uptime_s / 60U));
+    } else {
+        snprintf(uptime_str, sizeof(uptime_str), "%uh", (unsigned)(uptime_s / 3600U));
+    }
+
+    const char *node_id = s_node_config.base.node_id[0] ? s_node_config.base.node_id : "water";
+    const char *zone = s_node_config.base.zone[0] ? s_node_config.base.zone : "Zone";
+
+    oled_display_kv_t values[] = {
+        {.key = "node", .value = node_id},
+        {.key = "zone", .value = zone},
+        {.key = "mesh", .value = mesh_str},
+        {.key = "rssi", .value = rssi_str},
+        {.key = "mode", .value = mode_str},
+        {.key = "uptime", .value = uptime_str},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void water_oled_show_heartbeat(void)
+{
+    if (!s_oled_ready) {
+        return;
+    }
+    oled_display_show_heartbeat(true);
 }

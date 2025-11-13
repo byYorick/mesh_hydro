@@ -10,5 +10,6 @@ idf_component_register(
         mesh_manager
         mesh_protocol
         json
+        oled_display
 )
 
