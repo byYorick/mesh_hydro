@@ -18,6 +18,7 @@
 #include "esp_netif.h"
 #include "nvs_flash.h"
 #include "driver/i2c.h"
+#include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_mac.h"
 #include "esp_chip_info.h"
@@ -67,6 +68,8 @@ static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 #define I2C_MASTER_FREQ_HZ  100000
 #define I2C_MASTER_NUM      I2C_NUM_0
 
+#define STATUS_LED_GPIO     GPIO_NUM_4
+
 // Конфигурация узла
 static ph_node_config_t s_node_config;
 
@@ -84,9 +87,11 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
 static void setup_display_init(const char *pin);
 static void setup_display_update(const char *pin, const char *mesh, const char *status);
 static void setup_display_deinit(void);
+static void board_status_led_disable(void);
 
 void app_main(void)
 {
+    board_status_led_disable();
     ESP_ERROR_CHECK(node_config_init());
 
     // Определяем режим работы узла
@@ -328,6 +333,20 @@ static void setup_display_deinit(void)
 
     oled_display_shutdown();
     s_setup_display_ready = false;
+}
+
+static void board_status_led_disable(void)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << STATUS_LED_GPIO),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    if (gpio_config(&io_conf) == ESP_OK) {
+        gpio_set_level(STATUS_LED_GPIO, 0);
+    }
 }
 
 static void run_setup_mode(void)
