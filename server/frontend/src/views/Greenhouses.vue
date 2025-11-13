@@ -57,7 +57,7 @@
             >
               <v-list-item-title>{{ item.name }}</v-list-item-title>
               <v-list-item-subtitle class="text-caption text-medium-emphasis">
-                {{ item.location || 'Локация не указана' }}
+                {{ item.description || 'Описание не указано' }}
               </v-list-item-subtitle>
               <template #append>
                 <v-chip
@@ -86,10 +86,16 @@
                   Узлов: {{ selectedGreenhouse.node_count }}
                 </div>
                 <div class="text-caption text-medium-emphasis mt-2">
-                  Местоположение: {{ selectedGreenhouse.location || 'не указано' }}
+                  Описание: {{ selectedGreenhouse.description || 'не указано' }}
                 </div>
                 <div class="text-caption text-medium-emphasis mt-1">
-                  Часовой пояс: {{ selectedGreenhouse.timezone || '—' }}
+                  Профили климата:
+                  <template v-if="selectedGreenhouse.climate_profiles?.length">
+                    {{ selectedGreenhouse.climate_profiles.map((profile) => profile.name).join(', ') }}
+                  </template>
+                  <template v-else>
+                    не заданы
+                  </template>
                 </div>
               </v-sheet>
 

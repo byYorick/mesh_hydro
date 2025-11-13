@@ -6,6 +6,7 @@ import { useNodesStore } from '@/stores/nodes'
 import type {
   AttachNodePayload,
   AttachZonePayload,
+  ClimateProfile,
   CreateGreenhousePayload,
   GreenhouseAutomationRule,
   GreenhouseDetail,
@@ -79,11 +80,37 @@ export const useGreenhousesStore = defineStore('greenhouses', () => {
     items.value.map((item) => ({
       value: item.id,
       label: item.name,
-      location: item.location,
+      description: item.description,
       zones: item.zone_count,
       nodes: item.node_count,
     })),
   )
+
+  const knownClimateProfiles = computed<ClimateProfile[]>(() => {
+    const collected = new Map<string, ClimateProfile>()
+
+    const collect = (profiles?: ClimateProfile[] | null) => {
+      if (!profiles?.length) {
+        return
+      }
+
+      profiles.forEach((profile) => {
+        if (!profile?.name) {
+          return
+        }
+
+        collected.set(profile.name, { ...profile })
+      })
+    }
+
+    items.value.forEach((item) => collect(item.climate_profiles))
+    Object.values(detailCache.value).forEach((detail) => {
+      collect(detail.climate_profiles)
+      collect(detail.settings?.climate_profiles ?? null)
+    })
+
+    return Array.from(collected.values())
+  })
 
   function setGreenhouses(newItems: GreenhouseSummary[]) {
     items.value = newItems
@@ -120,13 +147,10 @@ export const useGreenhousesStore = defineStore('greenhouses', () => {
       id: greenhouse.id,
       name: greenhouse.name,
       code: greenhouse.code,
-      location: greenhouse.location,
       description: greenhouse.description,
-      timezone: greenhouse.timezone,
       status: greenhouse.status,
       root_node_id: greenhouse.root_node_id,
       root_node_mac: greenhouse.root_node_mac,
-      mesh_group: greenhouse.mesh_group,
       zone_count: greenhouse.zone_count,
       node_count: greenhouse.node_count,
       active_cycle_count: greenhouse.active_cycle_count,
@@ -134,6 +158,9 @@ export const useGreenhousesStore = defineStore('greenhouses', () => {
       image_url: greenhouse.image_url,
       created_at: greenhouse.created_at,
       updated_at: greenhouse.updated_at,
+      climate_profiles:
+        greenhouse.climate_profiles ??
+        ('settings' in greenhouse ? greenhouse.settings?.climate_profiles ?? null : null),
     }
 
     if (index === -1) {
@@ -544,6 +571,7 @@ export const useGreenhousesStore = defineStore('greenhouses', () => {
     hasGreenhouses,
     selectedGreenhouse,
     greenhouseOptions,
+    knownClimateProfiles,
     fetchGreenhouses,
     fetchGreenhouse,
     createGreenhouse,

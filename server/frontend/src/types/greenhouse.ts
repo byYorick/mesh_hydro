@@ -4,13 +4,10 @@ export interface GreenhouseSummary {
   id: number
   name: string
   code: string
-  location?: string | null
   description?: string | null
-  timezone?: string | null
   status: GreenhouseStatus
   root_node_id?: string | null
   root_node_mac?: string | null
-  mesh_group?: string | null
   zone_count: number
   node_count: number
   active_cycle_count: number
@@ -18,10 +15,28 @@ export interface GreenhouseSummary {
   image_url?: string | null
   created_at?: string
   updated_at?: string
+  climate_profiles?: ClimateProfile[] | null
+}
+
+export interface ClimateSetpoints {
+  temperature?: number | null
+  humidity?: number | null
+  co2?: number | null
+  light?: number | null
+  vpd?: number | null
+}
+
+export interface ClimateProfile {
+  id?: string
+  name: string
+  notes?: string | null
+  day?: ClimateSetpoints | null
+  night?: ClimateSetpoints | null
+  settings?: Record<string, any> | null
 }
 
 export interface GreenhouseSettings {
-  climate_profile?: string | null
+  climate_profiles?: ClimateProfile[] | null
   default_zone_type?: string | null
   preferred_units?: 'metric' | 'imperial'
   watering_rules?: Record<string, any> | null
@@ -33,6 +48,7 @@ export interface GreenhouseDetail extends GreenhouseSummary {
   owner?: string | null
   notes?: string | null
   settings?: GreenhouseSettings | null
+  climate_profiles?: ClimateProfile[]
 }
 
 export interface GreenhouseZoneLink {
@@ -93,14 +109,12 @@ export interface GreenhouseAutomationRule {
 export interface CreateGreenhousePayload {
   name: string
   code: string
-  location?: string | null
-  description?: string | null
-  timezone?: string | null
+  description: string
   status?: GreenhouseStatus
   root_node_id?: string | null
-  mesh_group?: string | null
   tags?: string[]
   settings?: GreenhouseSettings | null
+  climate_profiles?: ClimateProfile[] | null
 }
 
 export type UpdateGreenhousePayload = Partial<CreateGreenhousePayload>

@@ -64,55 +64,277 @@
                         ></v-select>
                       </v-col>
 
-                      <v-col cols="12" md="6">
-                        <v-text-field
-                          v-model="basicForm.location"
-                          label="Расположение"
-                          variant="outlined"
-                          prepend-inner-icon="mdi-map-marker"
-                        ></v-text-field>
-                      </v-col>
-
-                      <v-col cols="12" md="6">
-                        <v-autocomplete
-                          v-model="basicForm.timezone"
-                          :items="timezones"
-                          label="Часовой пояс"
-                          variant="outlined"
-                          prepend-inner-icon="mdi-clock-outline"
-                          clearable
-                        ></v-autocomplete>
-                      </v-col>
-
                       <v-col cols="12">
                         <v-textarea
                           v-model="basicForm.description"
-                          label="Описание"
+                          label="Описание *"
                           variant="outlined"
-                          rows="2"
+                          rows="3"
                           prepend-inner-icon="mdi-text"
+                          :rules="[rules.required]"
                         ></v-textarea>
                       </v-col>
 
-                      <v-col cols="12" md="6">
-                        <v-text-field
-                          v-model="basicForm.meshGroup"
-                          label="Mesh группа"
-                          variant="outlined"
-                          prepend-inner-icon="mdi-wifi"
-                        ></v-text-field>
+                      <v-col cols="12">
+                        <v-card variant="outlined">
+                          <v-card-text>
+                            <div class="d-flex flex-column flex-md-row align-md-center justify-space-between gap-4 mb-4">
+                              <div>
+                                <h3 class="text-subtitle-1 mb-1">Профили климата</h3>
+                                <p class="text-body-2 text-medium-emphasis mb-0">
+                                  Добавьте один или несколько профилей с целевыми параметрами. Они используются при настройке зон и сценариев автоматики.
+                                </p>
+                              </div>
+                            </div>
+
+                            <v-row dense class="align-center mb-4 ga-4">
+                              <v-col cols="12" md="6">
+                                <v-select
+                                  v-model="selectedExistingProfile"
+                                  :items="existingClimateProfileOptions"
+                                  item-title="title"
+                                  item-value="value"
+                                  label="Выберите существующий профиль"
+                                  variant="outlined"
+                                  prepend-inner-icon="mdi-archive-search"
+                                  clearable
+                                ></v-select>
+                              </v-col>
+                              <v-col cols="12" md="6" class="d-flex flex-wrap ga-2">
+                                <v-btn
+                                  color="secondary"
+                                  variant="tonal"
+                                  prepend-icon="mdi-pencil"
+                                  @click="startEditExistingProfile"
+                                >
+                                  Редактировать профиль
+                                </v-btn>
+                                <v-btn
+                                  color="primary"
+                                  variant="text"
+                                  prepend-icon="mdi-plus-circle"
+                                  @click="startNewClimateProfile"
+                                >
+                                  Новый профиль
+                                </v-btn>
+                              </v-col>
+                            </v-row>
+
+                            <v-alert
+                              v-if="editingProfileLabel"
+                              type="info"
+                              variant="tonal"
+                              border="start"
+                              class="mb-4"
+                              icon="mdi-pencil"
+                            >
+                              Редактирование профиля: {{ editingProfileLabel }}
+                            </v-alert>
+
+                            <v-row dense>
+                              <v-col cols="12" md="4">
+                                <v-text-field
+                                  v-model="climateDraft.name"
+                                  label="Название профиля"
+                                  variant="outlined"
+                                  prepend-inner-icon="mdi-thermometer"
+                                ></v-text-field>
+                              </v-col>
+                              <v-col cols="12" md="8">
+                                <v-text-field
+                                  v-model="climateDraft.notes"
+                                  label="Заметки"
+                                  variant="outlined"
+                                  prepend-inner-icon="mdi-note-text-outline"
+                                ></v-text-field>
+                              </v-col>
+
+                              <v-col cols="12" md="6">
+                                <v-sheet class="pa-4 border rounded-lg" color="transparent">
+                                  <h4 class="text-subtitle-2 mb-3">Дневные условия</h4>
+                                  <v-row dense>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.dayTemperature"
+                                        type="number"
+                                        label="Температура, °C"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.dayHumidity"
+                                        type="number"
+                                        label="Влажность, %"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.dayCo2"
+                                        type="number"
+                                        label="CO₂, ppm"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.dayLight"
+                                        type="number"
+                                        label="Освещённость, lux"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.dayVpd"
+                                        type="number"
+                                        label="VPD"
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hint="Паровой дефицит"
+                                        persistent-hint
+                                      ></v-text-field>
+                                    </v-col>
+                                  </v-row>
+                                </v-sheet>
+                              </v-col>
+
+                              <v-col cols="12" md="6">
+                                <v-sheet class="pa-4 border rounded-lg" color="transparent">
+                                  <h4 class="text-subtitle-2 mb-3">Ночные условия</h4>
+                                  <v-row dense>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.nightTemperature"
+                                        type="number"
+                                        label="Температура, °C"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.nightHumidity"
+                                        type="number"
+                                        label="Влажность, %"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.nightCo2"
+                                        type="number"
+                                        label="CO₂, ppm"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.nightLight"
+                                        type="number"
+                                        label="Освещённость, lux"
+                                        variant="outlined"
+                                        density="comfortable"
+                                      ></v-text-field>
+                                    </v-col>
+                                    <v-col cols="12" sm="6" md="4">
+                                      <v-text-field
+                                        v-model.number="climateDraft.nightVpd"
+                                        type="number"
+                                        label="VPD"
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hint="Паровой дефицит"
+                                        persistent-hint
+                                      ></v-text-field>
+                                    </v-col>
+                                  </v-row>
+                                </v-sheet>
+                              </v-col>
+                            </v-row>
+
+                            <v-row dense class="mt-2">
+                              <v-col cols="12" class="d-flex flex-wrap ga-3">
+                                <v-btn
+                                  color="primary"
+                                  variant="tonal"
+                                  prepend-icon="mdi-content-save"
+                                  @click="addClimateProfile"
+                                >
+                                  Сохранить профиль
+                                </v-btn>
+                                <v-btn
+                                  v-if="editingProfileId"
+                                  variant="text"
+                                  color="secondary"
+                                  prepend-icon="mdi-close-circle"
+                                  @click="startNewClimateProfile"
+                                >
+                                  Отмена редактирования
+                                </v-btn>
+                              </v-col>
+                            </v-row>
+                          </v-card-text>
+                        </v-card>
                       </v-col>
 
-                      <v-col cols="12" md="6">
-                        <v-text-field
-                          v-model="basicForm.climateProfile"
-                          label="Профиль климата"
-                          variant="outlined"
-                          prepend-inner-icon="mdi-thermometer"
-                          hint="Например: салаты, базилик, рассада"
-                          persistent-hint
-                        ></v-text-field>
+                      <v-col cols="12" v-if="climateProfiles.length">
+                        <v-card variant="flat" class="border rounded">
+                          <v-card-text>
+                            <h4 class="text-subtitle-2 mb-3">Сохранённые профили</h4>
+                            <v-list density="comfortable" variant="flat">
+                              <v-list-item
+                                v-for="profile in climateProfiles"
+                                :key="profile.id"
+                                class="mb-2"
+                              >
+                                <v-list-item-title>{{ profile.name }}</v-list-item-title>
+                                <v-list-item-subtitle v-if="profile.notes">
+                                  {{ profile.notes }}
+                                </v-list-item-subtitle>
+                                <v-list-item-subtitle class="text-caption text-medium-emphasis mt-2">
+                                  <span v-if="profile.dayTemperature !== null">
+                                    День: {{ profile.dayTemperature }}°C
+                                  </span>
+                                  <span v-if="profile.dayHumidity !== null">
+                                    · влажность {{ profile.dayHumidity }}%
+                                  </span>
+                                  <span v-if="profile.nightTemperature !== null">
+                                    <br />Ночь: {{ profile.nightTemperature }}°C
+                                  </span>
+                                  <span v-if="profile.nightHumidity !== null">
+                                    · влажность {{ profile.nightHumidity }}%
+                                  </span>
+                                </v-list-item-subtitle>
+                                <template #append>
+                                <div class="d-flex ga-2">
+                                  <v-btn
+                                    icon="mdi-pencil-outline"
+                                    variant="text"
+                                    color="primary"
+                                    @click="startEditDraftProfile(profile)"
+                                  ></v-btn>
+                                  <v-btn
+                                    icon="mdi-delete-outline"
+                                    variant="text"
+                                    color="error"
+                                    @click="removeClimateProfile(profile.id)"
+                                  ></v-btn>
+                                </div>
+                                </template>
+                              </v-list-item>
+                            </v-list>
+                          </v-card-text>
+                        </v-card>
                       </v-col>
+
                     </v-row>
                   </v-form>
                 </v-card-text>
@@ -341,9 +563,12 @@
                         <div class="text-caption text-medium-emphasis mt-4 mb-1">Код</div>
                         <div class="text-body-1 font-weight-medium">{{ basicForm.code || '—' }}</div>
 
-                        <div class="text-caption text-medium-emphasis mt-4 mb-1">Локация</div>
+                        <div class="text-caption text-medium-emphasis mt-4 mb-1">Статус</div>
+                        <div class="text-body-2 text-medium-emphasis">{{ statusLabel }}</div>
+
+                        <div class="text-caption text-medium-emphasis mt-4 mb-1">Описание</div>
                         <div class="text-body-2">
-                          {{ basicForm.location || 'Не указано' }}
+                          {{ basicForm.description || 'Не заполнено' }}
                         </div>
                       </v-sheet>
                     </v-col>
@@ -353,6 +578,21 @@
                         <div class="text-caption text-medium-emphasis mb-1">Root узел</div>
                         <div class="text-body-1 font-weight-medium">
                           {{ rootNodeLabel || 'Не назначен' }}
+                        </div>
+
+                        <div class="text-caption text-medium-emphasis mt-4 mb-1">Профили климата</div>
+                        <div class="text-body-2">
+                          <template v-if="climateProfiles.length">
+                            <div
+                              v-for="profile in climateProfiles"
+                              :key="profile.id"
+                            >
+                              • {{ profile.name }}
+                            </div>
+                          </template>
+                          <template v-else>
+                            Профили не добавлены
+                          </template>
                         </div>
 
                         <div class="text-caption text-medium-emphasis mt-4 mb-1">Зоны</div>
@@ -426,7 +666,7 @@ import { useNodesStore } from '@/stores/nodes'
 import { useGrowthStore } from '@/stores/growth'
 import { useSetupStore } from '@/stores/setup'
 import { usePopup } from '@/composables/usePopup'
-import type { GreenhouseDetail, CreateGreenhousePayload } from '@/types/greenhouse'
+import type { GreenhouseDetail, CreateGreenhousePayload, ClimateProfile } from '@/types/greenhouse'
 import type { Zone } from '@/stores/zones'
 
 interface DraftZone {
@@ -434,6 +674,56 @@ interface DraftZone {
   name: string
   zone_type: string
   location?: string
+}
+
+interface ClimateProfileDraftFields {
+  name: string
+  notes: string
+  dayTemperature: number | null
+  dayHumidity: number | null
+  dayCo2: number | null
+  dayLight: number | null
+  dayVpd: number | null
+  nightTemperature: number | null
+  nightHumidity: number | null
+  nightCo2: number | null
+  nightLight: number | null
+  nightVpd: number | null
+}
+
+interface ClimateProfileDraft extends ClimateProfileDraftFields {
+  id: string
+}
+
+interface ClimateProfileOption {
+  value: string
+  title: string
+  profile: ClimateProfile
+}
+
+interface SummaryZone {
+  id: number | string
+  name: string
+  zone_type: string
+  isDraft: boolean
+}
+
+interface ZoneTypeOption {
+  title: string
+  value: string
+}
+
+interface StatusOption {
+  label: string
+  value: string
+}
+
+interface ZoneLike {
+  id: number
+  name: string
+  zone_type: string
+  mesh_network_id?: string
+  greenhouse_id?: number | null
 }
 
 const props = defineProps<{
@@ -464,13 +754,35 @@ const rules = {
 const basicForm = reactive({
   name: '',
   code: '',
-  location: '',
   description: '',
-  timezone: defaultTimezone(),
   status: 'active',
-  meshGroup: '',
-  climateProfile: '',
 })
+
+const climateProfiles = ref<ClimateProfileDraft[]>([])
+const climateDraft = reactive<ClimateProfileDraftFields>({
+  name: '',
+  notes: '',
+  dayTemperature: null,
+  dayHumidity: null,
+  dayCo2: null,
+  dayLight: null,
+  dayVpd: null,
+  nightTemperature: null,
+  nightHumidity: null,
+  nightCo2: null,
+  nightLight: null,
+  nightVpd: null,
+})
+const climateProfilesCatalog = computed<ClimateProfile[]>(() => greenhousesStore.knownClimateProfiles)
+const existingClimateProfileOptions = computed<ClimateProfileOption[]>(() =>
+  climateProfilesCatalog.value.map((profile: ClimateProfile) => ({
+    value: profile.id ?? profile.name,
+    title: profile.name,
+    profile,
+  })),
+)
+const selectedExistingProfile = ref<string | null>(null)
+const editingProfileId = ref<string | null>(null)
 
 const codeTouched = ref(false)
 const rootNodeId = ref<string | null>(null)
@@ -507,29 +819,35 @@ const rootNodeOptions = computed(() =>
 )
 
 const availableZones = computed(() =>
-  zonesStore.zones.filter((zone: Zone) => zone.greenhouse_id == null),
+  zonesStore.zones.filter((zone: ZoneLike) => zone.greenhouse_id == null),
 )
 
 const zoneOptions = computed(() =>
-  availableZones.value.map((zone) => ({
+  availableZones.value.map((zone: ZoneLike) => ({
     value: zone.id,
     label: zone.name || zone.mesh_network_id,
     type: zone.zone_type,
   })),
 )
 
-const selectedZonesDetailed = computed(() =>
-  zonesStore.zones.filter((zone) => selectedZoneIds.value.includes(zone.id)),
+const selectedZonesDetailed = computed<ZoneLike[]>(() =>
+  zonesStore.zones
+    .filter((zone: ZoneLike) => selectedZoneIds.value.includes(zone.id))
+    .map((zone: ZoneLike) => ({
+      id: zone.id,
+      name: zone.name,
+      zone_type: zone.zone_type,
+    })),
 )
 
-const summaryZones = computed(() => [
-  ...selectedZonesDetailed.value.map((zone) => ({
+const summaryZones = computed<SummaryZone[]>(() => [
+  ...selectedZonesDetailed.value.map((zone: ZoneLike) => ({
     id: zone.id,
     name: zone.name,
     zone_type: zone.zone_type,
     isDraft: false,
   })),
-  ...draftZones.value.map((zone) => ({
+  ...draftZones.value.map((zone: DraftZone) => ({
     id: zone.id,
     name: zone.name,
     zone_type: zone.zone_type,
@@ -538,34 +856,54 @@ const summaryZones = computed(() => [
 ])
 
 const cycleZoneOptions = computed(() =>
-  selectedZonesDetailed.value.map((zone) => ({
+  selectedZonesDetailed.value.map((zone: ZoneLike) => ({
     value: zone.id,
     label: zone.name,
   })),
 )
 
 const presetOptions = computed(() =>
-  growthStore.presets.map((preset) => ({
+  growthStore.presets.map((preset: { id: number; name: string }) => ({
     value: preset.id,
     label: preset.name,
   })),
 )
 
-const rootNodeLabel = computed(() => {
-  if (!rootNodeId.value) {
+const editingProfileLabel = computed(() => {
+  if (!editingProfileId.value) {
     return null
   }
-  const node = rootNodeOptions.value.find((item) => item.value === rootNodeId.value)
-  return node?.label || rootNodeId.value
+
+  const id = editingProfileId.value
+
+  if (id.startsWith('existing-')) {
+    const targetId = id.replace('existing-', '')
+    const option = existingClimateProfileOptions.value.find(
+      (item: ClimateProfileOption) => item.value === targetId,
+    )
+    return option?.profile.name ?? (climateDraft.name || 'Профиль')
+  }
+
+  const draft = climateProfiles.value.find((profile: ClimateProfileDraft) => profile.id === id)
+  if (draft) {
+    return draft.name || 'Профиль'
+  }
+
+  return climateDraft.name || 'Профиль'
 })
 
-const statusOptions = [
+const statusOptions: StatusOption[] = [
   { label: 'Активна', value: 'active' },
   { label: 'Черновик', value: 'draft' },
   { label: 'Техническое обслуживание', value: 'maintenance' },
 ]
 
-const zoneTypes = [
+const statusLabel = computed(() => {
+  const match = statusOptions.find((option: StatusOption) => option.value === basicForm.status)
+  return match ? match.label : 'Не выбран'
+})
+
+const zoneTypes: ZoneTypeOption[] = [
   { title: 'NFT', value: 'nft' },
   { title: 'DWC', value: 'dwc' },
   { title: 'Капельный полив', value: 'drip' },
@@ -574,19 +912,9 @@ const zoneTypes = [
   { title: 'Другое', value: 'other' },
 ]
 
-const timezones = [
-  'UTC',
-  'Europe/Moscow',
-  'Europe/Berlin',
-  'America/New_York',
-  'Asia/Yekaterinburg',
-  'Asia/Novosibirsk',
-  'Asia/Tokyo',
-]
-
 watch(
   () => props.modelValue,
-  async (value) => {
+  async (value: boolean) => {
     internalModel.value = value
     if (value) {
       resetWizard()
@@ -595,13 +923,13 @@ watch(
   },
 )
 
-watch(internalModel, (value) => {
+watch(internalModel, (value: boolean) => {
   emit('update:modelValue', value)
 })
 
 watch(
   () => basicForm.name,
-  (value) => {
+  (value: string) => {
     if (!codeTouched.value) {
       basicForm.code = generateCode(value)
     }
@@ -610,20 +938,12 @@ watch(
 
 watch(
   () => internalModel.value,
-  (value) => {
+  (value: boolean) => {
     if (!value) {
       autoPlan.enabled = false
     }
   },
 )
-
-function defaultTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone
-  } catch (e) {
-    return 'UTC'
-  }
-}
 
 async function ensureData() {
   const promises: Promise<any>[] = []
@@ -661,12 +981,12 @@ function resetWizard() {
   codeTouched.value = false
   basicForm.name = ''
   basicForm.code = ''
-  basicForm.location = ''
   basicForm.description = ''
-  basicForm.timezone = defaultTimezone()
   basicForm.status = 'active'
-  basicForm.meshGroup = ''
-  basicForm.climateProfile = ''
+  climateProfiles.value = []
+  selectedExistingProfile.value = null
+  editingProfileId.value = null
+  resetClimateDraft()
   rootNodeId.value = null
   selectedZoneIds.value = []
   draftZones.value = []
@@ -682,7 +1002,7 @@ function resetWizard() {
 
 function isStepValid(stepIndex: number) {
   if (stepIndex === 1) {
-    return Boolean(basicForm.name.trim())
+    return Boolean(basicForm.name.trim() && basicForm.description.trim())
   }
   if (stepIndex === 3) {
     return selectedZoneIds.value.length + draftZones.value.length > 0
@@ -725,11 +1045,12 @@ function addDraftZone() {
 }
 
 function removeDraftZone(id: string) {
-  draftZones.value = draftZones.value.filter((zone) => zone.id !== id)
+  draftZones.value = draftZones.value.filter((zone: DraftZone) => zone.id !== id)
 }
 
 function zoneTypeLabel(value: string) {
-  return zoneTypes.find((zone) => zone.value === value)?.title || value
+  const match = zoneTypes.find((zone: ZoneTypeOption) => zone.value === value)
+  return match ? match.title : value
 }
 
 function generateCode(value: string) {
@@ -759,6 +1080,163 @@ function buildMqttPrefix(zoneName: string) {
   return `hydro/${base}/${suffix}/`
 }
 
+function resetClimateDraft() {
+  climateDraft.name = ''
+  climateDraft.notes = ''
+  climateDraft.dayTemperature = null
+  climateDraft.dayHumidity = null
+  climateDraft.dayCo2 = null
+  climateDraft.dayLight = null
+  climateDraft.dayVpd = null
+  climateDraft.nightTemperature = null
+  climateDraft.nightHumidity = null
+  climateDraft.nightCo2 = null
+  climateDraft.nightLight = null
+  climateDraft.nightVpd = null
+}
+
+function loadDraftFromExistingProfile(profile: ClimateProfile) {
+  resetClimateDraft()
+  climateDraft.name = profile.name ?? ''
+  climateDraft.notes = profile.notes ?? ''
+  climateDraft.dayTemperature = profile.day?.temperature ?? null
+  climateDraft.dayHumidity = profile.day?.humidity ?? null
+  climateDraft.dayCo2 = profile.day?.co2 ?? null
+  climateDraft.dayLight = profile.day?.light ?? null
+  climateDraft.dayVpd = profile.day?.vpd ?? null
+  climateDraft.nightTemperature = profile.night?.temperature ?? null
+  climateDraft.nightHumidity = profile.night?.humidity ?? null
+  climateDraft.nightCo2 = profile.night?.co2 ?? null
+  climateDraft.nightLight = profile.night?.light ?? null
+  climateDraft.nightVpd = profile.night?.vpd ?? null
+}
+
+function loadDraftFromDraftProfile(profile: ClimateProfileDraft) {
+  resetClimateDraft()
+  climateDraft.name = profile.name
+  climateDraft.notes = profile.notes
+  climateDraft.dayTemperature = profile.dayTemperature
+  climateDraft.dayHumidity = profile.dayHumidity
+  climateDraft.dayCo2 = profile.dayCo2
+  climateDraft.dayLight = profile.dayLight
+  climateDraft.dayVpd = profile.dayVpd
+  climateDraft.nightTemperature = profile.nightTemperature
+  climateDraft.nightHumidity = profile.nightHumidity
+  climateDraft.nightCo2 = profile.nightCo2
+  climateDraft.nightLight = profile.nightLight
+  climateDraft.nightVpd = profile.nightVpd
+}
+
+function startNewClimateProfile() {
+  selectedExistingProfile.value = null
+  editingProfileId.value = null
+  resetClimateDraft()
+}
+
+function startEditExistingProfile() {
+  if (!selectedExistingProfile.value) {
+    popup.toast.error('Выберите профиль из списка')
+    return
+  }
+
+  const option = existingClimateProfileOptions.value.find(
+    (item: ClimateProfileOption) => item.value === selectedExistingProfile.value,
+  )
+
+  if (!option) {
+    popup.toast.error('Не удалось найти выбранный профиль')
+    return
+  }
+
+  loadDraftFromExistingProfile(option.profile)
+  editingProfileId.value = `existing-${option.value}`
+}
+
+function startEditDraftProfile(profile: ClimateProfileDraft) {
+  selectedExistingProfile.value = null
+  editingProfileId.value = profile.id
+  loadDraftFromDraftProfile(profile)
+}
+
+function addClimateProfile() {
+  if (!climateDraft.name.trim()) {
+    popup.toast.error('Укажите название профиля климата')
+    return
+  }
+
+  const id =
+    editingProfileId.value ?? `profile-${Date.now()}-${climateProfiles.value.length}`
+
+  const profile: ClimateProfileDraft = {
+    id,
+    name: climateDraft.name.trim(),
+    notes: climateDraft.notes.trim(),
+    dayTemperature: climateDraft.dayTemperature,
+    dayHumidity: climateDraft.dayHumidity,
+    dayCo2: climateDraft.dayCo2,
+    dayLight: climateDraft.dayLight,
+    dayVpd: climateDraft.dayVpd,
+    nightTemperature: climateDraft.nightTemperature,
+    nightHumidity: climateDraft.nightHumidity,
+    nightCo2: climateDraft.nightCo2,
+    nightLight: climateDraft.nightLight,
+    nightVpd: climateDraft.nightVpd,
+  }
+
+  const index = climateProfiles.value.findIndex((item: ClimateProfileDraft) => item.id === id)
+  if (index === -1) {
+    climateProfiles.value.push(profile)
+  } else {
+    climateProfiles.value.splice(index, 1, profile)
+  }
+
+  startNewClimateProfile()
+}
+
+function removeClimateProfile(id: string) {
+  climateProfiles.value = climateProfiles.value.filter((profile: ClimateProfileDraft) => profile.id !== id)
+  if (editingProfileId.value === id) {
+    startNewClimateProfile()
+  }
+}
+
+function mapProfileToPayload(profile: ClimateProfileDraft) {
+  const day = pickNumericSetpoints({
+    temperature: profile.dayTemperature,
+    humidity: profile.dayHumidity,
+    co2: profile.dayCo2,
+    light: profile.dayLight,
+    vpd: profile.dayVpd,
+  })
+
+  const night = pickNumericSetpoints({
+    temperature: profile.nightTemperature,
+    humidity: profile.nightHumidity,
+    co2: profile.nightCo2,
+    light: profile.nightLight,
+    vpd: profile.nightVpd,
+  })
+
+  const notes = profile.notes.trim()
+
+  return {
+    name: profile.name,
+    notes: notes ? notes : undefined,
+    day: Object.keys(day).length ? day : undefined,
+    night: Object.keys(night).length ? night : undefined,
+  }
+}
+
+function pickNumericSetpoints(values: Record<string, number | null>) {
+  const result: Record<string, number> = {}
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== null && !Number.isNaN(value)) {
+      result[key] = Number(value)
+    }
+  })
+  return result
+}
+
 async function submit() {
   if (!isStepValid(step.value)) {
     popup.toast.error('Проверьте введённые данные перед созданием теплицы')
@@ -771,16 +1249,15 @@ async function submit() {
     const payload: CreateGreenhousePayload = {
       name: basicForm.name.trim(),
       code: (basicForm.code || generateCode(basicForm.name)).trim(),
-      location: basicForm.location.trim() || null,
-      description: basicForm.description.trim() || null,
-      timezone: basicForm.timezone || null,
+      description: basicForm.description.trim(),
       status: basicForm.status as any,
-      mesh_group: basicForm.meshGroup.trim() || null,
-      settings: basicForm.climateProfile
-        ? {
-            climate_profile: basicForm.climateProfile.trim(),
-          }
-        : null,
+    }
+
+    const profiles = climateProfiles.value
+      .map(mapProfileToPayload)
+      .filter((profile: ReturnType<typeof mapProfileToPayload>) => Boolean(profile.name))
+    if (profiles.length) {
+      payload.climate_profiles = profiles
     }
 
     const greenhouse = await greenhousesStore.createGreenhouse(payload)
@@ -789,7 +1266,6 @@ async function submit() {
     }
 
     const greenhouseId = greenhouse.id
-    const attachedZoneIds = new Set<number>()
 
     if (rootNodeId.value) {
       await greenhousesStore.attachNode(greenhouseId, {
@@ -800,10 +1276,8 @@ async function submit() {
 
     for (const zoneId of selectedZoneIds.value) {
       await greenhousesStore.attachZone(greenhouseId, { zone_id: zoneId })
-      attachedZoneIds.add(zoneId)
     }
 
-    const newlyCreatedZoneIds: number[] = []
     for (const draft of draftZones.value) {
       const zonePayload: Partial<Zone> & { greenhouse_id?: number | null } = {
         name: draft.name,
@@ -819,8 +1293,6 @@ async function submit() {
       const zone = await zonesStore.createZone(zonePayload)
       if (zone?.id) {
         await greenhousesStore.attachZone(greenhouseId, { zone_id: zone.id })
-        attachedZoneIds.add(zone.id)
-        newlyCreatedZoneIds.push(zone.id)
       }
     }
 

@@ -1,4 +1,8 @@
 import {
+  adapters
+} from "./chunk-QDFR6BSM.js";
+import "./chunk-TYMRZRFD.js";
+import {
   addDays,
   addHours,
   addMilliseconds,
@@ -39,10 +43,6 @@ import {
   startOfYear,
   toDate
 } from "./chunk-NFRNGUAW.js";
-import {
-  adapters
-} from "./chunk-QDFR6BSM.js";
-import "./chunk-TYMRZRFD.js";
 import "./chunk-DC5AMYBS.js";
 
 // node_modules/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.esm.js

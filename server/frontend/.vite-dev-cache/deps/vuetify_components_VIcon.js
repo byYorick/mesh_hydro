@@ -1,15 +1,15 @@
 import {
   VIcon
-} from "./chunk-KGUXEXV6.js";
+} from "./chunk-72VLP5UR.js";
 import "./chunk-2UL4C4D2.js";
-import "./chunk-FSWG3OMG.js";
-import "./chunk-XL4SHUX5.js";
 import {
   VClassIcon,
   VComponentIcon,
   VLigatureIcon,
   VSvgIcon
 } from "./chunk-JBMQ7ZRV.js";
+import "./chunk-FSWG3OMG.js";
+import "./chunk-XL4SHUX5.js";
 import "./chunk-CEVB7HK3.js";
 import "./chunk-QPYD2SUY.js";
 import "./chunk-ZS4T33C3.js";
