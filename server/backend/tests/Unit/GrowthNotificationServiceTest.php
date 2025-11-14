@@ -25,6 +25,8 @@ class GrowthNotificationServiceTest extends TestCase
     {
         parent::setUp();
         
+        config()->set('broadcasting.default', 'log');
+        
         // Мокаем зависимости
         $telegram = Mockery::mock(\App\Services\TelegramService::class);
         $sms = Mockery::mock(\App\Services\SmsService::class);

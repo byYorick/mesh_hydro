@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Event;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class EventFactory extends Factory
@@ -11,7 +12,7 @@ class EventFactory extends Factory
 
     public function definition(): array
     {
-        $createdAt = $this->faker->dateTimeBetween('-3 days', 'now');
+        $createdAt = Carbon::now()->subMinutes($this->faker->numberBetween(0, 3 * 24 * 60));
 
         return [
             'node_id' => 'node_' . $this->faker->numberBetween(100, 999),
@@ -37,7 +38,7 @@ class EventFactory extends Factory
     public function resolved(string $resolvedBy = 'system'): static
     {
         return $this->state(function () use ($resolvedBy) {
-            $resolvedAt = $this->faker->dateTimeBetween('-1 day', 'now');
+            $resolvedAt = Carbon::now()->subMinutes($this->faker->numberBetween(0, 24 * 60));
 
             return [
                 'resolved_at' => $resolvedAt,

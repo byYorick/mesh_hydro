@@ -76,6 +76,73 @@ class Node extends Model
         return $this->belongsTo(Zone::class, 'zone', 'mesh_network_id');
     }
 
+    public function getZoneAttribute($value)
+    {
+        if ($this->isResolvingZoneForeignKey()) {
+            return $value;
+        }
+
+        if ($value instanceof Zone) {
+            return $value;
+        }
+
+        $raw = $value ?? $this->attributes['zone'] ?? null;
+        if ($this->relationLoaded('zoneRelation')) {
+            return $this->getRelation('zoneRelation');
+        }
+
+        if (!$raw || !is_string($raw)) {
+            if (!empty($this->root_node_id)) {
+                $zone = Zone::where('root_node_id', $this->root_node_id)->first();
+                if ($zone) {
+                    $this->setRelation('zoneRelation', $zone);
+                    return $zone;
+                }
+            }
+
+            return $raw;
+        }
+
+        $zone = Zone::where('mesh_network_id', $raw)->first();
+        if ($zone) {
+            $this->setRelation('zoneRelation', $zone);
+            return $zone;
+        }
+
+        return $raw;
+    }
+
+    private function isResolvingZoneForeignKey(): bool
+    {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 6);
+        foreach ($trace as $frame) {
+            if (($frame['class'] ?? null) === BelongsTo::class && ($frame['function'] ?? null) === 'getForeignKeyFrom') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function zoneCode(): ?string
+    {
+        $zone = $this->getAttribute('zone');
+
+        if ($zone instanceof Zone) {
+            return $zone->mesh_network_id;
+        }
+
+        if (is_string($zone) && $zone !== '') {
+            return $zone;
+        }
+
+        if (!empty($this->root_node_id)) {
+            return Zone::where('root_node_id', $this->root_node_id)->value('mesh_network_id');
+        }
+
+        return null;
+    }
+
     /**
      * Отношение: узел имеет много записей телеметрии
      */

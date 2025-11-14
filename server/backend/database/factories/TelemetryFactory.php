@@ -11,7 +11,7 @@ class TelemetryFactory extends Factory
 
     public function definition(): array
     {
-        $receivedAt = $this->faker->dateTimeBetween('-2 days', 'now');
+        $receivedAt = $this->faker->dateTimeBetween('-2 days', '-2 hours');
 
         return [
             'node_id' => 'node_test_' . $this->faker->unique()->numberBetween(100, 999),

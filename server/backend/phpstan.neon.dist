@@ -1,0 +1,21 @@
+includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
+parameters:
+    level: 0
+    paths:
+        - app
+        - config
+    tmpDir: storage/framework/cache/phpstan
+    checkMissingIterableValueType: true
+    checkGenericClassInNonGenericObjectType: true
+    checkMissingCallableSignature: true
+    reportUnmatchedIgnoredErrors: true
+    checkImplicitMixed: true
+    treatPhpDocTypesAsCertain: false
+    bootstrapFiles:
+        - bootstrap/app.php
+
+    ignoreErrors:
+        - '#Call to an undefined method Illuminate\\Support\\Collection::[a-zA-Z0-9_]+\(\)#'
+

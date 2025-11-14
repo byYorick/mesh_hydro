@@ -26,6 +26,15 @@
             >
               {{ statusText }}
             </v-chip>
+            <v-chip
+              v-if="isDeprecatedCombinedNode"
+              size="x-small"
+              color="warning"
+              variant="outlined"
+              class="text-none ml-2"
+            >
+              Устарело
+            </v-chip>
           </div>
         </div>
       </div>
@@ -54,7 +63,7 @@
       <!-- Main Metrics -->
       <div v-if="lastData" class="main-metrics mb-4">
         <!-- pH/EC Node Metrics -->
-        <div v-if="(node.node_type === 'ph_ec' || node.node_type === 'ph') && lastData" class="metrics-layout">
+        <div v-if="(['ph_ec', 'deprecated_ph_ec', 'ph'].includes(node.node_type)) && lastData" class="metrics-layout">
           <div class="primary-metric">
             <div class="metric-header">
               <v-icon icon="mdi-flask" size="20" class="mr-2" color="primary"></v-icon>
@@ -190,7 +199,7 @@
       <!-- Quick actions based on node type -->
       <template v-if="isOnline">
         <!-- pH/EC Quick Actions -->
-        <v-menu v-if="node.node_type === 'ph_ec' || node.node_type === 'ph'">
+        <v-menu v-if="['ph_ec', 'deprecated_ph_ec', 'ph'].includes(node.node_type)">
           <template v-slot:activator="{ props }">
             <v-btn
               size="small"
@@ -332,7 +341,20 @@ const {
 // Удалены дублирующиеся computed свойства - теперь используются из useNodeStatus
 
 // Node type icon
+const normalizedNodeType = computed(() => {
+  const type = props.node?.node_type
+  if (type === 'deprecated_ph_ec') {
+    return 'ph_ec'
+  }
+  return type
+})
+
+const isDeprecatedCombinedNode = computed(() => props.node?.node_type === 'deprecated_ph_ec')
+
 const nodeIcon = computed(() => {
+  if (isDeprecatedCombinedNode.value) {
+    return 'mdi-flask-off'
+  }
   const icons = {
     'ph_ec': 'mdi-flask',
     'ph': 'mdi-flask-outline',
@@ -343,11 +365,14 @@ const nodeIcon = computed(() => {
     'display': 'mdi-monitor',
     'root': 'mdi-server-network',
   }
-  return icons[props.node.node_type] || 'mdi-chip'
+  return icons[normalizedNodeType.value] || 'mdi-chip'
 })
 
 // Node type text
 const nodeTypeText = computed(() => {
+  if (isDeprecatedCombinedNode.value) {
+    return 'pH/EC (устарело)'
+  }
   const types = {
     'ph_ec': 'pH/EC Сенсор',
     'ph': 'pH Контроллер',
@@ -358,7 +383,7 @@ const nodeTypeText = computed(() => {
     'display': 'Дисплей',
     'root': 'Root Узел',
   }
-  return types[props.node.node_type] || props.node.node_type
+  return types[normalizedNodeType.value] || normalizedNodeType.value
 })
 
 // Last telemetry data
@@ -480,7 +505,7 @@ const processNodeMetrics = (nodeType, data) => {
 
 // Visible metrics для mobile layout
 const visibleMetrics = computed(() => {
-  return processNodeMetrics(props.node.node_type, lastData.value)
+  return processNodeMetrics(normalizedNodeType.value, lastData.value)
 })
 
 // Config dialog state

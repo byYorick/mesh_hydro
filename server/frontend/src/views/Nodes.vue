@@ -129,7 +129,7 @@ const filterStatus = ref(null)
 // Debounced search для улучшения производительности
 const debouncedSearch = useDebounce(search, 300)
 
-const nodeTypes = ['ph', 'ec', 'ph_ec', 'climate', 'relay', 'water', 'display', 'root']
+const nodeTypes = ['ph', 'ec', 'deprecated_ph_ec', 'climate', 'relay', 'water', 'display', 'root']
 
 // Filtered nodes
 const filteredNodes = computed(() => {

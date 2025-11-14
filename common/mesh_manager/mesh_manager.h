@@ -30,7 +30,8 @@ typedef enum {
  */
 typedef struct {
     mesh_mode_t mode;               ///< Режим работы (ROOT или NODE)
-    const char *mesh_id;            ///< ID mesh-сети (6 байт)
+    uint8_t mesh_id[6];             ///< Бинарный mesh ID (6 байт)
+    const char *mesh_id_str;        ///< Человекочитаемый mesh ID / SSID (может быть NULL)
     const char *mesh_password;      ///< Пароль mesh-сети
     uint8_t channel;                ///< WiFi канал (1-13, 0=auto)
     uint8_t max_connection;         ///< Макс. подключений (для ROOT AP)
@@ -78,6 +79,42 @@ esp_err_t mesh_manager_start(void);
  * @return ESP_OK при успехе
  */
 esp_err_t mesh_manager_stop(void);
+
+/**
+ * @brief Настройка временного SoftAP (WIFI_MODE_APSTA) перед запуском mesh
+ *
+ * Позволяет включить одновременный SoftAP и STA режим, чтобы устройства
+ * могли обнаружить корневой узел до старта mesh.
+ *
+ * @param ssid        SSID SoftAP (до 31 символа)
+ * @param password    Пароль SoftAP (NULL или строка длиной >= 8)
+ * @param channel     Wi-Fi канал (1-13)
+ * @param hidden      Скрывать SSID (true/false)
+ * @param max_conn    Максимальное количество одновременных подключений
+ *
+ * @return ESP_OK при успехе
+ */
+esp_err_t mesh_manager_configure_softap(const char *ssid,
+                                        const char *password,
+                                        uint8_t channel,
+                                        bool hidden,
+                                        uint8_t max_conn);
+
+/**
+ * @brief Преобразовать строковый mesh ID в 6-байтовое значение
+ *
+ * @param str   Строка (может быть NULL)
+ * @param out   Массив из 6 байт для результата
+ */
+void mesh_manager_string_to_mesh_id(const char *str, uint8_t out[6]);
+
+/**
+ * @brief Сконвертировать mesh ID в HEX строку (12 символов + '\0')
+ *
+ * @param mesh_id  Массив из 6 байт
+ * @param out_hex  Буфер минимум 13 символов
+ */
+void mesh_manager_mesh_id_to_hex(const uint8_t mesh_id[6], char out_hex[13]);
 
 /**
  * @brief Отправка данных в mesh

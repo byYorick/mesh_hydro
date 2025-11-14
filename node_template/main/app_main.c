@@ -18,10 +18,11 @@ void app_main(void)
     // Mesh (NODE режим)
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = "HYDRO1",
         .mesh_password = "hydro_mesh_pass",
         .channel = 1
     };
+    mesh_manager_string_to_mesh_id("HYDRO1", mesh_config.mesh_id);
+    mesh_config.mesh_id_str = "HYDRO1";
     
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     ESP_ERROR_CHECK(mesh_manager_start());

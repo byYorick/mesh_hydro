@@ -24,6 +24,12 @@ class CheckNodesStatusCommand extends Command
     /**
      * Execute the console command.
      */
+    public function __construct(
+        private readonly TelegramService $telegramService,
+    ) {
+        parent::__construct();
+    }
+
     public function handle(): int
     {
         $this->info('Checking nodes status...');
@@ -76,7 +82,7 @@ class CheckNodesStatusCommand extends Command
                     // Отправка уведомления если включено
                     if ($this->option('notify')) {
                         try {
-                            app(TelegramService::class)->sendNodeStatus($node, 'offline');
+                            $this->telegramService->sendNodeStatus($node, 'offline');
                         } catch (\Exception $e) {
                             $this->error("Failed to send notification: {$e->getMessage()}");
                         }

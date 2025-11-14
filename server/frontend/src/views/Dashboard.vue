@@ -524,8 +524,9 @@ function nodeTypeIcon(type: string) {
     water: 'mdi-water',
     display: 'mdi-monitor',
     'ph_ec': 'mdi-flask',
+    'deprecated_ph_ec': 'mdi-flask-off',
   }
-  return map[type] || 'mdi-chip'
+  return map[type] || map[type === 'deprecated_ph_ec' ? 'ph_ec' : type] || 'mdi-chip'
 }
 
 function formatTelemetryData(data: Record<string, any>) {

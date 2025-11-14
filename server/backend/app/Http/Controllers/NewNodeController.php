@@ -3,12 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewNode;
-use Illuminate\Http\Request;
+use App\Services\NewNodeConfigurator;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class NewNodeController extends Controller
 {
+    public function __construct(
+        private readonly NewNodeConfigurator $newNodeConfigurator,
+    ) {
+    }
     public function index(): JsonResponse
     {
         $newNodes = NewNode::orderByDesc('is_root')
@@ -63,7 +68,7 @@ class NewNodeController extends Controller
         $node->metadata = $metadata;
         $node->save();
 
-        $success = $node->configure($config);
+        $success = $this->newNodeConfigurator->configure($node, $config);
 
         if (!$success) {
             return response()->json([

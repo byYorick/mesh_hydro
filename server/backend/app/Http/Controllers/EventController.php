@@ -45,6 +45,9 @@ class EventController extends Controller
             $query->where('created_at', '>', now()->subHours($hours));
         }
 
+        // Исключаем события из будущего (например, тестовые данные)
+        $query->where('created_at', '<=', now());
+
         // Сортировка
         $query->orderBy('created_at', 'desc');
 
@@ -139,7 +142,7 @@ class EventController extends Controller
     {
         $hours = $request->get('hours', 24);
 
-        $query = Event::where('created_at', '>', now()->subHours($hours));
+        $query = Event::whereBetween('created_at', [now()->subHours($hours), now()]);
 
         $total = $query->count();
         $active = (clone $query)->active()->count();

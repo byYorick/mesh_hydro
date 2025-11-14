@@ -142,7 +142,25 @@ class ZoneController extends Controller
             }
 
             $rootNode = $zoneModel?->rootNode
+                ?? Node::where('root_node_id', $zoneModel?->root_node_id)->where('node_type', 'root')->first()
+                ?? Node::where('node_id', $zoneModel?->root_node_id)->first()
                 ?? Node::where('zone', $zoneKey)->where('node_type', 'root')->first();
+
+            if (!$rootNode && $zoneModel && $zoneModel->root_node_id) {
+                $rootNode = Node::firstOrCreate(
+                    ['node_id' => $zoneModel->root_node_id],
+                    [
+                        'node_type' => 'root',
+                        'root_node_id' => $zoneModel->root_node_id,
+                        'zone' => $zoneModel->mesh_network_id,
+                        'online' => false,
+                        'metadata' => [
+                            'created_via' => 'zone_api_auto',
+                            'mesh_network_id' => $zoneModel->mesh_network_id,
+                        ],
+                    ]
+                );
+            }
 
             $childNodes = $rootNode
                 ? $rootNode->childNodes()->with('lastTelemetry')->get()
@@ -397,18 +415,18 @@ class ZoneController extends Controller
      */
     private function resolveZoneIdentifier(string $zone): array
     {
-        // 1. Прямое совпадение по mesh_network_id
-        if ($this->validateZone($zone)) {
-            $zoneModel = Zone::where('mesh_network_id', $zone)->first();
-            return [$zone, $zoneModel];
-        }
-
-        // 2. Если передан числовой id
+        // 1. Если передан числовой id
         if (is_numeric($zone)) {
             $zoneModel = Zone::find((int) $zone);
             if ($zoneModel && $zoneModel->mesh_network_id) {
                 return [$zoneModel->mesh_network_id, $zoneModel];
             }
+        }
+
+        // 2. Прямое совпадение по mesh_network_id
+        if ($this->validateZone($zone)) {
+            $zoneModel = Zone::where('mesh_network_id', $zone)->first();
+            return [$zone, $zoneModel];
         }
 
         // 3. Попытка найти по имени зоны

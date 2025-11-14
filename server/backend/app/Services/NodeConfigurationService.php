@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\GrowthCycle;
 use App\Models\Node;
 use App\Models\NodeConfigurationConfirmation;
-use App\Models\GrowthCycle;
 use App\Services\MqttService;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * ⭐ GROWTH PLANNER: Сервис для управления подтверждениями конфигурации узлов
@@ -15,8 +15,9 @@ use Carbon\Carbon;
 class NodeConfigurationService
 {
     public function __construct(
-        private MqttService $mqtt
-    ) {}
+        private readonly MqttService $mqttService,
+    ) {
+    }
 
     /**
      * Отправка конфигурации узлу с отслеживанием подтверждения
@@ -46,7 +47,7 @@ class NodeConfigurationService
                 '_confirmation_id' => $confirmation->id,
             ]);
 
-            $this->mqtt->sendConfig($nodeId, $configWithId);
+            $this->mqttService->sendConfig($nodeId, $configWithId);
 
             Log::info("Configuration sent with confirmation tracking", [
                 'node_id' => $nodeId,

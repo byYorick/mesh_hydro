@@ -79,7 +79,7 @@ class DashboardController extends Controller
                     return [
                         'node_id' => $node->node_id,
                         'node_type' => $node->node_type,
-                        'zone' => $node->zone,
+                        'zone' => $node->zoneCode(),
                         'icon' => $node->icon,
                         'data' => $node->lastTelemetry?->data,
                         'received_at' => $node->lastTelemetry?->received_at,
@@ -186,7 +186,7 @@ class DashboardController extends Controller
         // Информация о системе
         $systemInfo = [
             'php_version' => PHP_VERSION,
-            'laravel_version' => app()->version(),
+            'laravel_version' => \Illuminate\Foundation\Application::VERSION,
             'server_time' => now()->toDateTimeString(),
             'uptime' => $this->getServerUptime(),
             'mqtt_last_connection' => $lastMqttConnection

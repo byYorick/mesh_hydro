@@ -23,6 +23,7 @@
 #include "esp_app_desc.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
+#include "esp_random.h"
 #include "driver/gpio.h"
 
 // Common компоненты
@@ -30,6 +31,7 @@
 #include "mesh_protocol.h"
 #include "node_config.h"
 #include "mesh_config.h"
+#include "zone_config.h"
 #include "cJSON.h"
 #include "root_defaults.h"
 
@@ -65,7 +67,7 @@ static char s_setup_ap_ssid[32] = {0};
 #define ROOT_OLED_SDA_PIN   GPIO_NUM_8
 #define ROOT_OLED_SCL_PIN   GPIO_NUM_9
 
-#define ROOT_SETUP_BUTTON_PIN      GPIO_NUM_0
+#define ROOT_SETUP_BUTTON_PIN      GPIO_NUM_45
 #define ROOT_BUTTON_ACTIVE_LEVEL   0
 #define ROOT_BUTTON_POLL_MS        50
 #define ROOT_BUTTON_LONG_PRESS_MS  3000
@@ -78,8 +80,37 @@ static bool s_last_mqtt_connected = false;
 static TaskHandle_t s_button_task_handle = NULL;
 static bool s_setup_request_pending = false;
 
+#define NODE_PAIRING_SOFTAP_PASS MESH_NETWORK_PASSWORD
+#define NODE_PAIRING_SOFTAP_CHANNEL 6
+#define NODE_PAIRING_SOFTAP_GRACE_MS 10000
+#define NODE_PAIRING_SSID_PREFIX "ROOT_PAIR_"
+#define NODE_PAIRING_DISCOVERY_TIMEOUT_MS 120000
+#define NODE_PAIRING_CONFIRM_TIMEOUT_MS 60000
+
+typedef struct {
+    char generated_pin[7];
+    char mesh_tag_hex[13];
+    uint8_t mesh_id_bytes[6];
+    char ap_ssid[33];
+    char node_pin[8];
+    char node_type[16];
+    char node_mac_str[18];
+    char assigned_node_id[32];
+    char router_ssid[33];
+    char router_password[65];
+    uint8_t node_mac[6];
+    uint8_t src_mac[6];
+    bool discovery_received;
+    bool confirmation_received;
+} node_pairing_context_t;
+
+static node_pairing_context_t s_pairing_ctx = {0};
+static SemaphoreHandle_t s_pairing_discovery_sem = NULL;
+static SemaphoreHandle_t s_pairing_confirmation_sem = NULL;
+
 static void run_setup_mode(void);
 static void run_normal_mode(void);
+static void run_node_pairing_mode(void);
 static void setup_portal_credentials_cb(const setup_portal_credentials_t *credentials, void *user_ctx);
 static esp_err_t start_setup_mesh(const char *mesh_id, const char *ssid, const char *password, esp_netif_ip_info_t *ip_info_out);
 static esp_err_t send_setup_message(const char *type, const char *pin, const char *temp_mesh_id, const esp_netif_ip_info_t *ip_info);
@@ -94,13 +125,18 @@ static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *
                                 bool router_connected, bool mqtt_connected);
 static void root_display_show_heartbeat(void);
 static bool root_get_router_status(int8_t *rssi_out);
-static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint);
+static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint, const char *status);
 static void root_display_show_setup_request(void);
 static void root_display_show_setup_error(const char *message);
+static void root_display_show_pairing_status(const char *ap_ssid, const char *pin, const char *status);
 static void root_display_configure_normal(const char *mesh_id);
 static void root_button_init(void);
 static void root_button_task(void *arg);
 static void handle_setup_button_trigger(void);
+static void node_pairing_mesh_recv_cb(const uint8_t *src_addr, const uint8_t *data, size_t len);
+static bool node_pairing_assign_node_id(const char *node_type, const uint8_t mac[6], char *out_id, size_t out_len);
+static esp_err_t node_pairing_send_write_config(const root_config_t *root_cfg);
+static void root_log_config_state(const char *stage);
 
 static void root_display_init(const root_config_t *cfg) {
     if (s_root_display_ready) {
@@ -202,20 +238,21 @@ static bool root_get_router_status(int8_t *rssi_out) {
     return false;
 }
 
-static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint) {
+static void root_display_show_setup(const char *ap_ssid, const char *pin, const char *ssid_hint, const char *status) {
     if (!s_root_display_ready) {
         return;
     }
 
-    oled_display_set_template(0, "SETUP MODE");
+    oled_display_set_template(0, "SETUP {status}");
     oled_display_set_template(1, "AP  {ap}");
     oled_display_set_template(2, "PIN {pin}");
-    oled_display_set_template(3, "SSID {ssid}");
+    oled_display_set_template(3, "TIP {hint}");
 
     oled_display_kv_t values[] = {
-        {.key = "ap", .value = ap_ssid ? ap_ssid : "HYDRO_SETUP"},
+        {.key = "status", .value = (status && status[0]) ? status : "READY"},
+        {.key = "ap", .value = ap_ssid ? ap_ssid : "ROOT_SETUP"},
         {.key = "pin", .value = pin ? pin : "-----"},
-        {.key = "ssid", .value = (ssid_hint && ssid_hint[0]) ? ssid_hint : "use portal"},
+        {.key = "hint", .value = (ssid_hint && ssid_hint[0]) ? ssid_hint : "use portal"},
     };
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 }
@@ -255,6 +292,148 @@ static void root_display_show_setup_error(const char *message)
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 }
 
+static void root_display_show_pairing_status(const char *ap_ssid, const char *pin, const char *status)
+{
+    if (!s_root_display_ready) {
+        root_display_init(NULL);
+    }
+
+    oled_display_set_template(0, "NODE PAIR MODE");
+    oled_display_set_template(1, "AP  {ap}");
+    oled_display_set_template(2, "PIN {pin}");
+    oled_display_set_template(3, "{status}");
+
+    oled_display_kv_t values[] = {
+        {.key = "ap", .value = (ap_ssid && ap_ssid[0]) ? ap_ssid : "ROOT_SETUP"},
+        {.key = "pin", .value = (pin && pin[0]) ? pin : "------"},
+        {.key = "status", .value = (status && status[0]) ? status : "Waiting..."},
+    };
+    oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+}
+
+static void node_pairing_generate_mesh_identity(void)
+{
+    uint8_t mac[6] = {0};
+    esp_efuse_mac_get_default(mac);
+    memcpy(s_pairing_ctx.mesh_id_bytes, mac, 3);
+
+    uint32_t rnd = esp_random();
+    uint32_t pin_value = (uint32_t)strtoul(s_pairing_ctx.generated_pin, NULL, 10);
+
+    s_pairing_ctx.mesh_id_bytes[3] = (uint8_t)((rnd & 0xFF) ^ mac[3] ^ (pin_value & 0xFF));
+    s_pairing_ctx.mesh_id_bytes[4] = (uint8_t)(((rnd >> 8) & 0xFF) ^ mac[4] ^ ((pin_value >> 3) & 0xFF));
+    s_pairing_ctx.mesh_id_bytes[5] = (uint8_t)(((rnd >> 16) & 0xFF) ^ mac[5] ^ ((pin_value >> 6) & 0xFF));
+
+    for (size_t i = 0; i < sizeof(s_pairing_ctx.mesh_id_bytes); ++i) {
+        if (s_pairing_ctx.mesh_id_bytes[i] == 0) {
+            s_pairing_ctx.mesh_id_bytes[i] = (uint8_t)(mac[i % 6] ?: 1);
+        }
+    }
+
+    snprintf(s_pairing_ctx.mesh_tag_hex, sizeof(s_pairing_ctx.mesh_tag_hex),
+             "%02X%02X%02X%02X%02X%02X",
+             s_pairing_ctx.mesh_id_bytes[0], s_pairing_ctx.mesh_id_bytes[1],
+             s_pairing_ctx.mesh_id_bytes[2], s_pairing_ctx.mesh_id_bytes[3],
+             s_pairing_ctx.mesh_id_bytes[4], s_pairing_ctx.mesh_id_bytes[5]);
+    ESP_LOGI(TAG, "Pairing mesh tag: %s", s_pairing_ctx.mesh_tag_hex);
+}
+
+static esp_err_t node_pairing_prepare_softap(const char *ssid, const char *password, uint8_t channel)
+{
+    esp_err_t err = mesh_manager_configure_softap(ssid, password, channel, false, 4);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Pairing SoftAP configured: SSID='%s' channel=%d", ssid, channel);
+    }
+    return err;
+}
+
+static void root_log_config_state(const char *stage)
+{
+    if (!stage) {
+        stage = "UNSPEC";
+    }
+
+    memset(s_pairing_ctx.router_ssid, 0, sizeof(s_pairing_ctx.router_ssid));
+    memset(s_pairing_ctx.router_password, 0, sizeof(s_pairing_ctx.router_password));
+    if (node_config_get_router_credentials(s_pairing_ctx.router_ssid, sizeof(s_pairing_ctx.router_ssid),
+                                           s_pairing_ctx.router_password, sizeof(s_pairing_ctx.router_password)) != ESP_OK) {
+        strncpy(s_pairing_ctx.router_ssid, MESH_ROUTER_SSID, sizeof(s_pairing_ctx.router_ssid) - 1);
+        strncpy(s_pairing_ctx.router_password, MESH_ROUTER_PASSWORD, sizeof(s_pairing_ctx.router_password) - 1);
+    }
+
+    root_config_t root_cfg = {0};
+    esp_err_t root_err = root_config_get(&root_cfg);
+    if (root_err == ESP_OK) {
+        ESP_LOGI(TAG,
+                 "[CFG:%s] root_config: root_id=%s mesh_id=%s zone=%s(%d) mqtt=%s:%u topic=%s configured=%s",
+                 stage,
+                 root_cfg.root_node_id,
+                 root_cfg.mesh_network_id,
+                 root_cfg.zone_name[0] ? root_cfg.zone_name : "-",
+                 root_cfg.zone_number,
+                 root_cfg.mqtt_host[0] ? root_cfg.mqtt_host : MQTT_BROKER_HOST,
+                 root_cfg.mqtt_port ? root_cfg.mqtt_port : MQTT_BROKER_PORT,
+                 root_cfg.mqtt_topic_prefix[0] ? root_cfg.mqtt_topic_prefix : "-",
+                 root_cfg.is_configured ? "yes" : "no");
+    } else {
+        ESP_LOGW(TAG, "[CFG:%s] root_config_get failed: %s", stage, esp_err_to_name(root_err));
+    }
+
+    char zone_mesh[ZONE_CONFIG_MAX_LEN] = {0};
+    char zone_root[ZONE_CONFIG_MAX_LEN] = {0};
+    esp_err_t zone_err = zone_config_load(zone_mesh, sizeof(zone_mesh),
+                                          zone_root, sizeof(zone_root));
+
+    bool zone_valid = (zone_err == ESP_OK) &&
+                      zone_config_validate(zone_mesh) &&
+                      zone_config_validate(zone_root);
+
+    if (!zone_valid &&
+        root_err == ESP_OK &&
+        root_cfg.is_configured &&
+        root_cfg.mesh_network_id[0] != '\0' &&
+        root_cfg.root_node_id[0] != '\0') {
+        ESP_LOGW(TAG,
+                 "[CFG:%s] zone_config missing, restoring from root_config (mesh=%s root=%s)",
+                 stage,
+                 root_cfg.mesh_network_id,
+                 root_cfg.root_node_id);
+        if (zone_config_save(root_cfg.mesh_network_id, root_cfg.root_node_id) == ESP_OK) {
+            strncpy(zone_mesh, root_cfg.mesh_network_id, sizeof(zone_mesh) - 1);
+            strncpy(zone_root, root_cfg.root_node_id, sizeof(zone_root) - 1);
+            zone_mesh[sizeof(zone_mesh) - 1] = '\0';
+            zone_root[sizeof(zone_root) - 1] = '\0';
+            zone_err = ESP_OK;
+            zone_valid = true;
+        } else {
+            ESP_LOGE(TAG, "[CFG:%s] failed to restore zone_config", stage);
+        }
+    }
+
+    const char *zone_mesh_cached = zone_config_get_mesh_id();
+    const char *zone_root_cached = zone_config_get_root_id();
+    ESP_LOGI(TAG,
+             "[CFG:%s] zone_config: load=%s mesh_id=%s root_id=%s (cached mesh=%s root=%s)",
+             stage,
+             esp_err_to_name(zone_err),
+             zone_valid ? zone_mesh : "-",
+             zone_valid ? zone_root : "-",
+             zone_mesh_cached ? zone_mesh_cached : "(null)",
+             zone_root_cached ? zone_root_cached : "(null)");
+
+    char router_ssid[33] = {0};
+    char router_pass[65] = {0};
+    esp_err_t router_err = node_config_get_router_credentials(router_ssid, sizeof(router_ssid),
+                                                              router_pass, sizeof(router_pass));
+    ESP_LOGI(TAG,
+             "[CFG:%s] node_config: configured=%s router_ssid=%s (len=%d) router_get=%s",
+             stage,
+             node_config_is_configured() ? "yes" : "no",
+             router_err == ESP_OK ? router_ssid : "<none>",
+             router_err == ESP_OK ? (int)strlen(router_pass) : -1,
+             esp_err_to_name(router_err));
+}
+
 static void root_display_configure_normal(const char *mesh_id) {
     if (!s_root_display_ready) {
         return;
@@ -275,6 +454,228 @@ static void root_display_configure_normal(const char *mesh_id) {
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 }
 
+static bool node_pairing_parse_mac(const char *mac_str, uint8_t out_mac[6])
+{
+    if (!mac_str || strlen(mac_str) < 17 || !out_mac) {
+        return false;
+    }
+
+    unsigned int values[6] = {0};
+    if (sscanf(mac_str, "%02x:%02x:%02x:%02x:%02x:%02x",
+               &values[0], &values[1], &values[2],
+               &values[3], &values[4], &values[5]) != 6) {
+        return false;
+    }
+
+    for (int i = 0; i < 6; ++i) {
+        out_mac[i] = (uint8_t)values[i];
+    }
+    return true;
+}
+
+static bool node_pairing_assign_node_id(const char *node_type, const uint8_t mac[6], char *out_id, size_t out_len)
+{
+    if (!node_type || node_type[0] == '\0' || !mac || !out_id || out_len < 8) {
+        return false;
+    }
+
+    const char *prefix = node_type;
+    char sanitized_prefix[12] = {0};
+    size_t len = strlen(node_type);
+    size_t idx = 0;
+    for (size_t i = 0; i < len && idx < sizeof(sanitized_prefix) - 1; ++i) {
+        char c = node_type[i];
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+            sanitized_prefix[idx++] = c;
+        } else if (c >= 'A' && c <= 'Z') {
+            sanitized_prefix[idx++] = (char)(c - 'A' + 'a');
+        }
+    }
+    sanitized_prefix[idx] = '\0';
+    if (sanitized_prefix[0] == '\0') {
+        strncpy(sanitized_prefix, "node", sizeof(sanitized_prefix) - 1);
+    }
+    prefix = sanitized_prefix;
+
+    int written = snprintf(out_id, out_len, "%s_%02X%02X%02X",
+                           prefix, mac[3], mac[4], mac[5]);
+    if (written < 0 || (size_t)written >= out_len) {
+        return false;
+    }
+    return true;
+}
+
+static esp_err_t node_pairing_send_write_config(const root_config_t *root_cfg)
+{
+    if (!root_cfg) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_pairing_ctx.discovery_received || s_pairing_ctx.node_pin[0] == '\0') {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON_AddStringToObject(params, "pin", s_pairing_ctx.node_pin);
+    cJSON_AddStringToObject(params, "node_id", s_pairing_ctx.assigned_node_id);
+    cJSON_AddStringToObject(params, "mesh_network_id", root_cfg->mesh_network_id);
+    cJSON_AddStringToObject(params, "mesh_id", root_cfg->mesh_network_id);
+    cJSON_AddStringToObject(params, "root_node_id", root_cfg->root_node_id);
+    cJSON_AddStringToObject(params, "pairing_mesh_tag", s_pairing_ctx.mesh_tag_hex);
+
+    if (root_cfg->zone_name[0]) {
+        cJSON_AddStringToObject(params, "zone", root_cfg->zone_name);
+    }
+    if (root_cfg->zone_location[0]) {
+        cJSON_AddStringToObject(params, "zone_location", root_cfg->zone_location);
+    }
+    if (root_cfg->zone_number > 0) {
+        cJSON_AddNumberToObject(params, "zone_number", root_cfg->zone_number);
+    }
+    if (s_pairing_ctx.router_ssid[0] && s_pairing_ctx.router_password[0]) {
+        cJSON_AddStringToObject(params, "wifi_ssid", s_pairing_ctx.router_ssid);
+        cJSON_AddStringToObject(params, "wifi_password", s_pairing_ctx.router_password);
+    }
+
+    char command_buf[512];
+    if (!mesh_protocol_create_command(
+            s_pairing_ctx.assigned_node_id,
+            root_cfg->root_node_id,
+            root_cfg->mesh_network_id,
+            "write_config",
+            params,
+            command_buf,
+            sizeof(command_buf))) {
+        ESP_LOGE(TAG, "Pairing: failed to create write_config payload");
+        cJSON_Delete(params);
+        return ESP_FAIL;
+    }
+    cJSON_Delete(params);
+
+    ESP_LOGI(TAG, "Pairing: sending write_config to %s", s_pairing_ctx.assigned_node_id);
+    const uint8_t *dest_mac = s_pairing_ctx.src_mac[0] ? s_pairing_ctx.src_mac : s_pairing_ctx.node_mac;
+    esp_err_t err = mesh_manager_send(dest_mac, (const uint8_t *)command_buf, strlen(command_buf));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Pairing: mesh_manager_send failed: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
+static void node_pairing_mesh_recv_cb(const uint8_t *src_addr, const uint8_t *data, size_t len)
+{
+    if (!data || len == 0) {
+        return;
+    }
+
+    char *json_copy = calloc(1, len + 1);
+    if (!json_copy) {
+        ESP_LOGE(TAG, "Pairing: not enough memory for packet copy");
+        return;
+    }
+    memcpy(json_copy, data, len);
+
+    mesh_message_t msg = {0};
+    if (!mesh_protocol_parse(json_copy, &msg)) {
+        ESP_LOGE(TAG, "Pairing: failed to parse mesh message");
+        free(json_copy);
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(json_copy);
+    const char *pin_str = NULL;
+    const char *node_type = NULL;
+    const char *mac_str = NULL;
+    const char *status_str = NULL;
+    const char *pairing_tag = NULL;
+
+    if (root) {
+        cJSON *pin_item = cJSON_GetObjectItem(root, "pin");
+        if (cJSON_IsString(pin_item)) {
+            pin_str = pin_item->valuestring;
+        }
+        cJSON *type_item = cJSON_GetObjectItem(root, "node_type");
+        if (cJSON_IsString(type_item)) {
+            node_type = type_item->valuestring;
+        }
+        cJSON *mac_item = cJSON_GetObjectItem(root, "mac_address");
+        if (cJSON_IsString(mac_item)) {
+            mac_str = mac_item->valuestring;
+        }
+        cJSON *status_item = cJSON_GetObjectItem(root, "status");
+        if (cJSON_IsString(status_item)) {
+            status_str = status_item->valuestring;
+        }
+        cJSON *tag_item = cJSON_GetObjectItem(root, "pairing_mesh_tag");
+        if (cJSON_IsString(tag_item)) {
+            pairing_tag = tag_item->valuestring;
+        }
+    }
+
+    switch (msg.type) {
+        case MESH_MSG_DISCOVERY:
+        case MESH_MSG_HEARTBEAT:
+            if (!pin_str || !node_type || !mac_str) {
+                ESP_LOGW(TAG, "Pairing: discovery message missing fields");
+                break;
+            }
+
+            if (!s_pairing_ctx.discovery_received) {
+                strncpy(s_pairing_ctx.node_pin, pin_str, sizeof(s_pairing_ctx.node_pin) - 1);
+                strncpy(s_pairing_ctx.node_type, node_type, sizeof(s_pairing_ctx.node_type) - 1);
+                strncpy(s_pairing_ctx.node_mac_str, mac_str, sizeof(s_pairing_ctx.node_mac_str) - 1);
+                if (!node_pairing_parse_mac(mac_str, s_pairing_ctx.node_mac)) {
+                    ESP_LOGW(TAG, "Pairing: failed to parse mac %s", mac_str);
+                    break;
+                }
+                if (src_addr) {
+                    memcpy(s_pairing_ctx.src_mac, src_addr, sizeof(s_pairing_ctx.src_mac));
+                } else {
+                    memcpy(s_pairing_ctx.src_mac, s_pairing_ctx.node_mac, sizeof(s_pairing_ctx.src_mac));
+                }
+                if (pairing_tag && strcmp(pairing_tag, s_pairing_ctx.mesh_tag_hex) != 0) {
+                    ESP_LOGW(TAG, "Pairing: node tag mismatch (node=%s root=%s)", pairing_tag, s_pairing_ctx.mesh_tag_hex);
+                }
+                s_pairing_ctx.discovery_received = true;
+                ESP_LOGI(TAG, "Pairing: discovery from %s (pin=%s, type=%s)",
+                         s_pairing_ctx.node_mac_str, s_pairing_ctx.node_pin, s_pairing_ctx.node_type);
+                root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Node found");
+                if (s_pairing_discovery_sem) {
+                    xSemaphoreGive(s_pairing_discovery_sem);
+                }
+            } else if (status_str) {
+                root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, status_str);
+            }
+            break;
+
+        case MESH_MSG_CONFIG_CONFIRMATION:
+            if (!pin_str || strcmp(pin_str, s_pairing_ctx.node_pin) != 0) {
+                ESP_LOGW(TAG, "Pairing: config confirmation pin mismatch");
+                break;
+            }
+            s_pairing_ctx.confirmation_received = true;
+            ESP_LOGI(TAG, "Pairing: config confirmation received for %s", msg.node_id);
+            if (msg.node_id[0] != '\0') {
+                strncpy(s_pairing_ctx.assigned_node_id, msg.node_id, sizeof(s_pairing_ctx.assigned_node_id) - 1);
+            }
+            if (s_pairing_confirmation_sem) {
+                xSemaphoreGive(s_pairing_confirmation_sem);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    if (root) {
+        cJSON_Delete(root);
+    }
+    mesh_protocol_free_message(&msg);
+    free(json_copy);
+}
+
 static void root_button_init(void)
 {
     gpio_config_t cfg = {
@@ -285,6 +686,8 @@ static void root_button_init(void)
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&cfg);
+    int level = gpio_get_level(ROOT_SETUP_BUTTON_PIN);
+    ESP_LOGI(TAG, "Setup button configured on GPIO %d (initial level=%d)", (int)ROOT_SETUP_BUTTON_PIN, level);
 }
 
 static void handle_setup_button_trigger(void)
@@ -293,13 +696,13 @@ static void handle_setup_button_trigger(void)
         return;
     }
     s_setup_request_pending = true;
-    ESP_LOGW(TAG, "Долгое нажатие кнопки: запрос перехода в setup режим");
+    ESP_LOGW(TAG, "Долгое нажатие кнопки: запрос режима добавления ноды");
 
     root_display_show_setup_request();
 
-    esp_err_t err = root_config_request_setup();
+    esp_err_t err = root_config_request_node_pairing();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Не удалось записать флаг setup в NVS: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Не удалось записать флаг pairing в NVS: %s", esp_err_to_name(err));
         root_display_show_setup_error("NVS ERROR");
         s_setup_request_pending = false;
         return;
@@ -314,9 +717,15 @@ static void root_button_task(void *arg)
     (void)arg;
     uint32_t press_ms = 0;
     const TickType_t delay_ticks = pdMS_TO_TICKS(ROOT_BUTTON_POLL_MS);
-
+    bool last_pressed = gpio_get_level(ROOT_SETUP_BUTTON_PIN) == ROOT_BUTTON_ACTIVE_LEVEL;
+    ESP_LOGI(TAG, "Setup button task started, initial state: %s",
+             last_pressed ? "PRESSED" : "released");
     while (1) {
         bool pressed = gpio_get_level(ROOT_SETUP_BUTTON_PIN) == ROOT_BUTTON_ACTIVE_LEVEL;
+        if (pressed != last_pressed) {
+            ESP_LOGI(TAG, "Setup button %s", pressed ? "PRESSED" : "released");
+            last_pressed = pressed;
+        }
         if (pressed) {
             if (press_ms < ROOT_BUTTON_LONG_PRESS_MS) {
                 press_ms += ROOT_BUTTON_POLL_MS;
@@ -397,6 +806,12 @@ void app_main(void) {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(root_config_init());
 
+    if (root_config_take_node_pairing_request()) {
+        ESP_LOGW(TAG, "Обнаружен запрос добавления ноды — запускаем pairing режим");
+        run_node_pairing_mode();
+        return;
+    }
+
     if (root_config_take_setup_request()) {
         ESP_LOGW(TAG, "Обнаружен запрос setup режима — запускаем настройку");
         run_setup_mode();
@@ -419,11 +834,144 @@ void app_main(void) {
     run_normal_mode();
 }
 
+static void run_node_pairing_mode(void)
+{
+    ESP_LOGW(TAG, "========================================");
+    ESP_LOGW(TAG, "=== NODE PAIRING MODE ACTIVATED ===");
+    ESP_LOGW(TAG, "========================================");
+    root_log_config_state("PAIRING-START");
+
+    memset(&s_pairing_ctx, 0, sizeof(s_pairing_ctx));
+
+    if (s_pairing_discovery_sem) {
+        vSemaphoreDelete(s_pairing_discovery_sem);
+        s_pairing_discovery_sem = NULL;
+    }
+    if (s_pairing_confirmation_sem) {
+        vSemaphoreDelete(s_pairing_confirmation_sem);
+        s_pairing_confirmation_sem = NULL;
+    }
+
+    node_config_generate_setup_pin(s_pairing_ctx.generated_pin, sizeof(s_pairing_ctx.generated_pin));
+    node_pairing_generate_mesh_identity();
+    snprintf(s_pairing_ctx.ap_ssid, sizeof(s_pairing_ctx.ap_ssid),
+             NODE_PAIRING_SSID_PREFIX "%s_%s", s_pairing_ctx.mesh_tag_hex, s_pairing_ctx.generated_pin);
+
+    root_display_init(NULL);
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Init mesh...");
+
+    root_config_t root_cfg = {0};
+    if (root_config_get(&root_cfg) != ESP_OK) {
+        memset(&root_cfg, 0, sizeof(root_cfg));
+    }
+    root_log_config_state("PAIRING-ROOTCFG");
+
+    mesh_manager_config_t mesh_config = {
+        .mode = MESH_MODE_ROOT,
+        .mesh_password = MESH_NETWORK_PASSWORD,
+        .channel = NODE_PAIRING_SOFTAP_CHANNEL,
+        .max_connection = ROOT_MAX_MESH_CONNECTIONS,
+        .router_ssid = s_pairing_ctx.router_ssid[0] ? s_pairing_ctx.router_ssid : NULL,
+        .router_password = s_pairing_ctx.router_password[0] ? s_pairing_ctx.router_password : NULL,
+        .router_bssid = NULL,
+    };
+    memcpy(mesh_config.mesh_id, s_pairing_ctx.mesh_id_bytes, sizeof(mesh_config.mesh_id));
+    mesh_config.mesh_id_str = s_pairing_ctx.ap_ssid;
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Preparing Wi-Fi...");
+    mesh_manager_register_recv_cb(node_pairing_mesh_recv_cb);
+    esp_err_t err = mesh_manager_init(&mesh_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Pairing: mesh_manager_init failed: %s", esp_err_to_name(err));
+        root_display_show_setup_error("MESH INIT");
+        goto pairing_cleanup;
+    }
+
+    if (node_pairing_prepare_softap(s_pairing_ctx.ap_ssid, NODE_PAIRING_SOFTAP_PASS, NODE_PAIRING_SOFTAP_CHANNEL) != ESP_OK) {
+        root_display_show_setup_error("AP CONFIG");
+        goto pairing_cleanup;
+    }
+
+    ESP_LOGI(TAG, "Pairing: waiting %d ms for node discovery before mesh start", NODE_PAIRING_SOFTAP_GRACE_MS);
+    char status_buf[32];
+    snprintf(status_buf, sizeof(status_buf), "SoftAP %.*s", 6, s_pairing_ctx.mesh_tag_hex);
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, status_buf);
+    vTaskDelay(pdMS_TO_TICKS(NODE_PAIRING_SOFTAP_GRACE_MS));
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Starting mesh...");
+    err = mesh_manager_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Pairing: mesh_manager_start failed: %s", esp_err_to_name(err));
+        root_display_show_setup_error("MESH START");
+        goto pairing_cleanup;
+    }
+
+    s_pairing_discovery_sem = xSemaphoreCreateBinary();
+    s_pairing_confirmation_sem = xSemaphoreCreateBinary();
+    if (!s_pairing_discovery_sem || !s_pairing_confirmation_sem) {
+        root_display_show_setup_error("NO SEMAPHORE");
+        goto pairing_cleanup;
+    }
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Waiting node...");
+    if (xSemaphoreTake(s_pairing_discovery_sem, pdMS_TO_TICKS(NODE_PAIRING_DISCOVERY_TIMEOUT_MS)) != pdTRUE) {
+        ESP_LOGW(TAG, "Pairing: discovery timeout");
+        root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Timeout waiting node");
+        goto pairing_cleanup;
+    }
+
+    if (!node_pairing_assign_node_id(s_pairing_ctx.node_type, s_pairing_ctx.node_mac,
+                                     s_pairing_ctx.assigned_node_id, sizeof(s_pairing_ctx.assigned_node_id))) {
+        ESP_LOGE(TAG, "Pairing: failed to assign node id");
+        root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "ID error");
+        goto pairing_cleanup;
+    }
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Configuring node...");
+    if (node_pairing_send_write_config(&root_cfg) != ESP_OK) {
+        root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Config send fail");
+        root_config_request_node_pairing();
+        goto pairing_cleanup;
+    }
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Waiting confirm...");
+    if (xSemaphoreTake(s_pairing_confirmation_sem, pdMS_TO_TICKS(NODE_PAIRING_CONFIRM_TIMEOUT_MS)) != pdTRUE) {
+        ESP_LOGW(TAG, "Pairing: confirmation timeout");
+        root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Confirm timeout");
+        goto pairing_cleanup;
+    }
+
+    root_display_show_pairing_status(s_pairing_ctx.ap_ssid, s_pairing_ctx.generated_pin, "Success! Restart...");
+    ESP_LOGI(TAG, "Pairing: node %s configured successfully", s_pairing_ctx.assigned_node_id);
+    root_log_config_state("PAIRING-END");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+pairing_cleanup:
+    if (s_pairing_discovery_sem) {
+        vSemaphoreDelete(s_pairing_discovery_sem);
+        s_pairing_discovery_sem = NULL;
+    }
+    if (s_pairing_confirmation_sem) {
+        vSemaphoreDelete(s_pairing_confirmation_sem);
+        s_pairing_confirmation_sem = NULL;
+    }
+    mesh_manager_stop();
+    mesh_manager_register_recv_cb(NULL);
+
+    ESP_LOGI(TAG, "Pairing mode finished, restarting to normal mode");
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 static void run_setup_mode(void) {
     esp_log_level_set(TAG, ESP_LOG_DEBUG);
     ESP_LOGW(TAG, "========================================");
     ESP_LOGW(TAG, "=== ROOT NODE SETUP MODE ACTIVATED ===");
     ESP_LOGW(TAG, "========================================");
+    root_log_config_state("SETUP-START");
 
     memset(&s_credentials, 0, sizeof(s_credentials));
     memset(&s_setup_ip_info, 0, sizeof(s_setup_ip_info));
@@ -432,11 +980,11 @@ static void run_setup_mode(void) {
     node_config_generate_temp_mesh_id(s_current_pin, s_temp_mesh_id, sizeof(s_temp_mesh_id));
 
     memset(s_setup_ap_ssid, 0, sizeof(s_setup_ap_ssid));
-    snprintf(s_setup_ap_ssid, sizeof(s_setup_ap_ssid), "HYDRO_SETUP_%s", s_current_pin);
+    snprintf(s_setup_ap_ssid, sizeof(s_setup_ap_ssid), "ROOT_SETUP_%s", s_current_pin);
     const char *ap_password = "hydro2025";
 
     root_display_init(NULL);
-    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Open 192.168.4.1");
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Open 192.168.4.1", "AP READY");
 
     s_credentials_sem = xSemaphoreCreateBinary();
     if (!s_credentials_sem) {
@@ -483,6 +1031,7 @@ static void run_setup_mode(void) {
     }
 
     ESP_LOGI(TAG, "WiFi данные сохранены. SSID='%s'", s_credentials.ssid);
+    root_log_config_state("SETUP-CREDS");
 
     s_config_sem = xSemaphoreCreateBinary();
     if (!s_config_sem) {
@@ -492,17 +1041,22 @@ static void run_setup_mode(void) {
     esp_err_t mesh_err = start_setup_mesh(s_temp_mesh_id, s_credentials.ssid, s_credentials.password, &s_setup_ip_info);
     if (mesh_err != ESP_OK) {
         ESP_LOGE(TAG, "Не удалось запустить временную mesh сеть: %s", esp_err_to_name(mesh_err));
+        root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "MESH FAIL");
     }
 
     if (start_config_http_server() != ESP_OK) {
         ESP_LOGE(TAG, "Ошибка запуска HTTP сервера конфигурации");
+        root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "HTTP FAIL");
     }
 
     if (mesh_err == ESP_OK) {
+        root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "MESH READY");
         if (send_setup_message("discovery", s_current_pin, s_temp_mesh_id, &s_setup_ip_info) == ESP_OK) {
             ESP_LOGI(TAG, "Discovery запрос отправлен. Ожидаем конфигурацию от сервера...");
+            root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "DISCOVERY OK");
         } else {
             ESP_LOGE(TAG, "Не удалось отправить discovery запрос на сервер");
+            root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "DISCOVERY ERR");
         }
 
         s_setup_active = true;
@@ -517,6 +1071,7 @@ static void run_setup_mode(void) {
 
     if (s_config_sem) {
         ESP_LOGI(TAG, "Ожидаем конфигурацию (POST /api/config)...");
+        root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "WAIT CONFIG");
         xSemaphoreTake(s_config_sem, portMAX_DELAY);
         vSemaphoreDelete(s_config_sem);
         s_config_sem = NULL;
@@ -536,6 +1091,8 @@ static void run_setup_mode(void) {
     stop_config_http_server();
 
     ESP_LOGI(TAG, "Конфигурация получена. Перезагрузка для перехода в рабочий режим...");
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, s_credentials.ssid, "CONFIG OK");
+    root_log_config_state("SETUP-DONE");
     if (xTaskCreate(schedule_restart_task, "setup_restart", 2048, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Не удалось создать задачу перезапуска. Выполняем esp_restart немедленно.");
         esp_restart();
@@ -565,6 +1122,7 @@ static void run_normal_mode(void) {
 
     const char *configured_mqtt_host = root_cfg.mqtt_host[0] ? root_cfg.mqtt_host : MQTT_BROKER_HOST;
     uint16_t configured_mqtt_port = root_cfg.mqtt_port ? root_cfg.mqtt_port : MQTT_BROKER_PORT;
+    root_log_config_state("RUN-NORMAL");
 
     root_button_init();
     if (s_button_task_handle == NULL) {
@@ -591,7 +1149,6 @@ static void run_normal_mode(void) {
     ESP_LOGI(TAG, "[Step 2/6] Initializing Mesh (ROOT mode)...");
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_ROOT,
-        .mesh_id = s_mesh_id_buffer,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = ROOT_MAX_MESH_CONNECTIONS,
@@ -599,6 +1156,8 @@ static void run_normal_mode(void) {
         .router_password = s_router_pass_buffer,
         .router_bssid = NULL
     };
+    mesh_manager_string_to_mesh_id(s_mesh_id_buffer, mesh_config.mesh_id);
+    mesh_config.mesh_id_str = s_mesh_id_buffer;
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     ESP_LOGI(TAG, "Mesh ID: %s, Channel: %d", s_mesh_id_buffer, MESH_NETWORK_CHANNEL);
     
@@ -685,7 +1244,7 @@ static void setup_portal_credentials_cb(const setup_portal_credentials_t *creden
         ESP_LOGE(TAG, "Не удалось сохранить WiFi credentials: %s", esp_err_to_name(err));
     }
 
-    root_display_show_setup(s_setup_ap_ssid, s_current_pin, credentials->ssid);
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, credentials->ssid, "WIFI STORED");
 
     node_config_mark_configured(false);
 
@@ -701,7 +1260,6 @@ static esp_err_t start_setup_mesh(const char *mesh_id, const char *ssid, const c
 
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_ROOT,
-        .mesh_id = mesh_id,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = ROOT_MAX_MESH_CONNECTIONS,
@@ -709,6 +1267,8 @@ static esp_err_t start_setup_mesh(const char *mesh_id, const char *ssid, const c
         .router_password = password,
         .router_bssid = NULL,
     };
+    mesh_manager_string_to_mesh_id(mesh_id, mesh_config.mesh_id);
+    mesh_config.mesh_id_str = mesh_id;
 
     ESP_LOGI(TAG, "Запуск временной mesh сети: mesh_id='%s'", mesh_id);
 
@@ -999,9 +1559,17 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
+    err = zone_config_save(mesh_id->valuestring, root_node_id_str);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to persist zone_config: %s", esp_err_to_name(err));
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to store zone config");
+        return ESP_FAIL;
+    }
+
     node_config_mark_configured(true);
 
-    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Config saved");
+    root_display_show_setup(s_setup_ap_ssid, s_current_pin, "Config saved", "DONE");
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"success\":true}");
@@ -1011,6 +1579,8 @@ static esp_err_t config_post_handler(httpd_req_t *req) {
     if (s_config_sem) {
         xSemaphoreGive(s_config_sem);
     }
+
+    root_log_config_state("HTTP-CONFIG");
 
     return ESP_OK;
 cleanup:

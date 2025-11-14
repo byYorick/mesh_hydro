@@ -65,7 +65,7 @@ class TelemetryController extends Controller
             return [
                 'node_id' => $node->node_id,
                 'node_type' => $node->node_type,
-                'zone' => $node->zone,
+                'zone' => $node->zoneCode(),
                 'online' => $node->isOnline(),
                 'last_seen_at' => $node->last_seen_at,
                 'telemetry' => $node->lastTelemetry,

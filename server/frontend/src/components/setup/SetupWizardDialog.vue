@@ -503,12 +503,19 @@ const connectionHint = computed(() => {
 
 const setupSsid = computed(() => {
   if (props.node?.metadata?.setup_ssid) return props.node.metadata.setup_ssid
-  if (props.node?.temp_mesh_id) return props.node.temp_mesh_id.replace('HYDRO_', 'HYDRO_SETUP_')
-  if (props.node?.pin) return `HYDRO_SETUP_${props.node.pin}`
-  return 'HYDRO_SETUP_XXXXXX'
+  const tag = props.node?.metadata?.pairing_mesh_tag
+  const pin = props.node?.pin
+  if (props.node?.temp_mesh_id) {
+    const raw = props.node.temp_mesh_id
+    if (raw.startsWith('HYDRO_')) return raw.replace('HYDRO_', 'ROOT_PAIR_')
+    return raw
+  }
+  if (tag && pin) return `ROOT_PAIR_${tag}_${pin}`
+  if (pin) return `ROOT_PAIR_${pin}`
+  return 'ROOT_PAIR_XXXXXX'
 })
 
-const setupPassword = computed(() => props.node?.metadata?.setup_password || 'hydro2025')
+const setupPassword = computed(() => props.node?.metadata?.setup_password || 'hydro_mesh_2025')
 
 const setupPortalUrl = computed(() => props.node?.metadata?.portal_url || 'http://192.168.4.1')
 

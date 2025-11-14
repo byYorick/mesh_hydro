@@ -286,7 +286,7 @@ class GreenhouseController extends Controller
                     'node_type' => $node->node_type,
                     'is_root' => $node->isRootNode(),
                     'root_node_id' => $node->root_node_id,
-                    'zone_mesh_id' => $node->zone,
+                    'zone_mesh_id' => $node->zoneCode(),
                     'zone_id' => $node->zoneRelation?->id,
                     'zone_name' => $node->zoneRelation?->name,
                     'last_seen_at' => $node->last_seen_at?->toIso8601String(),

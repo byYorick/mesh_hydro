@@ -24,7 +24,7 @@
 // common/node_config/node_config.h
 typedef struct {
     char setup_token[33];      // 32 символа + \0
-    char temp_mesh_id[33];     // HYDRO_SETUP_XXXX
+    char temp_mesh_id[33];     // ROOT_PAIR_<TAG>_<PIN>
     uint32_t token_timestamp;  // Для истечения токена
 } setup_credentials_t;
 
@@ -45,7 +45,7 @@ esp_err_t node_config_generate_setup_credentials(setup_credentials_t *creds) {
     
     // Генерация уникального mesh ID из MAC
     snprintf(creds->temp_mesh_id, sizeof(creds->temp_mesh_id),
-             "HYDRO_SETUP_%02X%02X%02X", mac[3], mac[4], mac[5]);
+            "ROOT_PAIR_%s_%s", mesh_tag_hex, pin);
     
     // Генерация случайного токена (128 бит)
     uint8_t random_bytes[16];
@@ -1438,7 +1438,7 @@ export const useNewNodesStore = defineStore('newNodes', {
                       <li>Скачайте приложение "ESP BLE Provisioning"</li>
                       <li>Откройте приложение и найдите устройство:
                         <v-chip class="ml-2" color="primary">
-                          {{ node.temp_mesh_id || 'HYDRO_SETUP_XXX' }}
+                          {{ node.temp_mesh_id || 'ROOT_PAIR_TAG_PIN' }}
                         </v-chip>
                       </li>
                       <li>Введите пароль (PoP):

@@ -198,6 +198,16 @@ bool root_config_is_setup_requested(void);
  */
 bool root_config_take_setup_request(void);
 
+/**
+ * @brief Запрос запуска режима добавления новой ноды
+ */
+esp_err_t root_config_request_node_pairing(void);
+
+/**
+ * @brief Проверка и сброс флага режима добавления новой ноды
+ */
+bool root_config_take_node_pairing_request(void);
+
 #ifdef __cplusplus
 }
 #endif

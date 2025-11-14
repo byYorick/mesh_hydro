@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use App\Models\GrowthCycle;
 use App\Models\StageTransitionRecommendation;
-use App\Services\MqttService;
+use App\Services\GrowthNotificationService;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
@@ -24,7 +24,13 @@ class CheckStageTransitionsCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(MqttService $mqtt): int
+    public function __construct(
+        private readonly GrowthNotificationService $growthNotificationService,
+    ) {
+        parent::__construct();
+    }
+
+    public function handle(): int
     {
         $this->info('🔍 Проверка переходов стадий для активных циклов...');
         $this->newLine();
@@ -45,7 +51,7 @@ class CheckStageTransitionsCommand extends Command
         $recommendationsCount = 0;
 
         foreach ($activeCycles as $cycle) {
-            $this->line("Проверка цикла #{$cycle->id}: {$cycle->name} (Зона: {$cycle->zone->name})");
+                $this->line("Проверка цикла #{$cycle->id}: {$cycle->name} (Зона: {$cycle->zone->name})");
 
             try {
                 $recommendation = $this->checkCycleStageTransition($cycle);
@@ -132,8 +138,7 @@ class CheckStageTransitionsCommand extends Command
 
         // ⭐ GROWTH PLANNER: Отправка уведомления о рекомендации
         try {
-            $notificationService = app(\App\Services\GrowthNotificationService::class);
-            $notificationService->sendStageTransitionRecommendation($recommendation);
+            $this->growthNotificationService->sendStageTransitionRecommendation($recommendation);
         } catch (\Exception $e) {
             Log::error("Failed to send stage transition notification", [
                 'recommendation_id' => $recommendation->id,

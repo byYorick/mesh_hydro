@@ -47,9 +47,10 @@ const char *g_node_id = NULL;
 bool g_emergency_mode = false;
 bool g_autonomous_mode = false;
 
-#define SETUP_MESH_PREFIX "HYDRO_SETUP_"
+#define SETUP_MESH_PREFIX "ROOT_PAIR_"
 #define SETUP_HEARTBEAT_INTERVAL_MS 10000
 #define SETUP_DISCOVERY_RETRY_MS 5000
+#define SETUP_DISCOVERY_INTERVAL_MS 3000
 
 static bool s_is_setup_mode = false;
 static bool s_setup_active = false;
@@ -59,8 +60,36 @@ static char s_setup_pin[7] = {0};
 static char s_setup_mesh_id[32] = {0};
 static uint8_t s_setup_mesh_channel = 0;
 static bool s_setup_display_ready = false;
+static uint8_t s_setup_mesh_id_bytes[6] = {0};
+static char s_setup_mesh_tag[13] = {0};
+static char s_setup_root_pin[8] = {0};
 static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
+static bool s_setup_config_received = false;
+
+#define SETUP_STATUS_ANIMATION_INTERVAL_MS 500
+
+#define SETUP_STATUS_FRAME_MAX_LEN 20
+
+static TaskHandle_t s_setup_status_task = NULL;
+static bool s_setup_status_animation_active = false;
+static const char (*s_active_status_frames)[SETUP_STATUS_FRAME_MAX_LEN] = NULL;
+static size_t s_active_status_frame_count = 0;
+static const char *s_active_status_mesh = NULL;
+
+static const char s_setup_status_scanning_frames[][SETUP_STATUS_FRAME_MAX_LEN] = {
+    "Scanning mesh    ",
+    "Scanning mesh .  ",
+    "Scanning mesh .. ",
+    "Scanning mesh ..."
+};
+
+static const char s_setup_status_waiting_frames[][SETUP_STATUS_FRAME_MAX_LEN] = {
+    "Await config     ",
+    "Await config .   ",
+    "Await config ..  ",
+    "Await config ..."
+};
 
 // I2C конфигурация для ESP32 (стандартные пины)
 #define I2C_MASTER_SCL_IO   9
@@ -88,6 +117,41 @@ static void setup_display_init(const char *pin);
 static void setup_display_update(const char *pin, const char *mesh, const char *status);
 static void setup_display_deinit(void);
 static void board_status_led_disable(void);
+static void setup_status_animation_task(void *arg);
+static void setup_status_animation_start(const char (*frames)[SETUP_STATUS_FRAME_MAX_LEN], size_t frame_count, const char *mesh);
+static void setup_status_animation_stop(void);
+static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t out_len);
+
+static int hex_digit(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    return -1;
+}
+
+static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t out_len)
+{
+    if (!hex || !out || hex_len != out_len * 2) {
+        return false;
+    }
+
+    for (size_t i = 0; i < out_len; ++i) {
+        int high = hex_digit(hex[2 * i]);
+        int low = hex_digit(hex[2 * i + 1]);
+        if (high < 0 || low < 0) {
+            return false;
+        }
+        out[i] = (uint8_t)((high << 4) | low);
+    }
+    return true;
+}
 
 void app_main(void)
 {
@@ -102,6 +166,7 @@ void app_main(void)
         return;
     }
 
+    s_setup_config_received = true;
     s_is_setup_mode = false;
     run_normal_mode();
 }
@@ -198,16 +263,18 @@ static void run_normal_mode(void)
     
     // [Step 6/8] Mesh NODE mode init
     ESP_LOGI(TAG, "[Step 6/8] Mesh NODE mode init...");
-    char mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
-    if (zone_config_validate(s_mesh_network_id)) {
-        strncpy(mesh_network_id, s_mesh_network_id, sizeof(mesh_network_id) - 1);
-    } else if (node_config_get_mesh_network_id(mesh_network_id) != ESP_OK || mesh_network_id[0] == '\0') {
-        strncpy(mesh_network_id, MESH_NETWORK_ID, sizeof(mesh_network_id) - 1);
+    const char *mesh_ssid = NULL;
+    if (zone_config_validate(s_mesh_network_id) && s_mesh_network_id[0] != '\0') {
+        mesh_ssid = s_mesh_network_id;
+    } else {
+        if (node_config_get_mesh_network_id(s_mesh_network_id) != ESP_OK || s_mesh_network_id[0] == '\0') {
+            strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+            s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+        }
+        mesh_ssid = s_mesh_network_id;
     }
-    mesh_network_id[sizeof(mesh_network_id) - 1] = '\0';
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = mesh_network_id,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = 6,
@@ -215,9 +282,11 @@ static void run_normal_mode(void)
         .router_password = NULL,
         .router_bssid = NULL
     };
+    mesh_manager_string_to_mesh_id(mesh_ssid, mesh_config.mesh_id);
+    mesh_config.mesh_id_str = mesh_ssid;
     
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
-    ESP_LOGI(TAG, "  Mesh ID: %s", mesh_config.mesh_id);
+    ESP_LOGI(TAG, "  Mesh ID: %s", mesh_config.mesh_id_str);
     
     // Регистрация callback для команд от ROOT
     mesh_manager_register_recv_cb(on_mesh_data_received);
@@ -357,13 +426,16 @@ static void run_setup_mode(void)
 
     memset(s_setup_pin, 0, sizeof(s_setup_pin));
     memset(s_setup_mesh_id, 0, sizeof(s_setup_mesh_id));
+    s_setup_config_received = false;
     node_config_generate_setup_pin(s_setup_pin, sizeof(s_setup_pin));
 
     ESP_LOGI(TAG, "Setup PIN: %s", s_setup_pin);
     ESP_LOGI(TAG, "Ищем временную mesh сеть с префиксом %s", SETUP_MESH_PREFIX);
 
     setup_display_init(s_setup_pin);
-    setup_display_update(s_setup_pin, "SEARCHING", "Scanning mesh...");
+    setup_status_animation_start(s_setup_status_scanning_frames,
+                                 sizeof(s_setup_status_scanning_frames) / sizeof(s_setup_status_scanning_frames[0]),
+                                 "SEARCHING");
 
     esp_err_t scan_err;
     uint32_t attempt = 0;
@@ -377,12 +449,12 @@ static void run_setup_mode(void)
         }
     } while (scan_err != ESP_OK);
 
+    setup_status_animation_stop();
     ESP_LOGI(TAG, "Найдена сеть: %s (channel=%u)", s_setup_mesh_id, s_setup_mesh_channel);
     setup_display_update(s_setup_pin, s_setup_mesh_id, "Connecting...");
 
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = s_setup_mesh_id,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = s_setup_mesh_channel,
         .max_connection = 6,
@@ -390,6 +462,8 @@ static void run_setup_mode(void)
         .router_password = NULL,
         .router_bssid = NULL,
     };
+    memcpy(mesh_config.mesh_id, s_setup_mesh_id_bytes, sizeof(mesh_config.mesh_id));
+    mesh_config.mesh_id_str = s_setup_mesh_id;
 
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     mesh_manager_register_recv_cb(on_mesh_data_received);
@@ -410,7 +484,9 @@ static void run_setup_mode(void)
         ESP_LOGW(TAG, "Не удалось отправить discovery сообщение в mesh");
         setup_display_update(s_setup_pin, s_setup_mesh_id, "Discovery failed");
     } else {
-        setup_display_update(s_setup_pin, s_setup_mesh_id, "Await config...");
+        setup_status_animation_start(s_setup_status_waiting_frames,
+                                     sizeof(s_setup_status_waiting_frames) / sizeof(s_setup_status_waiting_frames[0]),
+                                     s_setup_mesh_id);
     }
 
     s_setup_active = true;
@@ -430,6 +506,8 @@ static void run_setup_mode(void)
         vSemaphoreDelete(s_setup_config_sem);
         s_setup_config_sem = NULL;
     }
+
+    setup_status_animation_stop();
 
     s_setup_active = false;
     if (s_setup_heartbeat_task) {
@@ -452,20 +530,79 @@ static void run_setup_mode(void)
 static void setup_heartbeat_task(void *arg)
 {
     while (s_setup_active) {
-        vTaskDelay(pdMS_TO_TICKS(SETUP_HEARTBEAT_INTERVAL_MS));
+        TickType_t delay_ticks = s_setup_config_received
+                                     ? pdMS_TO_TICKS(SETUP_HEARTBEAT_INTERVAL_MS)
+                                     : pdMS_TO_TICKS(SETUP_DISCOVERY_INTERVAL_MS);
+        vTaskDelay(delay_ticks);
         if (!s_setup_active) {
             break;
         }
-        if (send_setup_message("heartbeat", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
-            ESP_LOGW(TAG, "Не удалось отправить heartbeat в setup режиме");
-        }
-        if (s_setup_display_ready) {
+
+        const char *msg_type = s_setup_config_received ? "heartbeat" : "discovery";
+        if (send_setup_message(msg_type, s_setup_pin, s_setup_mesh_id) != ESP_OK) {
+            ESP_LOGW(TAG, "Не удалось отправить %s в setup режиме", msg_type);
+        } else if (s_setup_config_received && s_setup_display_ready) {
             oled_display_show_heartbeat(true);
         }
     }
 
     s_setup_heartbeat_task = NULL;
     vTaskDelete(NULL);
+}
+
+static void setup_status_animation_task(void *arg)
+{
+    (void)arg;
+    size_t frame_index = 0;
+
+    while (s_setup_status_animation_active) {
+        if (s_active_status_frames && s_active_status_frame_count > 0) {
+            const char *mesh = s_active_status_mesh ? s_active_status_mesh : s_setup_mesh_id;
+            setup_display_update(s_setup_pin, mesh, s_active_status_frames[frame_index]);
+            frame_index = (frame_index + 1) % s_active_status_frame_count;
+        }
+        vTaskDelay(pdMS_TO_TICKS(SETUP_STATUS_ANIMATION_INTERVAL_MS));
+    }
+
+    s_setup_status_task = NULL;
+    vTaskDelete(NULL);
+}
+
+static void setup_status_animation_start(const char (*frames)[SETUP_STATUS_FRAME_MAX_LEN], size_t frame_count, const char *mesh)
+{
+    if (!frames || frame_count == 0) {
+        return;
+    }
+
+    setup_status_animation_stop();
+
+    s_active_status_frames = frames;
+    s_active_status_frame_count = frame_count;
+    s_active_status_mesh = mesh;
+    s_setup_status_animation_active = true;
+    if (xTaskCreate(setup_status_animation_task, "setup_status_anim", 2048, NULL, 4, &s_setup_status_task) != pdPASS) {
+        ESP_LOGE(TAG, "Не удалось создать задачу анимации статуса");
+        s_setup_status_task = NULL;
+        s_setup_status_animation_active = false;
+        s_active_status_frames = NULL;
+        s_active_status_frame_count = 0;
+        s_active_status_mesh = NULL;
+    } else if (frames && frame_count > 0) {
+        // Отобразить первый кадр сразу
+        const char *initial_mesh = mesh ? mesh : s_setup_mesh_id;
+        setup_display_update(s_setup_pin, initial_mesh, frames[0]);
+    }
+}
+
+static void setup_status_animation_stop(void)
+{
+    s_setup_status_animation_active = false;
+    while (s_setup_status_task != NULL) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    s_active_status_frames = NULL;
+    s_active_status_frame_count = 0;
+    s_active_status_mesh = NULL;
 }
 
 static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint8_t *channel_out)
@@ -572,6 +709,9 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
     bool found = false;
     uint8_t best_channel = 0;
     char best_ssid[33] = {0};
+    char best_tag[13] = {0};
+    char best_pin[8] = {0};
+    uint8_t best_id[6] = {0};
 
     size_t prefix_len = strlen(SETUP_MESH_PREFIX);
     for (uint16_t i = 0; i < ap_count; ++i) {
@@ -579,13 +719,39 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
         if (ssid[0] == '\0') {
             continue;
         }
-        if (strncmp(ssid, SETUP_MESH_PREFIX, prefix_len) == 0) {
-            if (!found || ap_records[i].rssi > best_rssi) {
-                best_rssi = ap_records[i].rssi;
-                best_channel = ap_records[i].primary;
-                strncpy(best_ssid, ssid, sizeof(best_ssid) - 1);
-                found = true;
-            }
+        if (strncmp(ssid, SETUP_MESH_PREFIX, prefix_len) != 0) {
+            continue;
+        }
+
+        const char *payload = ssid + prefix_len;
+        const char *sep = strchr(payload, '_');
+        if (!sep) {
+            continue;
+        }
+        size_t tag_len = (size_t)(sep - payload);
+        if (tag_len != 12) {
+            continue;
+        }
+        char tag_buf[13] = {0};
+        memcpy(tag_buf, payload, tag_len);
+        const char *pin_part = sep + 1;
+        if (pin_part[0] == '\0') {
+            continue;
+        }
+
+        uint8_t candidate_id[6] = {0};
+        if (!hex_to_bytes(tag_buf, tag_len, candidate_id, sizeof(candidate_id))) {
+            continue;
+        }
+
+        if (!found || ap_records[i].rssi > best_rssi) {
+            best_rssi = ap_records[i].rssi;
+            best_channel = ap_records[i].primary;
+            strncpy(best_ssid, ssid, sizeof(best_ssid) - 1);
+            strncpy(best_tag, tag_buf, sizeof(best_tag) - 1);
+            strncpy(best_pin, pin_part, sizeof(best_pin) - 1);
+            memcpy(best_id, candidate_id, sizeof(best_id));
+            found = true;
         }
     }
 
@@ -600,6 +766,9 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
 
     strncpy(mesh_id_out, best_ssid, mesh_id_len - 1);
     mesh_id_out[mesh_id_len - 1] = '\0';
+    strncpy(s_setup_mesh_tag, best_tag, sizeof(s_setup_mesh_tag) - 1);
+    strncpy(s_setup_root_pin, best_pin, sizeof(s_setup_root_pin) - 1);
+    memcpy(s_setup_mesh_id_bytes, best_id, sizeof(s_setup_mesh_id_bytes));
     if (channel_out) {
         *channel_out = best_channel;
     }
@@ -633,6 +802,9 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
     }
     if (mesh_id && mesh_id[0] != '\0') {
         cJSON_AddStringToObject(root, "temp_mesh_id", mesh_id);
+    }
+    if (s_setup_mesh_tag[0] != '\0') {
+        cJSON_AddStringToObject(root, "pairing_mesh_tag", s_setup_mesh_tag);
     }
 
     const char *mesh_field = zone_config_validate(s_mesh_network_id) && s_mesh_network_id[0] != '\0'
@@ -761,6 +933,17 @@ static esp_err_t handle_write_config_command(cJSON *params)
     cJSON *zone_item = cJSON_GetObjectItem(params, "zone");
     if (cJSON_IsString(zone_item)) {
         strncpy(s_node_config.base.zone, zone_item->valuestring, sizeof(s_node_config.base.zone) - 1);
+    }
+
+    cJSON *wifi_ssid_item = cJSON_GetObjectItem(params, "wifi_ssid");
+    cJSON *wifi_pass_item = cJSON_GetObjectItem(params, "wifi_password");
+    if (cJSON_IsString(wifi_ssid_item) && cJSON_IsString(wifi_pass_item)) {
+        esp_err_t wifi_err = node_config_set_router_credentials(wifi_ssid_item->valuestring, wifi_pass_item->valuestring);
+        if (wifi_err != ESP_OK) {
+            ESP_LOGW(TAG, "Не удалось сохранить WiFi данные: %s", esp_err_to_name(wifi_err));
+        } else {
+            ESP_LOGI(TAG, "WiFi credentials обновлены: SSID='%s'", wifi_ssid_item->valuestring);
+        }
     }
 
     s_node_config.base.config_valid = true;

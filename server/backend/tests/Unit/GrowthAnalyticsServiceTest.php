@@ -194,13 +194,17 @@ class GrowthAnalyticsServiceTest extends TestCase
             'plant_count' => 20,
         ]);
 
-        // Создаем логи параметров
-        CycleParameterLog::factory()->count(3)->create([
-            'cycle_id' => $cycle->id,
-            'avg_ph' => 6.0,
-            'avg_ec' => 1.2,
-            'water_consumed_liters' => 5.0,
-        ]);
+        // Создаем логи параметров с уникальными датами
+        CycleParameterLog::factory()->count(3)->sequence(
+            fn (int $index) => [
+                'cycle_id' => $cycle->id,
+                'log_date' => now()->subDays(3 - $index)->startOfDay(),
+                'day_number' => $index + 1,
+                'avg_ph' => 6.0,
+                'avg_ec' => 1.2,
+                'water_consumed_liters' => 5.0,
+            ]
+        )->create();
 
         $snapshot = $this->analytics->createComparisonSnapshot($cycle->id);
 
@@ -236,15 +240,15 @@ class GrowthAnalyticsServiceTest extends TestCase
             'started_at' => now()->subDays(10),
         ]);
 
-        foreach (range(1, 5) as $day) {
-            CycleParameterLog::factory()->create([
+        CycleParameterLog::factory()->count(5)->sequence(
+            fn (int $index) => [
                 'cycle_id' => $cycle->id,
-                'log_date' => now()->subDays(5 - $day)->startOfDay(),
-                'day_number' => $day,
+                'log_date' => now()->subDays(5 - $index)->startOfDay(),
+                'day_number' => $index + 1,
                 'avg_ph' => 6.0,
                 'avg_ec' => 1.2,
-            ]);
-        }
+            ]
+        )->create();
 
         $report = $this->analytics->getCycleReport($cycle->id);
 

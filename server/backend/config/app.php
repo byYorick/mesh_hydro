@@ -44,6 +44,7 @@ return [
         // Application Service Providers
         App\Providers\AppServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        App\Providers\MqttServiceProvider::class,
     ],
 
     'aliases' => Facade::defaultAliases()->merge([

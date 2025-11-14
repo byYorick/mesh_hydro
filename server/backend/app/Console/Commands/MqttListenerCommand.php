@@ -2,9 +2,10 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
+use App\Services\Mqtt\Enum\MqttMessageType;
 use App\Services\MqttService;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 
 class MqttListenerCommand extends Command
 {
@@ -70,62 +71,22 @@ class MqttListenerCommand extends Command
         // Сброс счетчика попыток переподключения
         $this->reconnectAttempts = 0;
 
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на телеметрию ВСЕХ зон
-        // Формат: hydro/+/telemetry/# где + = любая зона (zone1, zone2, zone3...)
-        $this->info('📡 Subscribing to: hydro/+/telemetry/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/telemetry/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("📊 [TELEMETRY] [{$zoneName}] {$topic}");
-            $mqtt->handleTelemetry($topic, $message);
-        });
+        $topics = config('mqtt.topics', []);
+        $subscriptionMap = config('mqtt.subscriptions', []);
 
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на события ВСЕХ зон
-        $this->info('📡 Subscribing to: hydro/+/event/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/event/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("🔔 [EVENT] [{$zoneName}] {$topic}");
-            $mqtt->handleEvent($topic, $message);
-        });
+        foreach ($subscriptionMap as $topicKey => $type) {
+            $topicPattern = Arr::get($topics, $topicKey);
+            if (!$topicPattern) {
+                $this->warn("Topic pattern not found for subscription key [{$topicKey}]");
+                continue;
+            }
 
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на heartbeat ВСЕХ зон
-        $this->info('📡 Subscribing to: hydro/+/heartbeat/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/heartbeat/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("💓 [HEARTBEAT] [{$zoneName}] {$topic}");
-            $mqtt->handleHeartbeat($topic, $message);
-        });
+            $messageType = $type instanceof MqttMessageType ? $type : MqttMessageType::from($type);
 
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на ответы команд ВСЕХ зон
-        $this->info('📡 Subscribing to: hydro/+/response/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/response/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("📥 [RESPONSE] [{$zoneName}] {$topic}");
-            $mqtt->handleCommandResponse($topic, $message);
-        });
+            $this->info(sprintf('📡 Subscribing to: %s (%s)', $topicPattern, strtoupper($messageType->value)));
 
-        // Подписка на discovery (автопоиск узлов)
-        $this->info('📡 Subscribing to: hydro/+/discovery');
-        $mqtt->subscribe('hydro/+/discovery', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("🔍 [DISCOVERY] [{$zoneName}] {$topic}");
-            $mqtt->handleDiscovery($topic, $message);
-        });
-
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на config_response ВСЕХ зон
-        $this->info('📡 Subscribing to: hydro/+/config_response/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/config_response/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("📋 [CONFIG_RESPONSE] [{$zoneName}] {$topic}");
-            $mqtt->handleConfigResponse($topic, $message);
-        });
-
-        // ⭐ ЗОНИРОВАНИЕ: Подписка на ошибки узлов ВСЕХ зон
-        $this->info('📡 Subscribing to: hydro/+/error/# (ALL ZONES)');
-        $mqtt->subscribe('hydro/+/error/#', function ($topic, $message) use ($mqtt) {
-            $zoneName = $this->extractZoneFromTopic($topic);
-            $this->line("❌ [ERROR] [{$zoneName}] {$topic}");
-            $mqtt->handleError($topic, $message);
-        });
+            $mqtt->subscribe($topicPattern, $messageType);
+        }
 
         $this->newLine();
         $this->info('🎧 ⭐ MQTT Listener is running (MULTI-ZONE + AUTO-DISCOVERY)...');
@@ -167,31 +128,5 @@ class MqttListenerCommand extends Command
         }
     }
 
-    /**
-     * ⭐ ЗОНИРОВАНИЕ: Извлечение имени зоны из MQTT топика
-     * 
-     * Примеры:
-     * - hydro/zone1/telemetry/ph_001 → zone1
-     * - hydro/zone2/event/critical → zone2
-     * - hydro/zone123/heartbeat/root_123 → zone123
-     * 
-     * @param string $topic MQTT топик
-     * @return string Имя зоны (например "zone1") или "unknown"
-     */
-    private function extractZoneFromTopic(string $topic): string
-    {
-        $parts = explode('/', $topic);
-
-        if (count($parts) >= 2 && $parts[0] === 'hydro') {
-            $zone = $parts[1];
-            if ($zone === 'setup') {
-                return 'setup';
-            }
-
-            return $zone;
-        }
-
-        return 'unknown';
-    }
 }
 

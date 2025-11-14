@@ -6,7 +6,7 @@
 |---------|----|---------|----|
 | **WiFi Setup** | Hardcoded в коде | WiFi AP + браузер | BLE + приложение |
 | **Безопасность** | Пароль "setup_2025" | PIN из MAC (DDEEFF) | Токен 32 символа + истечение |
-| **Mesh ID** | "HYDRO_NEW" (одинаковый) | "HYDRO_DDEEFF" (уникальный) | "HYDRO_SETUP_XXXX" + токен |
+| **Mesh ID** | "HYDRO_NEW" (одинаковый) | "HYDRO_DDEEFF" (уникальный) | "ROOT_PAIR_<TAG>_<PIN>" |
 | **Состояния** | 2 (new/configured) | 4 (setup/waiting/ready/error) | 8 (полный FSM) |
 | **LED индикация** | ❌ Нет | ✅ 4 режима | ✅ 4 режима + паттерны |
 | **Timeout/Retry** | ❌ Бесконечно | ✅ 10 мин + 3 retry | ✅ Настраиваемый + recovery |

@@ -1,0 +1,13 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "binary_operator_spaces": {
+            "default": "single_space"
+        },
+        "nullable_type_declaration_for_default_null_value": true,
+        "phpdoc_align": {
+            "align": "left"
+        }
+    }
+}
+

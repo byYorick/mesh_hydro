@@ -292,7 +292,7 @@ class MqttServiceUpdates_sendCommand
             throw new \Exception("Node not found: {$nodeId}");
         }
         
-        $meshId = $node->zone;
+        $meshId = $node->zoneCode();
         if (!$meshId || !$this->validateZone($meshId)) {
             throw new \Exception("Node {$nodeId} has invalid zone: {$meshId}");
         }
@@ -335,7 +335,7 @@ class MqttServiceUpdates_sendConfig
             throw new \Exception("Node not found: {$nodeId}");
         }
         
-        $meshId = $node->zone;
+        $meshId = $node->zoneCode();
         if (!$meshId || !$this->validateZone($meshId)) {
             throw new \Exception("Node {$nodeId} has invalid zone: {$meshId}");
         }

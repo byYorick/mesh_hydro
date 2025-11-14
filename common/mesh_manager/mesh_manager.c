@@ -10,6 +10,7 @@
 #include "esp_event.h"
 #include "nvs_flash.h"
 #include <string.h>
+#include <stdio.h>
 
 static const char *TAG = "mesh_manager";
 
@@ -17,6 +18,37 @@ static mesh_manager_config_t s_config;
 static mesh_recv_cb_t s_recv_cb = NULL;
 static bool s_is_mesh_connected = false;
 static esp_netif_t *s_netif_sta = NULL;
+
+static void mesh_id_to_hex(const uint8_t mesh_id[6], char out_hex[13])
+{
+    for (int i = 0; i < 6; ++i) {
+        sprintf(&out_hex[i * 2], "%02X", mesh_id[i]);
+    }
+    out_hex[12] = '\0';
+}
+
+void mesh_manager_mesh_id_to_hex(const uint8_t mesh_id[6], char out_hex[13])
+{
+    mesh_id_to_hex(mesh_id, out_hex);
+}
+
+void mesh_manager_string_to_mesh_id(const char *str, uint8_t out[6])
+{
+    memset(out, 0, 6);
+    if (!str || str[0] == '\0') {
+        return;
+    }
+
+    size_t len = strlen(str);
+    size_t copy = len < 6 ? len : 6;
+    memcpy(out, str, copy);
+
+    if (len > 6) {
+        for (size_t i = 6; i < len; ++i) {
+            out[i % 6] ^= (uint8_t)str[i];
+        }
+    }
+}
 
 // Forward declarations
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -76,8 +108,11 @@ esp_err_t mesh_manager_init(const mesh_manager_config_t *config) {
     // Для NODE: Это не влияет, так как ROOT зафиксирован через esp_mesh_fix_root(true)
     ESP_ERROR_CHECK(esp_mesh_set_vote_percentage(1));
     
-    // Таймаут ассоциации (как в официальном примере)
-    ESP_ERROR_CHECK(esp_mesh_set_ap_assoc_expire(10));
+    // Таймаут ассоциации увеличен для устойчивого pairing
+    ESP_ERROR_CHECK(esp_mesh_set_ap_assoc_expire(120));
+
+    // Отключаем авто-самоорганизацию — корень фиксирован вне pairing
+    ESP_ERROR_CHECK(esp_mesh_set_self_organized(false, false));
 
     ESP_LOGI(TAG, "Mesh manager initialized (mode: %s)", 
              config->mode == MESH_MODE_ROOT ? "ROOT" : "NODE");
@@ -94,7 +129,13 @@ esp_err_t mesh_manager_start(void) {
     // Установка канала
     cfg.channel = s_config.channel;
     
+    char mesh_hex[13];
+    mesh_id_to_hex(s_config.mesh_id, mesh_hex);
+
     // Специфичные настройки для ROOT
+    bool router_provided = (s_config.router_ssid && s_config.router_ssid[0] != '\0' &&
+                            s_config.router_password && s_config.router_password[0] != '\0');
+
     if (s_config.mode == MESH_MODE_ROOT) {
         ESP_ERROR_CHECK(esp_mesh_set_type(MESH_ROOT));
         
@@ -102,49 +143,42 @@ esp_err_t mesh_manager_start(void) {
         ESP_ERROR_CHECK(esp_mesh_fix_root(true));
         ESP_LOGI(TAG, "ROOT status fixed (cannot lose ROOT role)");
         
-        // ТОЛЬКО ROOT подключается к WiFi роутеру!
-        if (s_config.router_ssid == NULL || s_config.router_password == NULL) {
-            ESP_LOGE(TAG, "ROOT requires router_ssid and router_password!");
-            return ESP_ERR_INVALID_ARG;
+        if (router_provided) {
+            cfg.router.ssid_len = strlen(s_config.router_ssid);
+            memcpy((uint8_t *)&cfg.router.ssid, s_config.router_ssid, cfg.router.ssid_len);
+            memcpy((uint8_t *)&cfg.router.password, s_config.router_password, strlen(s_config.router_password));
+            
+            if (s_config.router_bssid != NULL) {
+                memcpy((uint8_t *)&cfg.router.bssid, s_config.router_bssid, 6);
+            }
+            
+            ESP_LOGI(TAG, "ROOT mode: connecting to router '%s' (len=%d), BSSID=%s", 
+                     s_config.router_ssid, cfg.router.ssid_len,
+                     s_config.router_bssid ? "set" : "auto");
+        } else {
+            ESP_LOGW(TAG, "ROOT mode without router credentials: operating in isolated mesh (no upstream WiFi)");
+            cfg.router.ssid_len = 0;
+            memset(&cfg.router.ssid, 0, sizeof(cfg.router.ssid));
+            memset(&cfg.router.password, 0, sizeof(cfg.router.password));
         }
         
-        cfg.router.ssid_len = strlen(s_config.router_ssid);
-        memcpy((uint8_t *)&cfg.router.ssid, s_config.router_ssid, cfg.router.ssid_len);
-        memcpy((uint8_t *)&cfg.router.password, s_config.router_password, strlen(s_config.router_password));
-        
-        // Если указан BSSID - используем его
-        if (s_config.router_bssid != NULL) {
-            memcpy((uint8_t *)&cfg.router.bssid, s_config.router_bssid, 6);
-        }
-        
-        // Максимум подключений для ROOT
         cfg.mesh_ap.max_connection = s_config.max_connection;
-        
-        ESP_LOGI(TAG, "ROOT mode: connecting to router '%s' (len=%d), BSSID=%s, max_conn=%d", 
-                 s_config.router_ssid, cfg.router.ssid_len,
-                 s_config.router_bssid ? "set" : "auto",
-                 cfg.mesh_ap.max_connection);
-        
-        // ✅ ТЕСТ: Попробуем БЕЗ esp_wifi_set_config() (как в официальном примере)
-        // Router credentials будут применены через esp_mesh_set_config(&cfg)
-        // wifi_config_t wifi_config = {0};
-        // strcpy((char *)wifi_config.sta.ssid, s_config.router_ssid);
-        // strcpy((char *)wifi_config.sta.password, s_config.router_password);
-        // wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-        // wifi_config.sta.pmf_cfg.capable = true;
-        // wifi_config.sta.pmf_cfg.required = false;
-        // ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
         
         ESP_ERROR_CHECK(esp_mesh_set_ap_authmode(WIFI_AUTH_WPA2_PSK));
     } else {
         // NODE mode
-        // ✅ ГЕНИАЛЬНОЕ РЕШЕНИЕ: Передаем MESH параметры как "router"!
-        // NODE будет искать mesh AP "HYDRO1" вместо роутера "Yorick"
+        const char *mesh_ssid = (s_config.mesh_id_str && s_config.mesh_id_str[0] != '\0')
+                                    ? s_config.mesh_id_str
+                                    : mesh_hex;
+        size_t mesh_ssid_len = strlen(mesh_ssid);
         
-        // Устанавливаем mesh AP как "роутер" для NODE
-        cfg.router.ssid_len = strlen(s_config.mesh_id);
-        memcpy((uint8_t *)&cfg.router.ssid, s_config.mesh_id, cfg.router.ssid_len);
-        memcpy((uint8_t *)&cfg.router.password, s_config.mesh_password, strlen(s_config.mesh_password));
+        cfg.router.ssid_len = mesh_ssid_len;
+        if (mesh_ssid_len > sizeof(cfg.router.ssid)) {
+            mesh_ssid_len = sizeof(cfg.router.ssid);
+            cfg.router.ssid_len = mesh_ssid_len;
+        }
+        memcpy(cfg.router.ssid, mesh_ssid, mesh_ssid_len);
+        memcpy(cfg.router.password, s_config.mesh_password, strlen(s_config.mesh_password));
         
         // BSSID не устанавливаем - NODE найдет любой AP с SSID "HYDRO1"
         
@@ -152,7 +186,7 @@ esp_err_t mesh_manager_start(void) {
         cfg.mesh_ap.max_connection = 6;
         
         ESP_LOGI(TAG, "NODE mode: will search for mesh AP '%s' (password: %s) on channel %d", 
-                 s_config.mesh_id, 
+                 mesh_ssid, 
                  strlen(s_config.mesh_password) > 0 ? "***" : "OPEN",
                  cfg.channel);
     }
@@ -173,11 +207,17 @@ esp_err_t mesh_manager_start(void) {
     // Логирование Mesh AP конфигурации (для ROOT)
     if (s_config.mode == MESH_MODE_ROOT) {
         ESP_LOGI(TAG, "ROOT Mesh AP configuration:");
-        ESP_LOGI(TAG, "  SSID: %s (from mesh_id)", s_config.mesh_id);
+        ESP_LOGI(TAG, "  Mesh ID: %02X:%02X:%02X:%02X:%02X:%02X",
+                 cfg.mesh_id.addr[0], cfg.mesh_id.addr[1], cfg.mesh_id.addr[2],
+                 cfg.mesh_id.addr[3], cfg.mesh_id.addr[4], cfg.mesh_id.addr[5]);
+        if (s_config.mesh_id_str && s_config.mesh_id_str[0] != '\0') {
+            ESP_LOGI(TAG, "  Mesh SSID: %s", s_config.mesh_id_str);
+        }
         ESP_LOGI(TAG, "  Password: %s", 
-                 strlen(s_config.mesh_password) > 0 ? "***" : "OPEN");
+                 (s_config.mesh_password && strlen(s_config.mesh_password) > 0) ? "***" : "OPEN");
         ESP_LOGI(TAG, "  Max connections: %d", cfg.mesh_ap.max_connection);
         ESP_LOGI(TAG, "  Channel: %d (0=auto)", cfg.channel);
+        ESP_LOGI(TAG, "  Upstream router: %s", router_provided ? s_config.router_ssid : "not configured");
     }
 
     // Применение конфигурации с router credentials
@@ -205,6 +245,77 @@ esp_err_t mesh_manager_stop(void) {
     ESP_ERROR_CHECK(esp_mesh_stop());
     s_is_mesh_connected = false;
     ESP_LOGI(TAG, "Mesh stopped");
+    return ESP_OK;
+}
+
+esp_err_t mesh_manager_configure_softap(const char *ssid,
+                                        const char *password,
+                                        uint8_t channel,
+                                        bool hidden,
+                                        uint8_t max_conn)
+{
+    if (ssid == NULL || ssid[0] == '\0') {
+        ESP_LOGE(TAG, "SoftAP SSID is invalid");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    wifi_mode_t mode;
+    esp_err_t err = esp_wifi_get_mode(&mode);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_get_mode failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    if (mode == WIFI_MODE_STA) {
+        err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to switch to WIFI_MODE_APSTA: %s", esp_err_to_name(err));
+            return err;
+        }
+        mode = WIFI_MODE_APSTA;
+    } else if (mode != WIFI_MODE_AP && mode != WIFI_MODE_APSTA) {
+        err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable APSTA mode: %s", esp_err_to_name(err));
+            return err;
+        }
+        mode = WIFI_MODE_APSTA;
+    }
+
+    wifi_config_t ap_cfg = {0};
+    size_t ssid_len = strnlen(ssid, sizeof(ap_cfg.ap.ssid));
+    memcpy(ap_cfg.ap.ssid, ssid, ssid_len);
+    ap_cfg.ap.ssid_len = ssid_len;
+
+    if (password && password[0] != '\0') {
+        size_t pass_len = strnlen(password, sizeof(ap_cfg.ap.password));
+        if (pass_len < 8) {
+            ESP_LOGW(TAG, "SoftAP password too short (<8), falling back to OPEN mode");
+            password = NULL;
+        } else {
+            memcpy(ap_cfg.ap.password, password, pass_len);
+            ap_cfg.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+        }
+    }
+
+    if (!password || password[0] == '\0') {
+        ap_cfg.ap.password[0] = '\0';
+        ap_cfg.ap.authmode = WIFI_AUTH_OPEN;
+    }
+
+    ap_cfg.ap.max_connection = (max_conn == 0) ? s_config.max_connection : max_conn;
+    ap_cfg.ap.channel = channel;
+    ap_cfg.ap.beacon_interval = 100;
+    ap_cfg.ap.ssid_hidden = hidden ? 1 : 0;
+
+    err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set SoftAP config: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "SoftAP configured (mode=%d): SSID='%.*s', channel=%u, hidden=%d",
+             mode, (int)ap_cfg.ap.ssid_len, ap_cfg.ap.ssid, ap_cfg.ap.channel, hidden);
     return ESP_OK;
 }
 
@@ -402,7 +513,15 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         }
 
         case MESH_EVENT_PARENT_DISCONNECTED:
-            ESP_LOGI(TAG, "Parent disconnected");
+            if (event_data) {
+                mesh_event_disconnected_t *disconnected = (mesh_event_disconnected_t *)event_data;
+                ESP_LOGW(TAG,
+                         "Parent disconnected: reason=%d rssi=%d",
+                         disconnected->reason,
+                         disconnected->rssi);
+            } else {
+                ESP_LOGW(TAG, "Parent disconnected (no context)");
+            }
             s_is_mesh_connected = false;
             break;
 
@@ -421,15 +540,41 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
         case MESH_EVENT_CHILD_CONNECTED: {
             mesh_event_child_connected_t *child = (mesh_event_child_connected_t *)event_data;
-            ESP_LOGI(TAG, "Child connected: %02x:%02x:%02x:%02x:%02x:%02x", 
-                     MAC2STR(child->mac));
+            ESP_LOGI(TAG,
+                     "Child connected: " MACSTR " aid=%d mesh_child=%d",
+                     MAC2STR(child->mac),
+                     child->aid,
+                     child->is_mesh_child);
+            if (s_config.mode == MESH_MODE_ROOT && !s_is_mesh_connected) {
+                ESP_LOGI(TAG, "Mesh marked as connected (child joined isolated root)");
+                s_is_mesh_connected = true;
+            }
             break;
         }
 
         case MESH_EVENT_CHILD_DISCONNECTED: {
             mesh_event_child_disconnected_t *child = (mesh_event_child_disconnected_t *)event_data;
-            ESP_LOGI(TAG, "Child disconnected: %02x:%02x:%02x:%02x:%02x:%02x", 
-                     MAC2STR(child->mac));
+            ESP_LOGW(TAG,
+                     "Child disconnected: " MACSTR " reason=%d mesh_child=%d",
+                     MAC2STR(child->mac),
+                     child->reason,
+                     child->is_mesh_child);
+            break;
+        }
+
+        case MESH_EVENT_NO_PARENT_FOUND: {
+            mesh_event_no_parent_found_t *npf = (mesh_event_no_parent_found_t *)event_data;
+            ESP_LOGW(TAG,
+                     "No parent found: scan_times=%d",
+                     npf ? npf->scan_times : -1);
+            break;
+        }
+
+        case MESH_EVENT_NETWORK_STATE: {
+            mesh_event_network_state_t *state = (mesh_event_network_state_t *)event_data;
+            ESP_LOGI(TAG,
+                     "Network state update: rootless=%d",
+                     state ? state->is_rootless : -1);
             break;
         }
 
@@ -474,7 +619,12 @@ static void mesh_recv_task(void *arg) {
                 ESP_LOGW(TAG, "⚠️ No recv callback registered - data dropped!");
             }
         } else {
+            if (err == ESP_ERR_MESH_NOT_START || err == ESP_ERR_MESH_NOT_INIT) {
+                ESP_LOGW(TAG, "Mesh recv stopping: mesh not running (%s)", esp_err_to_name(err));
+                break;
+            }
             ESP_LOGE(TAG, "Mesh recv failed: %s", esp_err_to_name(err));
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));

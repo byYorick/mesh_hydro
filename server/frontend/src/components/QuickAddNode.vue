@@ -88,7 +88,6 @@ const quickNode = ref({
 })
 
 const nodeTypes = [
-  { value: 'ph_ec', label: 'pH/EC', icon: 'mdi-flask' },
   { value: 'climate', label: 'Climate', icon: 'mdi-thermometer' },
   { value: 'relay', label: 'Relay', icon: 'mdi-electric-switch' },
   { value: 'water', label: 'Water', icon: 'mdi-water' },

@@ -51,7 +51,7 @@ class NodeDiscovered implements ShouldBroadcast
                 'id' => $this->node->id,
                 'node_id' => $this->node->node_id,
                 'node_type' => $this->node->node_type,
-                'zone' => $this->node->zone,
+                'zone' => $this->node->zoneCode(),
                 'mac_address' => $this->node->mac_address,
                 'online' => $this->node->online,
                 'metadata' => $this->node->metadata,

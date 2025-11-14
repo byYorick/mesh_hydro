@@ -45,6 +45,16 @@
                   <v-card-text>
                     <h3 class="mb-4">Выберите тип узла</h3>
                     
+                    <v-alert
+                      v-if="showDeprecatedPhEcAlert"
+                      type="warning"
+                      variant="tonal"
+                      density="compact"
+                      class="mb-4"
+                    >
+                      Комбинированные узлы pH/EC больше не поддерживаются. Используйте отдельные узлы pH и EC.
+                    </v-alert>
+
                     <v-row>
                       <v-col
                         v-for="type in nodeTypes"
@@ -54,12 +64,15 @@
                         md="4"
                       >
                         <v-card
-                          :class="{ 'border-primary': newNode.node_type === type.value }"
+                          :class="{
+                            'border-primary': newNode.node_type === type.value,
+                            'opacity-50': type.disabled,
+                          }"
                           :variant="newNode.node_type === type.value ? 'tonal' : 'outlined'"
                           :color="newNode.node_type === type.value ? 'primary' : ''"
-                          @click="selectNodeType(type.value)"
-                          hover
-                          style="cursor: pointer"
+                          :style="type.disabled ? 'cursor: not-allowed' : 'cursor: pointer'"
+                          @click="selectNodeType(type)"
+                          :hover="!type.disabled"
                         >
                           <v-card-text class="text-center">
                             <v-icon :icon="type.icon" size="64"></v-icon>
@@ -84,7 +97,7 @@
                       label="ID узла *"
                       variant="outlined"
                       :rules="[rules.required, rules.nodeId]"
-                      hint="Пример: ph_ec_002, climate_001"
+                      hint="Пример: ph_002, ec_002, climate_001"
                       persistent-hint
                       clearable
                       autofocus
@@ -114,12 +127,15 @@
 
                     <v-select
                       v-model="newNode.zone"
-                      :items="zones"
+                      :items="zoneItems"
+                      item-title="title"
+                      item-value="value"
                       label="Зона *"
                       variant="outlined"
                       :rules="[rules.required]"
                       class="mt-4"
                       clearable
+                      @update:model-value="handleZoneChange"
                     >
                       <template v-slot:append>
                         <v-btn
@@ -128,6 +144,24 @@
                           variant="text"
                           @click="addZoneDialog = true"
                         ></v-btn>
+                      </template>
+                      <template #selection="{ item }">
+                        <span class="text-body-2">
+                          {{ item?.title ?? item?.raw?.title ?? newNode.zone }}
+                        </span>
+                      </template>
+                      <template #item="{ props, item }">
+                        <v-list-item
+                          v-bind="props"
+                          :title="item?.raw?.title ?? item?.title ?? props.value"
+                          :subtitle="item?.raw?.subtitle ?? item?.subtitle ?? ''"
+                        >
+                          <template v-if="item?.raw?.subtitle ?? item?.subtitle" #subtitle>
+                            <span class="text-caption text-medium-emphasis">
+                              {{ item?.raw?.subtitle ?? item?.subtitle }}
+                            </span>
+                          </template>
+                        </v-list-item>
                       </template>
                     </v-select>
                     
@@ -138,7 +172,7 @@
                       density="compact"
                       class="mt-2"
                     >
-                      Выберите зону или создайте новую (+)
+                      {{ hasZoneItems ? 'Выберите зону или создайте новую (+)' : 'Зоны не найдены — добавьте новую (+)' }}
                     </v-alert>
 
                     <v-text-field
@@ -180,14 +214,38 @@
 
                     <v-row v-if="isRootNode" class="mb-2">
                       <v-col cols="12" md="6">
-                        <v-text-field
+                        <v-combobox
                           v-model="newNode.config.mesh_id"
+                          :items="meshIdOptions"
+                          item-title="title"
+                          item-value="value"
                           label="Mesh Network ID *"
                           variant="outlined"
                           :rules="[rules.meshId]"
                           hint="Пример: zone_greenhouse_1"
                           persistent-hint
-                        ></v-text-field>
+                          clearable
+                          allow-overflow
+                          @update:model-value="handleMeshIdChange"
+                        >
+                          <template #selection="{ item, index }">
+                            <span v-if="index === 0" class="text-body-2">
+                              {{ item?.title ?? item?.raw?.title ?? newNode.config.mesh_id }}
+                            </span>
+                          </template>
+                          <template #item="{ props, item }">
+                            <v-list-item
+                              v-bind="props"
+                              :title="item?.raw?.title ?? item?.title ?? props.value"
+                            >
+                              <template v-if="item?.raw?.subtitle ?? item?.subtitle" #subtitle>
+                                <span class="text-caption text-medium-emphasis">
+                                  {{ item?.raw?.subtitle ?? item?.subtitle }}
+                                </span>
+                              </template>
+                            </v-list-item>
+                          </template>
+                        </v-combobox>
                       </v-col>
                       <v-col cols="12" md="6">
                         <v-text-field
@@ -253,57 +311,6 @@
                       hint="Как часто узел отправляет телеметрию"
                       persistent-hint
                     ></v-text-field>
-
-                    <!-- pH/EC specific -->
-                    <div v-if="newNode.node_type === 'ph_ec'" class="mt-4">
-                      <h4 class="mb-2">Настройки pH/EC сенсора</h4>
-                      
-                      <v-row>
-                        <v-col cols="6">
-                          <v-text-field
-                            v-model.number="newNode.config.ph_min"
-                            label="pH минимум"
-                            type="number"
-                            step="0.1"
-                            variant="outlined"
-                            hint="Нижний порог pH"
-                          ></v-text-field>
-                        </v-col>
-                        <v-col cols="6">
-                          <v-text-field
-                            v-model.number="newNode.config.ph_max"
-                            label="pH максимум"
-                            type="number"
-                            step="0.1"
-                            variant="outlined"
-                            hint="Верхний порог pH"
-                          ></v-text-field>
-                        </v-col>
-                      </v-row>
-
-                      <v-row>
-                        <v-col cols="6">
-                          <v-text-field
-                            v-model.number="newNode.config.ec_min"
-                            label="EC минимум"
-                            type="number"
-                            step="0.1"
-                            variant="outlined"
-                            hint="Нижний порог EC"
-                          ></v-text-field>
-                        </v-col>
-                        <v-col cols="6">
-                          <v-text-field
-                            v-model.number="newNode.config.ec_max"
-                            label="EC максимум"
-                            type="number"
-                            step="0.1"
-                            variant="outlined"
-                            hint="Верхний порог EC"
-                          ></v-text-field>
-                        </v-col>
-                      </v-row>
-                    </div>
 
                     <!-- Climate specific -->
                     <div v-if="newNode.node_type === 'climate'" class="mt-4">
@@ -456,7 +463,6 @@
           v-if="step === 4"
           color="success"
           prepend-icon="mdi-check"
-          :loading="loading"
           :disabled="!valid"
           @click="createNode"
         >
@@ -488,24 +494,102 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import api from '@/services/api'
-import { useAppStore } from '@/stores/app'
+import { ref, computed, watch, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useZonesStore } from '@/stores/zones'
 
 const emit = defineEmits(['node-created'])
-const appStore = useAppStore()
+
+const zonesStore = useZonesStore()
+const { zones: storeZones, selectedZone } = storeToRefs(zonesStore)
 
 const dialog = ref(false)
 const step = ref(1)
 const form = ref(null)
 const valid = ref(false)
-const loading = ref(false)
 const addZoneDialog = ref(false)
 const newZone = ref('')
 const jsonError = ref(null)
 const configJson = ref('')
+const zoneTouched = ref(false)
+const manualZones = ref([])
 
-const zones = ref(['Main', 'Zone 1', 'Zone 2', 'Greenhouse', 'Nursery'])
+const fallbackZones = ['Main', 'Zone 1', 'Zone 2', 'Greenhouse', 'Nursery']
+
+const selectedZoneSummary = computed(() => zonesStore.selectedZoneSummary)
+
+const zoneItems = computed(() => {
+  const items = []
+  const seen = new Set()
+
+  const pushItem = (rawValue, rawTitle, subtitle = '') => {
+    if (!rawValue || typeof rawValue !== 'string') {
+      return
+    }
+    const value = rawValue.trim()
+    if (!value || seen.has(value)) {
+      return
+    }
+    const title = typeof rawTitle === 'string' && rawTitle.trim().length
+      ? rawTitle.trim()
+      : value
+    items.push({
+      value,
+      title,
+      subtitle: typeof subtitle === 'string' && subtitle.trim().length ? subtitle.trim() : '',
+    })
+    seen.add(value)
+  }
+
+  storeZones.value.forEach((zone) => {
+    if (!zone || typeof zone !== 'object') {
+      return
+    }
+
+    const value = [
+      zone.mesh_network_id,
+      zone.zone,
+      zone.name,
+    ].find((candidate) => typeof candidate === 'string' && candidate.trim().length)
+
+    const title = [
+      zone.zone_name,
+      zone.name,
+      zone.mesh_network_id,
+      zone.zone,
+    ].find((candidate) => typeof candidate === 'string' && candidate.trim().length)
+
+    const subtitleParts = []
+    if (typeof zone.nodes_total === 'number') {
+      subtitleParts.push(`Узлов: ${zone.nodes_total}`)
+    }
+    if (typeof zone.nodes_online === 'number') {
+      subtitleParts.push(`Онлайн: ${zone.nodes_online}`)
+    }
+
+    pushItem(value, title, subtitleParts.join(' · '))
+  })
+
+  manualZones.value
+    .filter((zone) => typeof zone === 'string')
+    .forEach((zone) => pushItem(zone, zone, 'Добавлена вручную'))
+
+  fallbackZones.forEach((zone) => pushItem(zone, zone, 'Зона по умолчанию'))
+
+  return items
+})
+
+const zoneValues = computed(() => zoneItems.value.map((item) => item.value))
+
+const hasZoneItems = computed(() => zoneItems.value.length > 0)
+
+const meshIdOptions = computed(() =>
+  zoneItems.value.map((item) => ({
+    value: item.value,
+    title: item.title,
+    subtitle: item.subtitle,
+  })),
+)
 
 const newNode = ref({
   node_id: '',
@@ -525,6 +609,13 @@ const newNode = ref({
   metadata: {},
 })
 
+function sanitizeMeshId(value) {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  return value.trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
 const nodeTypes = [
   {
     value: 'root',
@@ -533,10 +624,11 @@ const nodeTypes = [
     icon: 'mdi-server-network',
   },
   {
-    value: 'ph_ec',
-    label: 'pH/EC Сенсор',
-    description: 'Измерение pH и EC раствора',
-    icon: 'mdi-flask',
+    value: 'deprecated_ph_ec',
+    label: 'pH/EC (устарело)',
+    description: 'Комбинированный узел. Используйте отдельные pH и EC устройства.',
+    icon: 'mdi-flask-off',
+    disabled: true,
   },
   {
     value: 'climate',
@@ -602,8 +694,10 @@ const canProceed = computed(() => {
   }
   if (step.value === 2) {
     // Должны быть заполнены node_id и zone (минимальная валидация)
-    const hasNodeId = newNode.value.node_id && newNode.value.node_id.length > 0
-    const hasZone = newNode.value.zone && newNode.value.zone.length > 0
+    const nodeId = typeof newNode.value.node_id === 'string' ? newNode.value.node_id.trim() : ''
+    const zoneValue = typeof newNode.value.zone === 'string' ? newNode.value.zone.trim() : ''
+    const hasNodeId = nodeId.length > 0
+    const hasZone = zoneValue.length > 0
     return hasNodeId && hasZone
   }
   if (step.value === 3) {
@@ -634,12 +728,121 @@ const finalConfig = computed(() => {
   }
 })
 
-watch(dialog, (val) => {
+async function ensureZonesAvailable() {
+  if (storeZones.value.length) {
+    return
+  }
+  try {
+    await zonesStore.fetchZones()
+  } catch (error) {
+    console.error('AddNodeDialog.vue: failed to fetch zones', error)
+  }
+}
+
+onMounted(() => {
+  ensureZonesAvailable()
+})
+
+function setDefaultZone(force = false) {
+  const available = zoneValues.value
+
+  if (!available.length) {
+    newNode.value.zone = ''
+    return
+  }
+
+  if (!force && zoneTouched.value) {
+    return
+  }
+
+  const currentZone = typeof newNode.value.zone === 'string' ? newNode.value.zone : ''
+  if (currentZone && available.includes(currentZone)) {
+    return
+  }
+
+  const summary = selectedZoneSummary.value || null
+  const candidates = [
+    currentZone,
+    summary?.mesh_network_id,
+    summary?.zone,
+    summary?.name,
+    selectedZone.value,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && available.includes(candidate)) {
+      newNode.value.zone = candidate
+      if (isRootNode.value) {
+        const sanitized = sanitizeMeshId(candidate)
+        if (!newNode.value.config.mesh_id || force) {
+          newNode.value.config.mesh_id = sanitized
+        }
+      }
+      return
+    }
+  }
+
+  newNode.value.zone = available[0]
+  if (isRootNode.value) {
+    newNode.value.config.mesh_id = sanitizeMeshId(available[0])
+  }
+}
+
+function handleZoneChange(value) {
+  zoneTouched.value = true
+  if (typeof value === 'string') {
+    newNode.value.zone = value
+    if (isRootNode.value && value) {
+      newNode.value.config.mesh_id = sanitizeMeshId(value)
+    }
+  } else {
+    newNode.value.zone = ''
+  }
+}
+
+watch(dialog, async (val) => {
   console.log('Dialog opened:', val)
   if (val) {
+    await ensureZonesAvailable()
     resetForm()
+  } else {
+    zoneTouched.value = false
   }
 })
+
+watch(zoneItems, () => {
+  if (!dialog.value) return
+  setDefaultZone()
+})
+
+watch(selectedZone, () => {
+  if (!dialog.value) return
+  if (zoneTouched.value) return
+  setDefaultZone()
+})
+
+watch(selectedZoneSummary, () => {
+  if (!dialog.value) return
+  if (zoneTouched.value) return
+  setDefaultZone()
+})
+
+function handleMeshIdChange(value) {
+  if (!isRootNode.value) {
+    return
+  }
+  const raw = typeof value === 'string' ? value : ''
+  const sanitized = sanitizeMeshId(raw)
+  newNode.value.config.mesh_id = sanitized
+
+  if (zoneTouched.value) {
+    return
+  }
+
+  if (raw && zoneValues.value.includes(raw)) {
+    newNode.value.zone = raw
+  }
+}
 
 watch(step, (newVal, oldVal) => {
   console.log('Step changed:', oldVal, '→', newVal)
@@ -655,41 +858,57 @@ watch(() => newNode.value.node_id, (val, oldVal) => {
   }
 })
 
+watch(() => newNode.value.zone, (val, oldVal) => {
+  if (!isRootNode.value) return
+  const sanitized = sanitizeMeshId(typeof val === 'string' ? val : '')
+  const prevSanitized = sanitizeMeshId(typeof oldVal === 'string' ? oldVal : '')
+  if (!sanitized) {
+    return
+  }
+  if (!newNode.value.config.mesh_id || newNode.value.config.mesh_id === prevSanitized) {
+    newNode.value.config.mesh_id = sanitized
+  }
+})
+
 watch(() => newNode.value.config, (config) => {
   configJson.value = JSON.stringify(config, null, 2)
 }, { deep: true })
 
+const showDeprecatedPhEcAlert = ref(false)
+
 function selectNodeType(type) {
-  console.log('Selecting node type:', type)
-  newNode.value.node_type = type
+  if (!type || typeof type !== 'object') {
+    return
+  }
+  if (type.disabled || type.value === 'deprecated_ph_ec') {
+    showDeprecatedPhEcAlert.value = true
+    newNode.value.node_type = null
+    return
+  }
+
+  const value = type.value
+  console.log('Selecting node type:', value)
+  newNode.value.node_type = value
   
   // Set default zone if not set
-  if (!newNode.value.zone) {
-    newNode.value.zone = 'Main'
+  if (!newNode.value.zone || !zoneValues.value.includes(newNode.value.zone)) {
+    setDefaultZone(true)
   }
   
   // Set default config based on type
-  if (type === 'ph_ec') {
-    newNode.value.config = {
-      interval: 30,
-      ph_min: 5.5,
-      ph_max: 6.5,
-      ec_min: 1.2,
-      ec_max: 2.0,
-    }
-  } else if (type === 'climate') {
+  if (value === 'climate') {
     newNode.value.config = {
       interval: 30,
       temp_min: 18,
       temp_max: 28,
       co2_max: 1200,
     }
-  } else if (type === 'relay') {
+  } else if (value === 'relay') {
     newNode.value.config = {
       interval: 60,
       relay_count: 4,
     }
-  } else if (type === 'root') {
+  } else if (value === 'root') {
     newNode.value.config = {
       interval: 30,
       mesh_id: '',
@@ -721,22 +940,20 @@ function validateJson(value) {
 }
 
 function addZone() {
-  console.log('🔍 AddNodeDialog: addZone function called')
-  console.log('🔍 AddNodeDialog: newZone.value:', newZone.value, typeof newZone.value)
-  console.log('🔍 AddNodeDialog: zones.value:', zones.value, typeof zones.value)
-  
-  try {
-    // Дополнительная проверка на undefined/null перед вызовом includes
-    if (newZone.value && zones.value && Array.isArray(zones.value) && !zones.value.includes(newZone.value)) {
-      console.log('🔍 AddNodeDialog: Adding new zone:', newZone.value)
-      zones.value.push(newZone.value)
-      newNode.value.zone = newZone.value
-    }
-  } catch (error) {
-    console.error('AddNodeDialog.vue: addZone - Error in includes:', error)
-    console.error('AddNodeDialog.vue: addZone - newZone.value:', newZone.value, typeof newZone.value)
-    console.error('AddNodeDialog.vue: addZone - zones.value:', zones.value, typeof zones.value)
+  const name = typeof newZone.value === 'string' ? newZone.value.trim() : ''
+
+  if (!name) {
+    addZoneDialog.value = false
+    newZone.value = ''
+    return
   }
+
+  if (!manualZones.value.includes(name)) {
+    manualZones.value.push(name)
+  }
+
+  newNode.value.zone = name
+  zoneTouched.value = true
   addZoneDialog.value = false
   newZone.value = ''
 }
@@ -751,75 +968,38 @@ function getNodeIcon(type) {
 
 async function createNode() {
   // Validate form
-  const { valid: isValid } = await form.value.validate()
+  const formRef = form.value
+  if (!formRef) {
+    return
+  }
+
+  const { valid: isValid } = await formRef.validate()
   if (!isValid) {
     console.error('Form validation failed')
     return
   }
 
-  loading.value = true
+  const zoneValue = typeof newNode.value.zone === 'string' ? newNode.value.zone.trim() : ''
+  const mac = typeof newNode.value.mac_address === 'string' ? newNode.value.mac_address.trim() : ''
 
-  try {
-    const nodeData = {
-      node_id: newNode.value.node_id.trim(),
-      node_type: newNode.value.node_type,
-      zone: newNode.value.zone,
-      mac_address: newNode.value.mac_address?.trim() || null,
-      config: finalConfig.value,
-      metadata: {
-        description: newNode.value.description || '',
-        created_via: 'web_ui',
-        created_at: new Date().toISOString(),
-      },
-    }
-
-    console.log('Creating node with data:', nodeData)
-    console.log('Node data details:', {
-      node_id: nodeData.node_id,
-      node_id_length: nodeData.node_id?.length,
-      node_type: nodeData.node_type,
-      zone: nodeData.zone
-    })
-
-    // Call API to create node
-    const response = await api.createNode(nodeData)
-    console.log('API response received:', response)
-    
-    // Backend returns { success: true, node: {...} }
-    const createdNode = response.node || response
-    
-    console.log('Node created successfully:', createdNode)
-    
-    // Success notification
-    appStore.showSnackbar(
-      `Узел ${createdNode.node_id} успешно создан`, 
-      'success'
-    )
-    
-    emit('node-created', createdNode)
-    dialog.value = false
-    
-  } catch (error) {
-    console.error('Error creating node:', error)
-    console.error('Error response:', error.response?.data)
-    
-    // Error notification
-    let errorMessage = 'Не удалось создать узел'
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message
-    } else if (error.response?.data?.errors) {
-      // Laravel validation errors
-      const errors = Object.values(error.response.data.errors).flat()
-      errorMessage = errors.join(', ')
-      console.error('Validation errors:', errors)
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-    
-    appStore.showSnackbar(errorMessage, 'error')
-  } finally {
-    loading.value = false
+  const nodeData = {
+    node_id: newNode.value.node_id.trim(),
+    node_type: newNode.value.node_type,
+    zone: zoneValue || null,
+    mac_address: mac || null,
+    config: finalConfig.value,
+    metadata: {
+      description: newNode.value.description || '',
+      created_via: 'web_ui',
+      created_at: new Date().toISOString(),
+    },
   }
+
+  console.log('Prepared node payload:', nodeData)
+
+  emit('node-created', nodeData)
+  dialog.value = false
+  resetForm()
 }
 
 function cancelAdd() {
@@ -829,6 +1009,7 @@ function cancelAdd() {
 
 function resetForm() {
   step.value = 1
+  zoneTouched.value = false
   newNode.value = {
     node_id: '',
     node_type: null,
@@ -848,6 +1029,7 @@ function resetForm() {
   }
   configJson.value = ''
   jsonError.value = null
+  setDefaultZone(true)
 }
 </script>
 

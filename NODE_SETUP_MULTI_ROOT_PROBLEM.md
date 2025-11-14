@@ -93,8 +93,8 @@ node_config_generate_temp_mesh_id(s_temp_mesh_id, sizeof(s_temp_mesh_id));
 
 3. **Конфликт WiFi AP** (если в режиме setup)
    ```
-   ROOT #1: WiFi AP = "HYDRO_SETUP_A1B2C3"
-   ROOT #2: WiFi AP = "HYDRO_SETUP_D4E5F6"
+   ROOT #1: WiFi AP = "ROOT_PAIR_TAG1_PIN1"
+   ROOT #2: WiFi AP = "ROOT_PAIR_TAG2_PIN2"
    ```
    - Уникальные имена ✅
    - НО оба на канале 1 (по умолчанию) → интерференция
@@ -103,9 +103,9 @@ node_config_generate_temp_mesh_id(s_temp_mesh_id, sizeof(s_temp_mesh_id));
 4. **Путаница для пользователя** ⚠️
    ```
    Смартфон видит:
-   - HYDRO_SETUP_A1B2C3
-   - HYDRO_SETUP_D4E5F6
-   - HYDRO_SETUP_123456
+   - ROOT_PAIR_TAG1_PIN1
+   - ROOT_PAIR_TAG2_PIN2
+   - ROOT_PAIR_TAG3_654321
    
    Какой выбрать? Откуда я знаю PIN?
    ```
@@ -113,8 +113,8 @@ node_config_generate_temp_mesh_id(s_temp_mesh_id, sizeof(s_temp_mesh_id));
 5. **Обычные ноды: к какому ROOT?** ⚠️
    ```c
    // Node сканирует и находит:
-   // - HYDRO_A1B2C3
-   // - HYDRO_D4E5F6
+   // - ROOT_PAIR_TAG1_PIN1
+   // - ROOT_PAIR_TAG2_PIN2
    // К какому подключаться?
    ```
    - Если auto-scan → может подключиться к чужому

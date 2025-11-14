@@ -39,7 +39,7 @@ class NodeStatusChanged implements ShouldBroadcast
         return [
             'node_id' => $this->node->node_id,
             'node_type' => $this->node->node_type,
-            'zone' => $this->node->zone,
+            'zone' => $this->node->zoneCode(),
             'online' => $this->currentStatus,
             'previous_online' => $this->previousStatus,
             'last_seen_at' => $this->node->last_seen_at,

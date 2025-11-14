@@ -120,12 +120,13 @@ void app_main(void)
     
     // [Step 6/9] Mesh NODE mode init
     ESP_LOGI(TAG, "[Step 6/9] Mesh NODE mode init...");
-    const char *mesh_id_ptr = zone_config_validate(s_mesh_network_id)
-                                  ? s_mesh_network_id
-                                  : MESH_NETWORK_ID;
+    if (!zone_config_validate(s_mesh_network_id) || s_mesh_network_id[0] == '\0') {
+        strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+        s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+    }
+    const char *mesh_id_ptr = s_mesh_network_id;
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = mesh_id_ptr,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = 6,          // Макс подключений для NODE AP
@@ -135,9 +136,11 @@ void app_main(void)
         .router_password = MESH_ROUTER_PASSWORD,
         .router_bssid = NULL
     };
+    mesh_manager_string_to_mesh_id(mesh_id_ptr, mesh_config.mesh_id);
+    mesh_config.mesh_id_str = mesh_id_ptr;
     
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
-    ESP_LOGI(TAG, "  Mesh ID: %s", mesh_config.mesh_id);
+    ESP_LOGI(TAG, "  Mesh ID: %s", mesh_config.mesh_id_str ? mesh_config.mesh_id_str : "(null)");
     
     // Регистрация callback для команд от ROOT
     mesh_manager_register_recv_cb(on_mesh_data_received);

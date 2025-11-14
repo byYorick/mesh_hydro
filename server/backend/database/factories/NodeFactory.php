@@ -20,8 +20,8 @@ class NodeFactory extends Factory
             'root_node_id' => null,
             'zone' => 'mesh_' . $this->faker->numberBetween(1, 999),
             'greenhouse_id' => null,
-            'online' => $this->faker->boolean(80),
-            'last_seen_at' => $this->faker->optional()->dateTimeBetween('-1 hour', 'now'),
+            'online' => false,
+            'last_seen_at' => null,
             'metadata' => [],
         ];
     }

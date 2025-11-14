@@ -2,64 +2,39 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Node;
-use App\Models\Command;
-use App\Models\Telemetry;
-use App\Services\MqttService;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use App\Exceptions\Nodes\DuplicateNodeException;
 use App\Http\Requests\StoreNodeRequest;
 use App\Http\Requests\UpdateNodeRequest;
-use App\Http\Requests\SendCommandRequest;
+use App\Models\Node;
+use App\Services\Nodes\NodeActionService;
+use App\Services\Nodes\NodeCatalogService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 
 class NodeController extends Controller
 {
+    public function __construct(
+        private readonly NodeCatalogService $nodeCatalogService,
+        private readonly NodeActionService $nodeActionService,
+    ) {
+    }
+
     /**
      * Список всех узлов с последней телеметрией
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Node::query();
+        $filters = collect([
+            'type' => $request->input('type'),
+            'status' => $request->input('status'),
+            'greenhouse_id' => $request->has('greenhouse_id')
+                ? $request->integer('greenhouse_id')
+                : null,
+        ]);
 
-        // Фильтр по типу
-        if ($request->has('type')) {
-            $query->where('node_type', $request->type);
-        }
-
-        // Фильтр по статусу
-        if ($request->has('status')) {
-            if ($request->status === 'online') {
-                $query->online();
-            } elseif ($request->status === 'offline') {
-                $query->offline();
-            }
-        }
-
-        if ($request->filled('greenhouse_id')) {
-            $query->where('greenhouse_id', $request->integer('greenhouse_id'));
-        }
-
-        // Оптимизированная загрузка узлов с последней телеметрией
-        // Используем eager loading для избежания N+1 запросов
-        $nodes = $query
-            ->with(['lastTelemetry', 'greenhouse'])
-            ->get();
-
-        // Добавление вычисляемых полей для каждого узла
-        $nodes->each(function ($node) {
-            // Обновляем online статус на основе isOnline() метода
-            $node->online = $node->isOnline();
-            $node->status_color = $node->status_color;
-            $node->icon = $node->icon;
-            
-            // Добавляем last_telemetry для совместимости со старым форматом
-            $node->last_telemetry = $node->lastTelemetry;
-            // Также добавляем last_data для обратной совместимости
-            $node->last_data = $node->lastTelemetry?->data;
-            $node->greenhouse_name = $node->greenhouse?->name;
-        });
+        $nodes = $this->nodeCatalogService->listNodes($filters);
 
         return response()->json($nodes);
     }
@@ -69,30 +44,7 @@ class NodeController extends Controller
      */
     public function show(string $nodeId): JsonResponse
     {
-        $node = Node::with([
-            'telemetry' => function ($query) {
-                $query->latest('received_at')->limit(100);
-            },
-            'lastTelemetry',
-            'events' => function ($query) {
-                $query->latest()->limit(50);
-            },
-            'commands' => function ($query) {
-                $query->latest()->limit(20);
-            },
-            'greenhouse',
-        ])
-        ->where('node_id', $nodeId)
-        ->firstOrFail();
-
-        // Обновляем online статус на основе isOnline() метода
-        $node->online = $node->isOnline();
-        $node->status_color = $node->status_color;
-        $node->icon = $node->icon;
-        
-        // Добавляем last_telemetry для совместимости со старым форматом
-        $node->last_telemetry = $node->lastTelemetry;
-        $node->greenhouse_name = $node->greenhouse?->name;
+        $node = $this->nodeCatalogService->findNodeWithDetails($nodeId);
 
         return response()->json($node);
     }
@@ -104,10 +56,9 @@ class NodeController extends Controller
     {
         $validated = $request->validated();
 
-        // Создаём новый узел (unique constraint защитит от дублей)
         try {
-            $node = Node::create($validated);
-            
+            $node = $this->nodeActionService->createNode(collect($validated));
+
             Log::info("Node created via API", [
                 'node_id' => $node->node_id,
                 'node_type' => $node->node_type,
@@ -119,153 +70,53 @@ class NodeController extends Controller
                 'message' => 'Node created successfully',
                 'node' => $node,
             ], 201);
-            
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Handle duplicate node_id (PostgreSQL: 23000)
-            if ($e->errorInfo[0] == 23000 || $e->errorInfo[1] == 19) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'duplicate_node_id',
-                    'message' => 'Узел с таким ID уже существует',
-                ], 409);
-            }
-            
-            throw $e;
+        } catch (DuplicateNodeException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'duplicate_node_id',
+                'message' => 'Узел с таким ID уже существует',
+            ], 409);
         }
     }
 
     /**
      * Обновление конфигурации узла
      */
-    public function updateConfig(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    public function updateConfig(Request $request, string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        $validated = $request->validate([
+        $validated = collect($request->validate([
             'config' => 'required|array',
             'comment' => 'nullable|string|max:500',
             'cycle_id' => 'nullable|integer|exists:growth_cycles,id',
             'require_confirmation' => 'nullable|boolean',
-        ]);
+        ]))->put('require_confirmation', (bool) $request->boolean('require_confirmation'));
 
-        // Сохранение старой конфигурации для истории
-        $oldConfig = $node->config ?? [];
-
-        // Логирование изменений в истории
-        \App\Models\ConfigHistory::logChange(
-            $nodeId,
-            $oldConfig,
-            $validated['config'],
-            'update_config',
-            $request->user()?->email ?? 'api',
-            $validated['comment'] ?? null
+        $result = $this->nodeActionService->updateConfig(
+            $node,
+            $validated,
+            $request->user()?->email
         );
 
-        // Сохранение в БД
-        $node->update(['config' => $validated['config']]);
-
-        $requireConfirmation = $validated['require_confirmation'] ?? false;
-        $cycleId = $validated['cycle_id'] ?? null;
-
-        // Если требуется подтверждение, используем сервис подтверждений
-        if ($requireConfirmation && $node->isOnline()) {
-            $configService = app(\App\Services\NodeConfigurationService::class);
-            $confirmation = $configService->sendConfigurationWithConfirmation(
-                $nodeId,
-                $validated['config'],
-                $cycleId
-            );
-
-            return response()->json([
-                'success' => true,
-                'status' => 'awaiting_confirmation',
-                'message' => 'Config updated and sent to node (awaiting confirmation)',
-                'node' => $node,
-                'confirmation_id' => $confirmation->id,
-                'confirmation' => $confirmation,
-            ]);
-        }
-
-        // Отправка конфигурации на узел через MQTT (без подтверждения)
-        if ($node->isOnline()) {
-            try {
-                $mqtt->sendConfig($nodeId, $validated['config']);
-                $message = 'Config updated and sent to node';
-                $status = 'sent';
-            } catch (\Exception $e) {
-                $message = 'Config updated but failed to send to node: ' . $e->getMessage();
-                $status = 'queued';
-            }
-        } else {
-            $message = 'Config updated but node is offline';
-            $status = 'queued';
-        }
-
-        return response()->json([
-            'success' => true,
-            'status' => $status,
-            'message' => $message,
-            'node' => $node,
-        ]);
+        return $this->jsonFromCollection($result);
     }
 
     /**
      * Отправка команды узлу
      */
-    public function sendCommand(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    public function sendCommand(Request $request, string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        $validated = $request->validate([
+        $validated = collect($request->validate([
             'command' => 'required|string|max:100',
             'params' => 'nullable|array',
-        ]);
+        ]));
 
-        // Создание записи команды в БД
-        $command = Command::create([
-            'node_id' => $nodeId,
-            'command' => $validated['command'],
-            'params' => $validated['params'] ?? [],
-            'status' => Command::STATUS_PENDING,
-        ]);
+        $result = $this->nodeActionService->dispatchCommand($node, $validated);
 
-        // Если узел офлайн — помещаем команду в очередь
-        if (!$node->isOnline()) {
-            return response()->json([
-                'success' => true,
-                'status' => 'queued',
-                'message' => 'Node is offline, command queued for delivery',
-                'command' => $command,
-            ]);
-        }
-
-        // Отправка через MQTT
-        try {
-            $mqtt->sendCommand(
-                $nodeId,
-                $validated['command'],
-                $validated['params'] ?? [],
-                $command->id
-            );
-
-            $command->markAsSent();
-
-            return response()->json([
-                'success' => true,
-                'status' => 'sent',
-                'message' => 'Command sent to node',
-                'command' => $command->fresh(),
-            ]);
-        } catch (\Exception $e) {
-            $command->markAsFailed($e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'status' => 'failed',
-                'error' => 'Failed to send command: ' . $e->getMessage(),
-                'command' => $command->fresh(),
-            ], 500);
-        }
+        return $this->jsonFromCollection($result);
     }
 
     /**
@@ -273,21 +124,10 @@ class NodeController extends Controller
      */
     public function statistics(string $nodeId, Request $request): JsonResponse
     {
-        $node = Node::where('node_id', $nodeId)->firstOrFail();
+        $hours = (int) $request->get('hours', 24);
+        $statistics = $this->nodeCatalogService->collectStatistics($nodeId, $hours);
 
-        $hours = $request->get('hours', 24);
-
-        $telemetry = $node->telemetry()
-            ->where('received_at', '>', now()->subHours($hours))
-            ->orderBy('received_at', 'asc')
-            ->get();
-
-        return response()->json([
-            'node_id' => $nodeId,
-            'period_hours' => $hours,
-            'data_points' => $telemetry->count(),
-            'telemetry' => $telemetry,
-        ]);
+        return response()->json($statistics);
     }
 
     /**
@@ -297,24 +137,20 @@ class NodeController extends Controller
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        $validated = $request->validate([
+        $validated = collect($request->validate([
             'zone' => 'nullable|string|max:100',
             'mac_address' => 'nullable|string|size:17',
             'config' => 'nullable|array',
             'metadata' => 'nullable|array',
             'greenhouse_id' => 'nullable|integer|exists:greenhouses,id',
-        ]);
+        ]));
 
-        $node->update($validated);
-
-        if (array_key_exists('greenhouse_id', $validated)) {
-            $node->load('greenhouse');
-        }
+        $updated = $this->nodeActionService->updateNode($node, $validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Node updated',
-            'node' => $node,
+            'node' => $updated,
         ]);
     }
 
@@ -324,14 +160,8 @@ class NodeController extends Controller
     public function destroy(string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
-        
-        // Delete related data
-        $node->telemetry()->delete();
-        $node->events()->delete();
-        $node->commands()->delete();
-        
-        // Delete node
-        $node->delete();
+
+        $this->nodeActionService->deleteNode($node);
 
         return response()->json([
             'success' => true,
@@ -342,212 +172,52 @@ class NodeController extends Controller
     /**
      * Ручной запуск насоса
      */
-    public function runPump(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    public function runPump(Request $request, string $nodeId): JsonResponse
     {
-        // Простое отладочное сообщение
-        error_log("=== RUNPUMP CALLED ===");
-        error_log("Node ID: " . $nodeId);
-        error_log("Request data: " . json_encode($request->all()));
-        error_log("Request method: " . $request->method());
-        error_log("Request headers: " . json_encode($request->headers->all()));
-        
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        // Отладочная информация
-        Log::info("runPump request data", [
-            'node_id' => $nodeId,
-            'request_data' => $request->all(),
-            'content_type' => $request->header('Content-Type'),
-        ]);
-
-        $validated = $request->validate([
+        $validated = collect($request->validate([
             'pump_id' => 'required|integer|min:0|max:5',
             'duration_sec' => 'required|numeric|min:0.1|max:30',
-        ]);
+        ]));
 
-        // Проверка что узел онлайн
-        if (!$node->isOnline()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Node is offline',
-            ], 400);
-        }
+        $result = $this->nodeActionService->runPump($node, $validated);
 
-        // Отправка команды через MQTT
-        try {
-            $mqtt->sendCommand(
-                $nodeId,
-                'run_pump_manual',
-                [
-                    'pump_id' => $validated['pump_id'],
-                    'duration_sec' => $validated['duration_sec'],
-                ]
-            );
-
-            Log::info("Pump run command sent", [
-                'node_id' => $nodeId,
-                'pump_id' => $validated['pump_id'],
-                'duration_sec' => $validated['duration_sec'],
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => "Pump {$validated['pump_id']} started for {$validated['duration_sec']} seconds",
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Failed to send pump run command", [
-                'node_id' => $nodeId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to send command: ' . $e->getMessage(),
-            ], 500);
-        }
+        return $this->jsonFromCollection($result);
     }
 
     /**
      * Калибровка насоса
      */
-    public function calibratePump(Request $request, string $nodeId, MqttService $mqtt): JsonResponse
+    public function calibratePump(Request $request, string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        $validated = $request->validate([
+        $validated = collect($request->validate([
             'pump_id' => 'required|integer|min:0|max:5',
             'duration_sec' => 'required|numeric|min:0.1|max:60',
             'volume_ml' => 'required|numeric|min:0.1|max:1000',
-        ]);
+        ]));
 
-        // Проверка что узел онлайн
-        if (!$node->isOnline()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Node is offline',
-            ], 400);
-        }
-
-        // Расчет производительности
-        $mlPerSecond = $validated['volume_ml'] / $validated['duration_sec'];
-
-        // Получить старую калибровку для истории
-        $oldCalibration = \App\Models\PumpCalibration::where('node_id', $nodeId)
-            ->where('pump_id', $validated['pump_id'])
-            ->first();
-
-        // Сохранение калибровки в БД
-        $calibration = \App\Models\PumpCalibration::updateOrCreate(
-            [
-                'node_id' => $nodeId,
-                'pump_id' => $validated['pump_id'],
-            ],
-            [
-                'ml_per_second' => $mlPerSecond,
-                'calibration_volume_ml' => $validated['volume_ml'],
-                'calibration_time_ms' => (int)($validated['duration_sec'] * 1000),
-                'is_calibrated' => true,
-                'calibrated_at' => now(),
-            ]
+        $result = $this->nodeActionService->calibratePump(
+            $node,
+            $validated,
+            $request->user()?->email
         );
 
-        // Логирование в истории
-        \App\Models\ConfigHistory::logChange(
-            $nodeId,
-            $oldCalibration ? ['pump_' . $validated['pump_id'] . '_ml_per_sec' => $oldCalibration->ml_per_second] : [],
-            ['pump_' . $validated['pump_id'] . '_ml_per_sec' => $mlPerSecond],
-            'calibrate_pump',
-            $request->user()?->email ?? 'api',
-            "Pump #{$validated['pump_id']}: {$validated['volume_ml']} ml in {$validated['duration_sec']} sec"
-        );
-
-        // Отправка конфига калибровки в NVS на узел
-        try {
-            // Отправляем конфиг калибровки в NVS
-            $mqtt->sendCommand(
-                $nodeId,
-                'set_config',
-                [
-                    'pump_' . $validated['pump_id'] . '_ml_per_sec' => $mlPerSecond,
-                    'pump_' . $validated['pump_id'] . '_calibration_volume' => $validated['volume_ml'],
-                    'pump_' . $validated['pump_id'] . '_calibration_time' => $validated['duration_sec'],
-                ]
-            );
-
-            Log::info("Pump calibration saved and sent", [
-                'node_id' => $nodeId,
-                'pump_id' => $validated['pump_id'],
-                'ml_per_second' => $mlPerSecond,
-            ]);
-
-            // Отправка Telegram уведомления
-            if (config('telegram.enabled', false)) {
-                try {
-                    app(\App\Services\TelegramService::class)->sendCalibrationAlert(
-                        $nodeId,
-                        $validated['pump_id'],
-                        $mlPerSecond
-                    );
-                } catch (\Exception $e) {
-                    Log::warning("Failed to send Telegram notification", ['error' => $e->getMessage()]);
-                }
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => "Pump {$validated['pump_id']} calibrated: {$mlPerSecond} ml/s",
-                'calibration' => $calibration,
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Failed to send calibration command", [
-                'node_id' => $nodeId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Calibration saved to DB but failed to send to node: ' . $e->getMessage(),
-                'calibration' => $calibration,
-            ], 500);
-        }
+        return $this->jsonFromCollection($result);
     }
 
     /**
      * Запрос конфигурации от узла
      */
-    public function requestConfig(string $nodeId, MqttService $mqtt): JsonResponse
+    public function requestConfig(string $nodeId): JsonResponse
     {
         $node = Node::where('node_id', $nodeId)->firstOrFail();
 
-        // Проверка что узел онлайн
-        if (!$node->isOnline()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Node is offline',
-            ], 400);
-        }
+        $result = $this->nodeActionService->requestConfig($node);
 
-        // Отправка команды get_config
-        try {
-            $mqtt->sendCommand($nodeId, 'get_config', []);
-
-            Log::info("Config request sent to node", ['node_id' => $nodeId]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Config request sent to node. Check WebSocket for response.',
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Failed to request config", [
-                'node_id' => $nodeId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Failed to send request: ' . $e->getMessage(),
-            ], 500);
-        }
+        return $this->jsonFromCollection($result);
     }
 
     /**
@@ -555,14 +225,9 @@ class NodeController extends Controller
      */
     public function getPumpCalibrations(string $nodeId): JsonResponse
     {
-        $calibrations = \App\Models\PumpCalibration::where('node_id', $nodeId)
-            ->orderBy('pump_id')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'calibrations' => $calibrations,
-        ]);
+        return response()->json(
+            $this->nodeCatalogService->loadPumpCalibrations($nodeId)
+        );
     }
 
     /**
@@ -570,15 +235,17 @@ class NodeController extends Controller
      */
     public function getConfigHistory(string $nodeId): JsonResponse
     {
-        $history = \App\Models\ConfigHistory::where('node_id', $nodeId)
-            ->orderBy('changed_at', 'desc')
-            ->limit(50)
-            ->get();
+        return response()->json(
+            $this->nodeCatalogService->loadConfigHistory($nodeId)
+        );
+    }
 
-        return response()->json([
-            'success' => true,
-            'history' => $history,
-        ]);
+    private function jsonFromCollection(Collection $result): JsonResponse
+    {
+        $status = $result->get('http_status', 200);
+        $payload = $result->except('http_status');
+
+        return response()->json($payload, $status);
     }
 }
 

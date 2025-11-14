@@ -2,11 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use App\Services\MqttService;
 use App\Models\Node;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
 class NewNode extends Model
 {
@@ -43,86 +41,6 @@ class NewNode extends Model
     public function scopeOnline($query)
     {
         return $query->where('last_heartbeat_at', '>=', now()->subSeconds(30));
-    }
-
-    public function configure(array $config): bool
-    {
-        if ($this->status === 'confirmed') {
-            return false;
-        }
-
-        if (!$this->isOnline()) {
-            Log::warning('Attempt to configure offline new node', [
-                'mac_address' => $this->mac_address,
-            ]);
-            return false;
-        }
-
-        // Добавляем PIN в конфигурацию для проверки на устройстве
-        $config['pin'] = $this->pin;
-
-        if ($this->is_root) {
-            $result = $this->sendConfigViaHttp($config);
-        } else {
-            $result = $this->sendConfigViaMqtt($config);
-        }
-
-        if ($result) {
-            $this->status = 'configuring';
-            $this->save();
-        }
-
-        return $result;
-    }
-
-    protected function sendConfigViaHttp(array $config): bool
-    {
-        $ip = $this->metadata['ip_address'] ?? null;
-        if (!$ip) {
-            Log::error('Cannot send config via HTTP without IP address', [
-                'mac_address' => $this->mac_address,
-            ]);
-            return false;
-        }
-
-        try {
-            $response = Http::timeout(5)->post("http://{$ip}/api/config", $config);
-            if ($response->successful()) {
-                return true;
-            }
-
-            Log::error('HTTP config request failed', [
-                'mac_address' => $this->mac_address,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-            return false;
-        } catch (\Throwable $e) {
-            Log::error('HTTP config request error', [
-                'mac_address' => $this->mac_address,
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
-    }
-
-    protected function sendConfigViaMqtt(array $config): bool
-    {
-        try {
-            $nodeId = $config['node_id'] ?? $this->mac_address;
-            app(MqttService::class)->sendCommand(
-                $nodeId,
-                'write_config',
-                $config
-            );
-            return true;
-        } catch (\Throwable $e) {
-            Log::error('MQTT config send failed', [
-                'mac_address' => $this->mac_address,
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
     }
 
     public function confirmConfiguration(string $nodeId, array $attributes = []): Node

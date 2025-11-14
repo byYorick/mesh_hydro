@@ -33,9 +33,10 @@
 
 static const char *TAG = "water_node";
 
-#define SETUP_MESH_PREFIX            "HYDRO_SETUP_"
+#define SETUP_MESH_PREFIX            "ROOT_PAIR_"
 #define SETUP_HEARTBEAT_INTERVAL_MS  10000
 #define SETUP_DISCOVERY_RETRY_MS     5000
+#define SETUP_DISCOVERY_INTERVAL_MS  3000
 
 static water_node_config_t s_node_config = {0};
 static bool s_is_setup_mode = false;
@@ -45,8 +46,12 @@ static TaskHandle_t s_setup_heartbeat_task = NULL;
 static char s_setup_pin[7] = {0};
 static char s_setup_mesh_id[32] = {0};
 static uint8_t s_setup_mesh_channel = 0;
+static uint8_t s_setup_mesh_id_bytes[6] = {0};
+static char s_setup_mesh_tag[13] = {0};
+static char s_setup_root_pin[8] = {0};
 static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
+static bool s_setup_config_received = false;
 
 #define WATER_OLED_I2C_PORT  I2C_NUM_0
 #define WATER_OLED_SDA_PIN   GPIO_NUM_8
@@ -66,6 +71,39 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
 static void water_oled_init(void);
 static void water_oled_update(const char *mode_label);
 static void water_oled_show_heartbeat(void);
+static int hex_digit(char c);
+static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t out_len);
+
+static int hex_digit(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    return -1;
+}
+
+static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t out_len)
+{
+    if (!hex || !out || hex_len != out_len * 2) {
+        return false;
+    }
+
+    for (size_t i = 0; i < out_len; ++i) {
+        int high = hex_digit(hex[2 * i]);
+        int low = hex_digit(hex[2 * i + 1]);
+        if (high < 0 || low < 0) {
+            return false;
+        }
+        out[i] = (uint8_t)((high << 4) | low);
+    }
+    return true;
+}
 
 void app_main(void)
 {
@@ -117,17 +155,19 @@ static void run_normal_mode(void)
     water_oled_init();
     water_oled_update("BOOT");
 
-    char mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
-    if (zone_config_validate(s_mesh_network_id)) {
-        strncpy(mesh_network_id, s_mesh_network_id, sizeof(mesh_network_id) - 1);
-    } else if (node_config_get_mesh_network_id(mesh_network_id) != ESP_OK || mesh_network_id[0] == '\0') {
-        strncpy(mesh_network_id, MESH_NETWORK_ID, sizeof(mesh_network_id) - 1);
+    const char *mesh_ssid = NULL;
+    if (zone_config_validate(s_mesh_network_id) && s_mesh_network_id[0] != '\0') {
+        mesh_ssid = s_mesh_network_id;
+    } else {
+        if (node_config_get_mesh_network_id(s_mesh_network_id) != ESP_OK || s_mesh_network_id[0] == '\0') {
+            strncpy(s_mesh_network_id, MESH_NETWORK_ID, sizeof(s_mesh_network_id) - 1);
+            s_mesh_network_id[sizeof(s_mesh_network_id) - 1] = '\0';
+        }
+        mesh_ssid = s_mesh_network_id;
     }
-    mesh_network_id[sizeof(mesh_network_id) - 1] = '\0';
 
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = mesh_network_id,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = MESH_NETWORK_CHANNEL,
         .max_connection = 6,
@@ -135,12 +175,14 @@ static void run_normal_mode(void)
         .router_password = NULL,
         .router_bssid = NULL,
     };
+    mesh_manager_string_to_mesh_id(mesh_ssid, mesh_config.mesh_id);
+    mesh_config.mesh_id_str = mesh_ssid;
 
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     mesh_manager_register_recv_cb(on_mesh_data_received);
     ESP_ERROR_CHECK(mesh_manager_start());
 
-    ESP_LOGI(TAG, "Mesh started (%s)", mesh_config.mesh_id);
+    ESP_LOGI(TAG, "Mesh started (%s)", mesh_config.mesh_id_str ? mesh_config.mesh_id_str : "(null)");
     water_oled_update("RUN");
 
     while (1) {
@@ -162,6 +204,7 @@ static void run_setup_mode(void)
     strncpy(s_root_node_id, ZONE_CONFIG_UNCONFIGURED, sizeof(s_root_node_id) - 1);
     memset(s_setup_pin, 0, sizeof(s_setup_pin));
     node_config_generate_setup_pin(s_setup_pin, sizeof(s_setup_pin));
+    s_setup_config_received = false;
 
     water_oled_init();
     water_oled_update("SETUP");
@@ -183,7 +226,6 @@ static void run_setup_mode(void)
 
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
-        .mesh_id = s_setup_mesh_id,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = s_setup_mesh_channel,
         .max_connection = 6,
@@ -191,6 +233,8 @@ static void run_setup_mode(void)
         .router_password = NULL,
         .router_bssid = NULL,
     };
+    memcpy(mesh_config.mesh_id, s_setup_mesh_id_bytes, sizeof(mesh_config.mesh_id));
+    mesh_config.mesh_id_str = s_setup_mesh_id;
 
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     mesh_manager_register_recv_cb(on_mesh_data_received);
@@ -351,6 +395,9 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
     bool found = false;
     uint8_t best_channel = 0;
     char best_ssid[33] = {0};
+    char best_tag[13] = {0};
+    char best_pin[8] = {0};
+    uint8_t best_id[6] = {0};
     size_t prefix_len = strlen(SETUP_MESH_PREFIX);
 
     for (uint16_t i = 0; i < ap_count; ++i) {
@@ -358,13 +405,40 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
         if (ssid[0] == '\0') {
             continue;
         }
-        if (strncmp(ssid, SETUP_MESH_PREFIX, prefix_len) == 0) {
-            if (!found || ap_records[i].rssi > best_rssi) {
-                best_rssi = ap_records[i].rssi;
-                best_channel = ap_records[i].primary;
-                strncpy(best_ssid, ssid, sizeof(best_ssid) - 1);
-                found = true;
-            }
+        if (strncmp(ssid, SETUP_MESH_PREFIX, prefix_len) != 0) {
+            continue;
+        }
+
+        const char *payload = ssid + prefix_len;
+        const char *sep = strchr(payload, '_');
+        if (!sep) {
+            continue;
+        }
+        size_t tag_len = (size_t)(sep - payload);
+        if (tag_len != 12) {
+            continue;
+        }
+
+        char tag_buf[13] = {0};
+        memcpy(tag_buf, payload, tag_len);
+        const char *pin_part = sep + 1;
+        if (pin_part[0] == '\0') {
+            continue;
+        }
+
+        uint8_t candidate_id[6] = {0};
+        if (!hex_to_bytes(tag_buf, tag_len, candidate_id, sizeof(candidate_id))) {
+            continue;
+        }
+
+        if (!found || ap_records[i].rssi > best_rssi) {
+            best_rssi = ap_records[i].rssi;
+            best_channel = ap_records[i].primary;
+            strncpy(best_ssid, ssid, sizeof(best_ssid) - 1);
+            strncpy(best_tag, tag_buf, sizeof(best_tag) - 1);
+            strncpy(best_pin, pin_part, sizeof(best_pin) - 1);
+            memcpy(best_id, candidate_id, sizeof(best_id));
+            found = true;
         }
     }
 
@@ -379,6 +453,9 @@ static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint
 
     strncpy(mesh_id_out, best_ssid, mesh_id_len - 1);
     mesh_id_out[mesh_id_len - 1] = '\0';
+    strncpy(s_setup_mesh_tag, best_tag, sizeof(s_setup_mesh_tag) - 1);
+    strncpy(s_setup_root_pin, best_pin, sizeof(s_setup_root_pin) - 1);
+    memcpy(s_setup_mesh_id_bytes, best_id, sizeof(s_setup_mesh_id_bytes));
     if (channel_out) {
         *channel_out = best_channel;
     }
@@ -412,6 +489,9 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
     }
     if (mesh_id && mesh_id[0] != '\0') {
         cJSON_AddStringToObject(root, "temp_mesh_id", mesh_id);
+    }
+    if (s_setup_mesh_tag[0] != '\0') {
+        cJSON_AddStringToObject(root, "pairing_mesh_tag", s_setup_mesh_tag);
     }
 
     const char *mesh_field = zone_config_validate(s_mesh_network_id) && s_mesh_network_id[0] != '\0'
@@ -452,12 +532,18 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
 static void setup_heartbeat_task(void *arg)
 {
     while (s_setup_active) {
-        vTaskDelay(pdMS_TO_TICKS(SETUP_HEARTBEAT_INTERVAL_MS));
+        TickType_t delay_ticks = s_setup_config_received
+                                     ? pdMS_TO_TICKS(SETUP_HEARTBEAT_INTERVAL_MS)
+                                     : pdMS_TO_TICKS(SETUP_DISCOVERY_INTERVAL_MS);
+        vTaskDelay(delay_ticks);
         if (!s_setup_active) {
             break;
         }
-        if (send_setup_message("heartbeat", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to send heartbeat");
+        const char *msg_type = s_setup_config_received ? "heartbeat" : "discovery";
+        if (send_setup_message(msg_type, s_setup_pin, s_setup_mesh_id) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to send %s", msg_type);
+        } else if (s_setup_config_received) {
+            water_oled_show_heartbeat();
         }
     }
 
@@ -561,6 +647,7 @@ static esp_err_t handle_write_config_command(cJSON *params)
 
     water_oled_update("CONFIG");
 
+    s_setup_config_received = true;
     s_is_setup_mode = false;
     send_setup_config_confirmation();
     return ESP_OK;
