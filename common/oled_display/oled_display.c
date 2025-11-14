@@ -237,14 +237,29 @@ esp_err_t oled_display_init(const oled_display_config_t *config)
         .master.clk_speed = s_ctx.cfg.clk_speed_hz,
     };
 
+    // Сначала пытаемся установить параметры (это работает даже если драйвер уже установлен)
     esp_err_t err = i2c_param_config(s_ctx.cfg.i2c_port, &i2c_conf);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
         ESP_LOGE(OLED_TAG, "i2c_param_config failed: %s", esp_err_to_name(err));
         return err;
     }
 
+    // Пытаемся установить драйвер. Если он уже установлен, получим ESP_ERR_INVALID_STATE или ESP_FAIL
     err = i2c_driver_install(s_ctx.cfg.i2c_port, I2C_MODE_MASTER, 0, 0, 0);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    if (err == ESP_ERR_INVALID_STATE) {
+        // Драйвер уже установлен - это нормально, продолжаем
+        ESP_LOGI(OLED_TAG, "I2C driver already installed, using existing driver");
+    } else if (err == ESP_FAIL) {
+        // ESP_FAIL может означать, что драйвер уже установлен с другими параметрами
+        // Попробуем использовать существующий драйвер
+        ESP_LOGW(OLED_TAG, "i2c_driver_install returned ESP_FAIL, assuming driver already installed");
+        // Обновляем параметры для существующего драйвера
+        err = i2c_param_config(s_ctx.cfg.i2c_port, &i2c_conf);
+        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+            ESP_LOGE(OLED_TAG, "Failed to update I2C params: %s", esp_err_to_name(err));
+            return err;
+        }
+    } else if (err != ESP_OK) {
         ESP_LOGE(OLED_TAG, "i2c_driver_install failed: %s", esp_err_to_name(err));
         return err;
     }

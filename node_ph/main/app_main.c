@@ -31,6 +31,7 @@
 #include "node_config.h"
 #include "mesh_config.h"
 #include "zone_config.h"
+#include "esp_mesh.h"
 
 // Компоненты pH
 #include "ph_sensor.h"
@@ -67,29 +68,8 @@ static char s_mesh_network_id[ZONE_CONFIG_MAX_LEN] = {0};
 static char s_root_node_id[ZONE_CONFIG_MAX_LEN] = {0};
 static bool s_setup_config_received = false;
 
-#define SETUP_STATUS_ANIMATION_INTERVAL_MS 500
-
-#define SETUP_STATUS_FRAME_MAX_LEN 20
-
-static TaskHandle_t s_setup_status_task = NULL;
-static bool s_setup_status_animation_active = false;
-static const char (*s_active_status_frames)[SETUP_STATUS_FRAME_MAX_LEN] = NULL;
-static size_t s_active_status_frame_count = 0;
-static const char *s_active_status_mesh = NULL;
-
-static const char s_setup_status_scanning_frames[][SETUP_STATUS_FRAME_MAX_LEN] = {
-    "Scanning mesh    ",
-    "Scanning mesh .  ",
-    "Scanning mesh .. ",
-    "Scanning mesh ..."
-};
-
-static const char s_setup_status_waiting_frames[][SETUP_STATUS_FRAME_MAX_LEN] = {
-    "Await config     ",
-    "Await config .   ",
-    "Await config ..  ",
-    "Await config ..."
-};
+// Старые переменные для анимации статуса больше не используются
+// Заменены на систему отображения шагов с анимацией трех точек
 
 // I2C конфигурация для ESP32 (стандартные пины)
 #define I2C_MASTER_SCL_IO   9
@@ -101,6 +81,21 @@ static const char s_setup_status_waiting_frames[][SETUP_STATUS_FRAME_MAX_LEN] = 
 
 // Конфигурация узла
 static ph_node_config_t s_node_config;
+
+// Переменные для отображения шагов инициализации на OLED
+static bool s_init_display_ready = false;
+static TaskHandle_t s_init_step_animation_task = NULL;
+static bool s_init_step_animation_active = false;
+static char s_current_step_text[32] = {0};
+static int s_current_step_number = 0;
+#define INIT_STEP_ANIMATION_INTERVAL_MS 500
+
+// Переменные для отображения шагов setup режима на OLED
+static TaskHandle_t s_setup_step_animation_task = NULL;
+static bool s_setup_step_animation_active = false;
+static char s_setup_current_step_text[32] = {0};
+static int s_setup_current_step_number = 0;
+#define SETUP_STEP_ANIMATION_INTERVAL_MS 500
 
 // Forward declarations
 static void run_setup_mode(void);
@@ -117,10 +112,17 @@ static void setup_display_init(const char *pin);
 static void setup_display_update(const char *pin, const char *mesh, const char *status);
 static void setup_display_deinit(void);
 static void board_status_led_disable(void);
-static void setup_status_animation_task(void *arg);
-static void setup_status_animation_start(const char (*frames)[SETUP_STATUS_FRAME_MAX_LEN], size_t frame_count, const char *mesh);
-static void setup_status_animation_stop(void);
 static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t out_len);
+static void init_step_display_init(void);
+static void init_step_display_start(void);
+static void show_init_step(int step_num, const char *step_text);
+static void init_step_animation_task(void *arg);
+static void stop_init_step_animation(void);
+static void init_step_display_deinit(void);
+static void show_setup_step(int step_num, const char *step_text);
+static void setup_step_animation_task(void *arg);
+static void stop_setup_step_animation(void);
+static void config_received_restart_task(void *arg);
 
 static int hex_digit(char c)
 {
@@ -180,6 +182,7 @@ static void run_normal_mode(void)
     
     // [Step 1/8] Loading config from NVS
     ESP_LOGI(TAG, "[Step 1/8] Loading config...");
+    // OLED еще не инициализирован, поэтому не показываем шаг 1
     esp_err_t ret = node_config_load(&s_node_config, sizeof(ph_node_config_t), "ph_ns");
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Config not found, using defaults");
@@ -247,8 +250,13 @@ static void run_normal_mode(void)
     ESP_LOGI(TAG, "[Step 3/8] I2C init...");
     ESP_ERROR_CHECK(i2c_master_init());
     
+    // После инициализации I2C можем инициализировать OLED
+    init_step_display_start();
+    show_init_step(3, "I2C init");
+    
     // [Step 4/8] Sensor init
     ESP_LOGI(TAG, "[Step 4/8] pH Sensor init...");
+    show_init_step(4, "pH Sensor init");
     esp_err_t ret_ph = ph_sensor_init(I2C_MASTER_NUM);
     if (ret_ph != ESP_OK) {
         ESP_LOGW(TAG, "  ⚠️ pH sensor not found - using mock values");
@@ -258,11 +266,13 @@ static void run_normal_mode(void)
     
     // [Step 5/8] Pumps init (2 насоса)
     ESP_LOGI(TAG, "[Step 5/8] Pumps init (2x PWM)...");
+    show_init_step(5, "Pumps init");
     ESP_ERROR_CHECK(pump_controller_init());
     ESP_LOGI(TAG, "  - 2 pumps ready (GPIO 12,13 - pH UP/DOWN)");
     
     // [Step 6/8] Mesh NODE mode init
     ESP_LOGI(TAG, "[Step 6/8] Mesh NODE mode init...");
+    show_init_step(6, "Mesh init");
     const char *mesh_ssid = NULL;
     if (zone_config_validate(s_mesh_network_id) && s_mesh_network_id[0] != '\0') {
         mesh_ssid = s_mesh_network_id;
@@ -293,18 +303,39 @@ static void run_normal_mode(void)
     
     // [Step 7/8] pH Manager init
     ESP_LOGI(TAG, "[Step 7/8] pH Manager init...");
+    ESP_LOGI(TAG, "🔵 [OLED_CHECK] Before ph_manager_init:");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    show_init_step(7, "pH Manager init");
+    ESP_LOGI(TAG, "   Calling ph_manager_init()...");
     ESP_ERROR_CHECK(ph_manager_init(&s_node_config));
+    ESP_LOGI(TAG, "   ✅ ph_manager_init() returned");
+    ESP_LOGI(TAG, "🔵 [OLED_CHECK] After ph_manager_init:");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
     
     // [Step 8/8] Starting
     ESP_LOGI(TAG, "[Step 8/8] Starting...");
+    show_init_step(8, "Starting");
     ESP_ERROR_CHECK(mesh_manager_start());
     ESP_ERROR_CHECK(ph_manager_start());
+    
+    // Останавливаем анимацию шагов инициализации
+    ESP_LOGI(TAG, "🔵 [OLED_CHECK] Before stop_init_step_animation:");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    stop_init_step_animation();
+    ESP_LOGI(TAG, "🔵 [OLED_CHECK] After stop_init_step_animation:");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
     
     ESP_LOGI(TAG, "╔════════════════════════════════════════╗");
     ESP_LOGI(TAG, "║  NODE pH Running! ✓                    ║");
     ESP_LOGI(TAG, "║  Autonomous: YES                       ║");
     ESP_LOGI(TAG, "║  Emergency Protection: ACTIVE          ║");
     ESP_LOGI(TAG, "╚════════════════════════════════════════╝");
+    
+    // OLED теперь будет управляться ph_manager через ph_display_init_once()
+    // Который вызывается в ph_manager_init() и устанавливает правильные шаблоны
+    ESP_LOGI(TAG, "🔵 [OLED_CHECK] Final state:");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    ESP_LOGI(TAG, "   OLED should be managed by ph_manager now");
     
     // Главный цикл - статистика
     while (1) {
@@ -316,6 +347,266 @@ static void run_normal_mode(void)
         ESP_LOGI(TAG, "Status: pH=%.2f (target %.2f), Mesh=%s",
                  ph, s_node_config.ph_target,
                  mesh_manager_is_connected() ? "ONLINE" : "OFFLINE");
+    }
+}
+
+static void init_step_display_init(void)
+{
+    // Эта функция больше не используется, т.к. OLED инициализируется после I2C
+    // Оставлена для совместимости
+    (void)0;
+}
+
+static void init_step_display_start(void)
+{
+    ESP_LOGI(TAG, "🔵 [OLED_INIT] init_step_display_start() called");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    
+    if (s_init_display_ready) {
+        ESP_LOGI(TAG, "   OLED already initialized, skipping");
+        return;
+    }
+
+    ESP_LOGI(TAG, "   Configuring OLED: I2C port=%d, SDA=%d, SCL=%d, addr=0x%02X",
+             I2C_MASTER_NUM, I2C_MASTER_SDA_IO, I2C_MASTER_SCL_IO, 0x3C);
+    
+    const oled_display_config_t cfg = {
+        .i2c_port = I2C_MASTER_NUM,
+        .sda_pin = I2C_MASTER_SDA_IO,
+        .scl_pin = I2C_MASTER_SCL_IO,
+        .clk_speed_hz = I2C_MASTER_FREQ_HZ,
+        .i2c_address = 0x3C,
+        .width = 128,
+        .height = 64,
+        .line_count = 4,
+    };
+
+    ESP_LOGI(TAG, "   Calling oled_display_init()...");
+    esp_err_t init_err = oled_display_init(&cfg);
+    if (init_err != ESP_OK) {
+        ESP_LOGE(TAG, "   ❌ OLED init failed: %s (0x%x)", esp_err_to_name(init_err), init_err);
+        return;
+    }
+    ESP_LOGI(TAG, "   ✅ OLED init OK");
+
+    const oled_display_task_config_t task_cfg = {
+        .stack_size = 4096,
+        .priority = 4,
+        .queue_depth = 6,
+        .heartbeat_timeout_ticks = pdMS_TO_TICKS(2000),
+    };
+
+    ESP_LOGI(TAG, "   Calling oled_display_start_task()...");
+    esp_err_t task_err = oled_display_start_task(&task_cfg);
+    if (task_err != ESP_OK) {
+        ESP_LOGE(TAG, "   ❌ OLED task start failed: %s (0x%x)", esp_err_to_name(task_err), task_err);
+        ESP_LOGI(TAG, "   Shutting down OLED...");
+        oled_display_shutdown();
+        return;
+    }
+    ESP_LOGI(TAG, "   ✅ OLED task started OK");
+
+    ESP_LOGI(TAG, "   Setting templates...");
+    oled_display_set_template(0, "pH NODE INIT");
+    oled_display_set_template(1, "Step {step_num}/8");
+    oled_display_set_template(2, "{step_text}");
+    oled_display_set_template(3, "{dots}");
+    ESP_LOGI(TAG, "   ✅ Templates set");
+
+    s_init_display_ready = true;
+    ESP_LOGI(TAG, "   ✅ init_step_display_start() completed, s_init_display_ready = true");
+}
+
+static void init_step_animation_task(void *arg)
+{
+    (void)arg;
+    int dot_count = 0;
+    char dots_buf[8] = {0};
+
+    while (s_init_step_animation_active) {
+        // Формируем строку с точками: "", ".", "..", "..."
+        memset(dots_buf, 0, sizeof(dots_buf));
+        for (int i = 0; i < dot_count; i++) {
+            dots_buf[i] = '.';
+        }
+        dots_buf[dot_count] = '\0';
+
+        // Обновляем отображение
+        if (s_init_display_ready) {
+            char step_num_str[8];
+            snprintf(step_num_str, sizeof(step_num_str), "%d", s_current_step_number);
+
+            oled_display_kv_t values[] = {
+                {.key = "step_num", .value = step_num_str},
+                {.key = "step_text", .value = s_current_step_text},
+                {.key = "dots", .value = dots_buf},
+            };
+            oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+        }
+
+        dot_count = (dot_count + 1) % 4; // 0, 1, 2, 3 -> "", ".", "..", "..."
+        vTaskDelay(pdMS_TO_TICKS(INIT_STEP_ANIMATION_INTERVAL_MS));
+    }
+
+    s_init_step_animation_task = NULL;
+    vTaskDelete(NULL);
+}
+
+static void show_init_step(int step_num, const char *step_text)
+{
+    ESP_LOGI(TAG, "🔵 [OLED_STEP] show_init_step(%d, '%s') called", step_num, step_text ? step_text : "NULL");
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    
+    // Если OLED еще не инициализирован, инициализируем его (только после I2C)
+    if (!s_init_display_ready && step_num >= 3) {
+        // I2C уже должен быть инициализирован к шагу 3
+        ESP_LOGI(TAG, "   OLED not ready, calling init_step_display_start()...");
+        init_step_display_start();
+        ESP_LOGI(TAG, "   After init_step_display_start(): s_init_display_ready = %d", s_init_display_ready);
+    }
+
+    if (!s_init_display_ready) {
+        // OLED еще не готов, просто логируем
+        ESP_LOGI(TAG, "   ⚠️ OLED not ready, skipping display update");
+        return;
+    }
+
+    s_current_step_number = step_num;
+    if (step_text) {
+        strncpy(s_current_step_text, step_text, sizeof(s_current_step_text) - 1);
+        s_current_step_text[sizeof(s_current_step_text) - 1] = '\0';
+    } else {
+        s_current_step_text[0] = '\0';
+    }
+    ESP_LOGI(TAG, "   Step info: num=%d, text='%s'", s_current_step_number, s_current_step_text);
+
+    // Запускаем анимацию, если еще не запущена
+    if (!s_init_step_animation_active) {
+        ESP_LOGI(TAG, "   Starting animation task...");
+        s_init_step_animation_active = true;
+        if (xTaskCreate(init_step_animation_task, "init_step_anim", 2048, NULL, 4, &s_init_step_animation_task) != pdPASS) {
+            ESP_LOGE(TAG, "   ❌ Не удалось создать задачу анимации шагов");
+            s_init_step_animation_task = NULL;
+            s_init_step_animation_active = false;
+        } else {
+            ESP_LOGI(TAG, "   ✅ Animation task created");
+        }
+    } else {
+        ESP_LOGI(TAG, "   Animation task already active");
+    }
+}
+
+static void stop_init_step_animation(void)
+{
+    ESP_LOGI(TAG, "🔵 [OLED_ANIM] stop_init_step_animation() called");
+    ESP_LOGI(TAG, "   s_init_step_animation_active = %d", s_init_step_animation_active);
+    ESP_LOGI(TAG, "   s_init_step_animation_task = %p", s_init_step_animation_task);
+    ESP_LOGI(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    
+    s_init_step_animation_active = false;
+    int wait_count = 0;
+    while (s_init_step_animation_task != NULL && wait_count < 100) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+        wait_count++;
+    }
+    
+    if (s_init_step_animation_task != NULL) {
+        ESP_LOGW(TAG, "   ⚠️ Animation task still exists after wait");
+    } else {
+        ESP_LOGI(TAG, "   ✅ Animation task stopped");
+    }
+    ESP_LOGI(TAG, "   ⚠️ OLED remains initialized (s_init_display_ready = %d)", s_init_display_ready);
+}
+
+static void init_step_display_deinit(void)
+{
+    ESP_LOGW(TAG, "🔴 [OLED_DEINIT] init_step_display_deinit() called!");
+    ESP_LOGW(TAG, "   s_init_display_ready = %d", s_init_display_ready);
+    ESP_LOGW(TAG, "   ⚠️ WARNING: This will shutdown OLED!");
+    
+    if (!s_init_display_ready) {
+        ESP_LOGI(TAG, "   OLED not initialized, skipping");
+        return;
+    }
+
+    stop_init_step_animation();
+    ESP_LOGI(TAG, "   Calling oled_display_shutdown()...");
+    oled_display_shutdown();
+    s_init_display_ready = false;
+    ESP_LOGW(TAG, "   ❌ OLED shutdown completed, s_init_display_ready = false");
+}
+
+static void setup_step_animation_task(void *arg)
+{
+    (void)arg;
+    int dot_count = 0;
+    char dots_buf[8] = {0};
+
+    while (s_setup_step_animation_active) {
+        // Формируем строку с точками: "", ".", "..", "..."
+        memset(dots_buf, 0, sizeof(dots_buf));
+        for (int i = 0; i < dot_count; i++) {
+            dots_buf[i] = '.';
+        }
+        dots_buf[dot_count] = '\0';
+
+        // Обновляем отображение
+        if (s_setup_display_ready) {
+            char step_num_str[8];
+            snprintf(step_num_str, sizeof(step_num_str), "%d", s_setup_current_step_number);
+
+            oled_display_set_template(0, "SETUP MODE");
+            oled_display_set_template(1, "Step {step_num}/6");
+            oled_display_set_template(2, "{step_text}");
+            oled_display_set_template(3, "{dots}");
+
+            oled_display_kv_t values[] = {
+                {.key = "step_num", .value = step_num_str},
+                {.key = "step_text", .value = s_setup_current_step_text},
+                {.key = "dots", .value = dots_buf},
+            };
+            oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
+        }
+
+        dot_count = (dot_count + 1) % 4; // 0, 1, 2, 3 -> "", ".", "..", "..."
+        vTaskDelay(pdMS_TO_TICKS(SETUP_STEP_ANIMATION_INTERVAL_MS));
+    }
+
+    s_setup_step_animation_task = NULL;
+    vTaskDelete(NULL);
+}
+
+static void show_setup_step(int step_num, const char *step_text)
+{
+    if (!s_setup_display_ready) {
+        // OLED еще не готов, просто логируем
+        return;
+    }
+
+    s_setup_current_step_number = step_num;
+    if (step_text) {
+        strncpy(s_setup_current_step_text, step_text, sizeof(s_setup_current_step_text) - 1);
+        s_setup_current_step_text[sizeof(s_setup_current_step_text) - 1] = '\0';
+    } else {
+        s_setup_current_step_text[0] = '\0';
+    }
+
+    // Запускаем анимацию, если еще не запущена
+    if (!s_setup_step_animation_active) {
+        s_setup_step_animation_active = true;
+        if (xTaskCreate(setup_step_animation_task, "setup_step_anim", 2048, NULL, 4, &s_setup_step_animation_task) != pdPASS) {
+            ESP_LOGE(TAG, "Не удалось создать задачу анимации шагов setup");
+            s_setup_step_animation_task = NULL;
+            s_setup_step_animation_active = false;
+        }
+    }
+}
+
+static void stop_setup_step_animation(void)
+{
+    s_setup_step_animation_active = false;
+    while (s_setup_step_animation_task != NULL) {
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
@@ -400,6 +691,7 @@ static void setup_display_deinit(void)
         return;
     }
 
+    stop_setup_step_animation();
     oled_display_shutdown();
     s_setup_display_ready = false;
 }
@@ -427,15 +719,21 @@ static void run_setup_mode(void)
     memset(s_setup_pin, 0, sizeof(s_setup_pin));
     memset(s_setup_mesh_id, 0, sizeof(s_setup_mesh_id));
     s_setup_config_received = false;
+    
+    // [Step 1/6] Генерация PIN
+    ESP_LOGI(TAG, "[Step 1/6] Generating PIN...");
     node_config_generate_setup_pin(s_setup_pin, sizeof(s_setup_pin));
-
     ESP_LOGI(TAG, "Setup PIN: %s", s_setup_pin);
-    ESP_LOGI(TAG, "Ищем временную mesh сеть с префиксом %s", SETUP_MESH_PREFIX);
-
+    
+    // [Step 2/6] Инициализация дисплея
+    ESP_LOGI(TAG, "[Step 2/6] Initializing display...");
     setup_display_init(s_setup_pin);
-    setup_status_animation_start(s_setup_status_scanning_frames,
-                                 sizeof(s_setup_status_scanning_frames) / sizeof(s_setup_status_scanning_frames[0]),
-                                 "SEARCHING");
+    show_setup_step(2, "Display init");
+    
+    // [Step 3/6] Поиск mesh сети
+    ESP_LOGI(TAG, "[Step 3/6] Scanning for mesh network...");
+    ESP_LOGI(TAG, "Ищем временную mesh сеть с префиксом %s", SETUP_MESH_PREFIX);
+    show_setup_step(3, "Scanning mesh");
 
     esp_err_t scan_err;
     uint32_t attempt = 0;
@@ -449,10 +747,13 @@ static void run_setup_mode(void)
         }
     } while (scan_err != ESP_OK);
 
-    setup_status_animation_stop();
+    stop_setup_step_animation();
     ESP_LOGI(TAG, "Найдена сеть: %s (channel=%u)", s_setup_mesh_id, s_setup_mesh_channel);
-    setup_display_update(s_setup_pin, s_setup_mesh_id, "Connecting...");
-
+    
+    // [Step 4/6] Подключение к mesh
+    ESP_LOGI(TAG, "[Step 4/6] Connecting to mesh...");
+    show_setup_step(4, "Connecting");
+    
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_NODE,
         .mesh_password = MESH_NETWORK_PASSWORD,
@@ -465,28 +766,59 @@ static void run_setup_mode(void)
     memcpy(mesh_config.mesh_id, s_setup_mesh_id_bytes, sizeof(mesh_config.mesh_id));
     mesh_config.mesh_id_str = s_setup_mesh_id;
 
+    ESP_LOGI(TAG, "🔵 [SETUP] Initializing mesh manager...");
+    ESP_LOGI(TAG, "   Mode: NODE");
+    ESP_LOGI(TAG, "   Mesh ID (hex): %02X:%02X:%02X:%02X:%02X:%02X",
+             mesh_config.mesh_id[0], mesh_config.mesh_id[1], mesh_config.mesh_id[2],
+             mesh_config.mesh_id[3], mesh_config.mesh_id[4], mesh_config.mesh_id[5]);
+    ESP_LOGI(TAG, "   Mesh ID (str): %s", mesh_config.mesh_id_str);
+    ESP_LOGI(TAG, "   Channel: %d", mesh_config.channel);
+    
     ESP_ERROR_CHECK(mesh_manager_init(&mesh_config));
     mesh_manager_register_recv_cb(on_mesh_data_received);
+    
+    ESP_LOGI(TAG, "🔵 [SETUP] Starting mesh...");
     ESP_ERROR_CHECK(mesh_manager_start());
+    
+    stop_setup_step_animation();
 
+    ESP_LOGI(TAG, "🔵 [SETUP] Waiting for mesh connection (max 20s)...");
     const int max_wait_ms = 20000;
     int waited_ms = 0;
     while (!mesh_manager_is_connected() && waited_ms < max_wait_ms) {
         vTaskDelay(pdMS_TO_TICKS(500));
         waited_ms += 500;
+        if (waited_ms % 5000 == 0) {
+            ESP_LOGI(TAG, "   Still waiting... (%d/%d ms)", waited_ms, max_wait_ms);
+            bool is_root = esp_mesh_is_root();
+            int total_nodes = esp_mesh_get_total_node_num();
+            ESP_LOGI(TAG, "   Mesh state: is_root=%d, total_nodes=%d", is_root, total_nodes);
+        }
     }
 
     if (!mesh_manager_is_connected()) {
-        ESP_LOGW(TAG, "Не удалось подключиться к mesh %s, продолжаем попытки отправки discovery", s_setup_mesh_id);
+        ESP_LOGW(TAG, "⚠️ [SETUP] Не удалось подключиться к mesh %s за %d ms, продолжаем попытки отправки discovery", 
+                 s_setup_mesh_id, waited_ms);
+        bool is_root = esp_mesh_is_root();
+        int total_nodes = esp_mesh_get_total_node_num();
+        ESP_LOGW(TAG, "   Current mesh state: is_root=%d, total_nodes=%d", is_root, total_nodes);
+    } else {
+        ESP_LOGI(TAG, "✅ [SETUP] Mesh connected! (waited %d ms)", waited_ms);
     }
 
+    // [Step 5/6] Отправка discovery
+    ESP_LOGI(TAG, "[Step 5/6] Sending discovery...");
+    show_setup_step(5, "Sending discovery");
+    
     if (send_setup_message("discovery", s_setup_pin, s_setup_mesh_id) != ESP_OK) {
         ESP_LOGW(TAG, "Не удалось отправить discovery сообщение в mesh");
+        stop_setup_step_animation();
         setup_display_update(s_setup_pin, s_setup_mesh_id, "Discovery failed");
     } else {
-        setup_status_animation_start(s_setup_status_waiting_frames,
-                                     sizeof(s_setup_status_waiting_frames) / sizeof(s_setup_status_waiting_frames[0]),
-                                     s_setup_mesh_id);
+        stop_setup_step_animation();
+        // [Step 6/6] Ожидание конфигурации
+        ESP_LOGI(TAG, "[Step 6/6] Waiting for config...");
+        show_setup_step(6, "Await config");
     }
 
     s_setup_active = true;
@@ -507,19 +839,51 @@ static void run_setup_mode(void)
         s_setup_config_sem = NULL;
     }
 
-    setup_status_animation_stop();
+    stop_setup_step_animation();
 
     s_setup_active = false;
     if (s_setup_heartbeat_task) {
-        // Ждём завершения задачи heartbeat
-        while (eTaskGetState(s_setup_heartbeat_task) != eDeleted) {
-            vTaskDelay(pdMS_TO_TICKS(50));
+        // Останавливаем задачу heartbeat
+        // ВАЖНО: Проверяем валидность handle перед вызовом eTaskGetState
+        TaskHandle_t task_handle = s_setup_heartbeat_task;
+        s_setup_heartbeat_task = NULL;  // Сбрасываем указатель сразу
+        
+        // Проверяем, что задача еще существует и не удалена
+        if (task_handle != NULL) {
+            eTaskState state = eTaskGetState(task_handle);
+            if (state != eDeleted && state != eInvalid) {
+                // Ждём завершения задачи (максимум 2 секунды)
+                int wait_count = 0;
+                while (wait_count < 40) {  // 40 * 50ms = 2000ms
+                    state = eTaskGetState(task_handle);
+                    if (state == eDeleted || state == eInvalid) {
+                        break;
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    wait_count++;
+                }
+                // Если задача все еще не удалена, удаляем принудительно
+                if (state != eDeleted && state != eInvalid) {
+                    vTaskDelete(task_handle);
+                }
+            }
         }
-        s_setup_heartbeat_task = NULL;
     }
 
     ESP_LOGI(TAG, "Конфигурация получена. Перезапуск устройства...");
-    setup_display_update(s_setup_pin, s_setup_mesh_id, "Config received!");
+    stop_setup_step_animation();
+    
+    // Показываем финальное сообщение
+    if (s_setup_display_ready) {
+        oled_display_set_template(0, "SETUP MODE");
+        oled_display_set_template(1, "Config received!");
+        oled_display_set_template(2, "Restarting...");
+        oled_display_set_template(3, "");
+        
+        oled_display_kv_t values[] = {};
+        oled_display_queue_render(values, 0, 0);
+    }
+    
     vTaskDelay(pdMS_TO_TICKS(2000));
 
     mesh_manager_stop();
@@ -550,59 +914,22 @@ static void setup_heartbeat_task(void *arg)
     vTaskDelete(NULL);
 }
 
-static void setup_status_animation_task(void *arg)
+static void config_received_restart_task(void *arg)
 {
     (void)arg;
-    size_t frame_index = 0;
-
-    while (s_setup_status_animation_active) {
-        if (s_active_status_frames && s_active_status_frame_count > 0) {
-            const char *mesh = s_active_status_mesh ? s_active_status_mesh : s_setup_mesh_id;
-            setup_display_update(s_setup_pin, mesh, s_active_status_frames[frame_index]);
-            frame_index = (frame_index + 1) % s_active_status_frame_count;
-        }
-        vTaskDelay(pdMS_TO_TICKS(SETUP_STATUS_ANIMATION_INTERVAL_MS));
+    vTaskDelay(pdMS_TO_TICKS(1000));  // Даем 1 секунду на отправку confirmation
+    
+    ESP_LOGI(TAG, "🔄 Перезагружаемся для применения конфигурации...");
+    
+    // Останавливаем mesh и дисплей
+    mesh_manager_stop();
+    if (s_setup_display_ready) {
+        stop_setup_step_animation();
+        setup_display_deinit();
     }
-
-    s_setup_status_task = NULL;
-    vTaskDelete(NULL);
-}
-
-static void setup_status_animation_start(const char (*frames)[SETUP_STATUS_FRAME_MAX_LEN], size_t frame_count, const char *mesh)
-{
-    if (!frames || frame_count == 0) {
-        return;
-    }
-
-    setup_status_animation_stop();
-
-    s_active_status_frames = frames;
-    s_active_status_frame_count = frame_count;
-    s_active_status_mesh = mesh;
-    s_setup_status_animation_active = true;
-    if (xTaskCreate(setup_status_animation_task, "setup_status_anim", 2048, NULL, 4, &s_setup_status_task) != pdPASS) {
-        ESP_LOGE(TAG, "Не удалось создать задачу анимации статуса");
-        s_setup_status_task = NULL;
-        s_setup_status_animation_active = false;
-        s_active_status_frames = NULL;
-        s_active_status_frame_count = 0;
-        s_active_status_mesh = NULL;
-    } else if (frames && frame_count > 0) {
-        // Отобразить первый кадр сразу
-        const char *initial_mesh = mesh ? mesh : s_setup_mesh_id;
-        setup_display_update(s_setup_pin, initial_mesh, frames[0]);
-    }
-}
-
-static void setup_status_animation_stop(void)
-{
-    s_setup_status_animation_active = false;
-    while (s_setup_status_task != NULL) {
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-    s_active_status_frames = NULL;
-    s_active_status_frame_count = 0;
-    s_active_status_mesh = NULL;
+    
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
 }
 
 static esp_err_t scan_for_setup_mesh(char *mesh_id_out, size_t mesh_id_len, uint8_t *channel_out)
@@ -863,13 +1190,47 @@ static esp_err_t send_setup_message(const char *type, const char *pin, const cha
         return ESP_ERR_NO_MEM;
     }
 
-    if (!mesh_manager_is_connected()) {
-        ESP_LOGW(TAG, "Mesh не подключён, отправка %s может не пройти", type);
-    }
-
-    esp_err_t err = mesh_manager_send_to_root((const uint8_t *)payload, strlen(payload));
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "mesh_manager_send_to_root(%s) failed: %s", type, esp_err_to_name(err));
+    // В setup режиме mesh может быть запущен, но еще не подключен к родителю
+    // Попробуем отправить сообщение напрямую через esp_mesh_send
+    esp_err_t err;
+    bool is_connected = mesh_manager_is_connected();
+    bool is_root = esp_mesh_is_root();
+    int total_nodes = esp_mesh_get_total_node_num();
+    
+    ESP_LOGI(TAG, "📤 [SETUP_SEND] Preparing to send %s message:", type);
+    ESP_LOGI(TAG, "   Mesh connected: %d", is_connected);
+    ESP_LOGI(TAG, "   Is root: %d", is_root);
+    ESP_LOGI(TAG, "   Total nodes: %d", total_nodes);
+    ESP_LOGI(TAG, "   Payload length: %d", (int)strlen(payload));
+    
+    if (!is_connected && s_is_setup_mode) {
+        // В setup режиме отправляем напрямую через esp_mesh_send (TODS - к ROOT)
+        ESP_LOGI(TAG, "   → Using direct esp_mesh_send (setup mode, not connected)");
+        mesh_data_t mesh_data;
+        mesh_data.data = (uint8_t *)payload;
+        mesh_data.size = strlen(payload);
+        mesh_data.proto = MESH_PROTO_BIN;
+        mesh_data.tos = MESH_TOS_P2P;
+        
+        mesh_addr_t addr;
+        memset(&addr, 0, sizeof(addr));
+        err = esp_mesh_send(&addr, &mesh_data, MESH_DATA_TODS, NULL, 0);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "   ❌ esp_mesh_send(%s) в setup режиме failed: %s", type, esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "   ✅ Discovery отправлен через esp_mesh_send (setup режим)");
+        }
+    } else {
+        if (!is_connected) {
+            ESP_LOGW(TAG, "   ⚠️ Mesh не подключён, отправка %s может не пройти", type);
+        }
+        ESP_LOGI(TAG, "   → Using mesh_manager_send_to_root");
+        err = mesh_manager_send_to_root((const uint8_t *)payload, strlen(payload));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "   ❌ mesh_manager_send_to_root(%s) failed: %s", type, esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "   ✅ mesh_manager_send_to_root(%s) success", type);
+        }
     }
 
     free(payload);
@@ -986,8 +1347,25 @@ static esp_err_t handle_write_config_command(cJSON *params)
         return err;
     }
 
+    // Устанавливаем флаги для остановки setup режима
+    s_setup_config_received = true;
     s_is_setup_mode = false;
+    s_setup_active = false;  // Останавливаем задачу heartbeat
+    
+    ESP_LOGI(TAG, "✅ Конфигурация сохранена. Отправляем confirmation и перезагружаемся...");
+    
+    // Отправляем confirmation (если mesh еще подключен)
     send_setup_config_confirmation();
+    
+    // Даем семафор, чтобы разблокировать run_setup_mode()
+    if (s_setup_config_sem) {
+        xSemaphoreGive(s_setup_config_sem);
+    }
+    
+    // Создаем задачу для перезагрузки с небольшой задержкой
+    // чтобы дать время отправить confirmation
+    xTaskCreate(config_received_restart_task, "restart_task", 4096, NULL, 5, NULL);
+    
     return ESP_OK;
 }
 
@@ -1183,11 +1561,8 @@ static void on_mesh_data_received(const uint8_t *src, const uint8_t *data, size_
                 if (!params) {
                     params = msg.data;
                 }
-                if (handle_write_config_command(params) == ESP_OK) {
-                    if (s_setup_config_sem) {
-                        xSemaphoreGive(s_setup_config_sem);
-                    }
-                }
+                // handle_write_config_command сам даст семафор и установит флаги
+                handle_write_config_command(params);
                 mesh_protocol_free_message(&msg);
                 free(data_copy);
                 return;

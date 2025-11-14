@@ -150,8 +150,13 @@ esp_err_t ph_manager_init(ph_node_config_t *config) {
     ESP_LOGI(TAG, "Zone context: mesh_id=%s, root_id=%s",
              s_mesh_network_id, s_root_node_id);
 
+    ESP_LOGI(TAG, "🔵 [PH_OLED] Calling ph_display_init_once() from ph_manager_init()...");
     ph_display_init_once();
+    ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_init_once() returned, s_display_ready = %d", s_display_ready);
+    
+    ESP_LOGI(TAG, "🔵 [PH_OLED] Calling ph_display_update() from ph_manager_init()...");
     ph_display_update(s_current_ph, mesh_manager_is_connected(), mesh_manager_is_connected() ? get_rssi_to_parent() : 0);
+    ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_update() returned");
     
     return ESP_OK;
 }
@@ -628,10 +633,17 @@ static void control_ph(void) {
 
 static void ph_display_init_once(void)
 {
+    ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_init_once() called");
+    ESP_LOGI(TAG, "   s_display_ready = %d", s_display_ready);
+    
     if (s_display_ready) {
+        ESP_LOGI(TAG, "   OLED already ready in ph_manager, skipping");
         return;
     }
 
+    ESP_LOGI(TAG, "   Configuring OLED: I2C port=%d, SDA=%d, SCL=%d, addr=0x%02X",
+             PH_OLED_I2C_PORT, PH_OLED_SDA_PIN, PH_OLED_SCL_PIN, PH_OLED_I2C_ADDR);
+    
     const oled_display_config_t cfg = {
         .i2c_port = PH_OLED_I2C_PORT,
         .sda_pin = PH_OLED_SDA_PIN,
@@ -643,11 +655,18 @@ static void ph_display_init_once(void)
         .line_count = 4,
     };
 
-    if (oled_display_init(&cfg) != ESP_OK) {
-        ESP_LOGW(TAG, "OLED init failed");
+    // Пытаемся инициализировать OLED (может быть уже инициализирован в app_main)
+    // oled_display_init() вернет ESP_OK если OLED уже инициализирован
+    ESP_LOGI(TAG, "   Calling oled_display_init()...");
+    esp_err_t init_err = oled_display_init(&cfg);
+    ESP_LOGI(TAG, "   oled_display_init() returned: %s (0x%x)", esp_err_to_name(init_err), init_err);
+    if (init_err != ESP_OK) {
+        ESP_LOGE(TAG, "   ❌ OLED init failed: %s (0x%x)", esp_err_to_name(init_err), init_err);
         return;
     }
+    ESP_LOGI(TAG, "   ✅ OLED init OK (may be already initialized)");
 
+    // Проверяем, запущена ли уже задача (OLED мог быть инициализирован в app_main)
     const oled_display_task_config_t task_cfg = {
         .stack_size = 4096,
         .priority = 4,
@@ -655,23 +674,45 @@ static void ph_display_init_once(void)
         .heartbeat_timeout_ticks = pdMS_TO_TICKS(1500),
     };
 
-    if (oled_display_start_task(&task_cfg) != ESP_OK) {
-        ESP_LOGW(TAG, "OLED task start failed");
-        return;
+    // Пытаемся запустить задачу (если уже запущена, вернет ESP_OK)
+    ESP_LOGI(TAG, "   Calling oled_display_start_task()...");
+    esp_err_t task_err = oled_display_start_task(&task_cfg);
+    ESP_LOGI(TAG, "   oled_display_start_task() returned: %s (0x%x)", esp_err_to_name(task_err), task_err);
+    if (task_err != ESP_OK) {
+        // Если задача не запустилась, но OLED инициализирован, все равно продолжаем
+        // (задача могла быть запущена в app_main)
+        ESP_LOGI(TAG, "   ⚠️ Task start returned error (may be already running), continuing...");
+    } else {
+        ESP_LOGI(TAG, "   ✅ Task start OK");
     }
 
+    // Устанавливаем шаблоны для нормального режима работы
+    // Это должно работать даже если OLED был инициализирован в app_main
+    ESP_LOGI(TAG, "   Setting templates for normal mode...");
     oled_display_set_template(0, "{node} {zone}");
     oled_display_set_template(1, "pH {ph} -> {target}");
     oled_display_set_template(2, "Pump {pump_up}/{pump_down}ml");
     oled_display_set_template(3, "{mode} Mesh {mesh} {rssi}");
+    ESP_LOGI(TAG, "   ✅ Templates set");
 
+    // Помечаем дисплей как готовый (OLED инициализирован и шаблоны установлены)
     s_display_ready = true;
+    ESP_LOGI(TAG, "   ✅ s_display_ready = true");
+    ESP_LOGI(TAG, "   ✅ OLED display ready for ph_manager");
+    
+    // Обновляем дисплей с текущими данными
+    ESP_LOGI(TAG, "   Calling ph_display_update() with ph=%.2f, mesh=%d",
+             s_current_ph, mesh_manager_is_connected());
     ph_display_update(s_current_ph, mesh_manager_is_connected(), mesh_manager_is_connected() ? get_rssi_to_parent() : 0);
+    ESP_LOGI(TAG, "   ✅ ph_display_update() completed");
+    ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_init_once() completed successfully");
 }
 
 static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
 {
     if (!s_display_ready) {
+        ESP_LOGW(TAG, "🔵 [PH_OLED] ph_display_update() called but s_display_ready = false");
+        ESP_LOGW(TAG, "   ph=%.2f, mesh=%d, rssi=%d", ph_value, mesh_connected, rssi);
         return;
     }
 
@@ -716,12 +757,24 @@ static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
         {.key = "rssi", .value = rssi_str},
     };
 
+    // Логируем только первые несколько раз и при ошибках, чтобы не засорять логи
+    static int update_count = 0;
+    update_count++;
+    if (update_count <= 3) {
+        ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_update() #%d: ph=%.2f, target=%.2f, mesh=%s, mode=%s",
+                 update_count, ph_value, target, mesh_str, mode_str);
+    }
+    
     esp_err_t err = oled_display_queue_render(values,
                                               sizeof(values) / sizeof(values[0]),
                                               0);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "OLED render failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "🔵 [PH_OLED] ph_display_update() #%d: ❌ OLED render failed: %s (0x%x)",
+                 update_count, esp_err_to_name(err), err);
         return;
+    }
+    if (update_count <= 3) {
+        ESP_LOGI(TAG, "   ✅ OLED render queued successfully");
     }
 
     s_display_last_ph = ph_value;
@@ -735,12 +788,17 @@ static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
 
 static void ph_display_show_state(bool mesh_connected)
 {
+    ESP_LOGI(TAG, "🔵 [PH_OLED] ph_display_show_state() called: mesh=%d, s_display_ready=%d",
+             mesh_connected, s_display_ready);
+    
     if (!s_display_ready) {
+        ESP_LOGW(TAG, "   ⚠️ Display not ready, skipping");
         return;
     }
 
     float ph_value = s_display_has_data ? s_display_last_ph : s_current_ph;
     int8_t rssi = mesh_connected ? get_rssi_to_parent() : s_display_last_rssi;
+    ESP_LOGI(TAG, "   Calling ph_display_update(ph=%.2f, mesh=%d, rssi=%d)", ph_value, mesh_connected, rssi);
 
     ph_display_update(ph_value, mesh_connected, rssi);
 }

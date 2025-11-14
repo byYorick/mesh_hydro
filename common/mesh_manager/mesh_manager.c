@@ -111,8 +111,17 @@ esp_err_t mesh_manager_init(const mesh_manager_config_t *config) {
     // Таймаут ассоциации увеличен для устойчивого pairing
     ESP_ERROR_CHECK(esp_mesh_set_ap_assoc_expire(120));
 
-    // Отключаем авто-самоорганизацию — корень фиксирован вне pairing
-    ESP_ERROR_CHECK(esp_mesh_set_self_organized(false, false));
+    // Настройка self-organizing в зависимости от режима:
+    // ROOT: отключаем self-organizing (корень фиксирован)
+    // NODE: включаем self-organizing (нужно найти и подключиться к ROOT)
+    if (config->mode == MESH_MODE_ROOT) {
+        ESP_ERROR_CHECK(esp_mesh_set_self_organized(false, false));
+        ESP_LOGI(TAG, "Self-organizing disabled for ROOT (fixed root)");
+    } else {
+        // NODE: включаем self-organizing с reconnect, чтобы найти родителя
+        ESP_ERROR_CHECK(esp_mesh_set_self_organized(true, true));
+        ESP_LOGI(TAG, "Self-organizing enabled for NODE (will find parent)");
+    }
 
     ESP_LOGI(TAG, "Mesh manager initialized (mode: %s)", 
              config->mode == MESH_MODE_ROOT ? "ROOT" : "NODE");
@@ -206,18 +215,24 @@ esp_err_t mesh_manager_start(void) {
 
     // Логирование Mesh AP конфигурации (для ROOT)
     if (s_config.mode == MESH_MODE_ROOT) {
-        ESP_LOGI(TAG, "ROOT Mesh AP configuration:");
-        ESP_LOGI(TAG, "  Mesh ID: %02X:%02X:%02X:%02X:%02X:%02X",
+        ESP_LOGI(TAG, "🔵 [MESH_START] ROOT Mesh AP configuration:");
+        ESP_LOGI(TAG, "   Mesh ID (hex): %02X:%02X:%02X:%02X:%02X:%02X",
                  cfg.mesh_id.addr[0], cfg.mesh_id.addr[1], cfg.mesh_id.addr[2],
                  cfg.mesh_id.addr[3], cfg.mesh_id.addr[4], cfg.mesh_id.addr[5]);
         if (s_config.mesh_id_str && s_config.mesh_id_str[0] != '\0') {
-            ESP_LOGI(TAG, "  Mesh SSID: %s", s_config.mesh_id_str);
+            ESP_LOGI(TAG, "   Mesh SSID: %s", s_config.mesh_id_str);
         }
-        ESP_LOGI(TAG, "  Password: %s", 
+        ESP_LOGI(TAG, "   Password: %s", 
                  (s_config.mesh_password && strlen(s_config.mesh_password) > 0) ? "***" : "OPEN");
-        ESP_LOGI(TAG, "  Max connections: %d", cfg.mesh_ap.max_connection);
-        ESP_LOGI(TAG, "  Channel: %d (0=auto)", cfg.channel);
-        ESP_LOGI(TAG, "  Upstream router: %s", router_provided ? s_config.router_ssid : "not configured");
+        ESP_LOGI(TAG, "   Max connections: %d", cfg.mesh_ap.max_connection);
+        ESP_LOGI(TAG, "   Channel: %d (0=auto)", cfg.channel);
+        ESP_LOGI(TAG, "   Upstream router: %s", router_provided ? s_config.router_ssid : "not configured (isolated mode)");
+        ESP_LOGI(TAG, "   Router password: %s", router_provided && s_config.router_password ? "***" : "N/A");
+    } else {
+        ESP_LOGI(TAG, "🔵 [MESH_START] NODE configuration:");
+        ESP_LOGI(TAG, "   Mesh SSID: %.*s", cfg.router.ssid_len, cfg.router.ssid);
+        ESP_LOGI(TAG, "   Mesh password: %s", strlen(s_config.mesh_password) > 0 ? "***" : "OPEN");
+        ESP_LOGI(TAG, "   Channel: %d", cfg.channel);
     }
 
     // Применение конфигурации с router credentials
@@ -226,12 +241,15 @@ esp_err_t mesh_manager_start(void) {
     // Для NODE тип устанавливается автоматически (MESH_NODE - дефолт)
     // esp_mesh_set_type() вызывается только для ROOT (выше)
     
-    // NODE: Никаких дополнительных настроек не требуется!
-    // ROOT зафиксирован через esp_mesh_fix_root(true), поэтому NODE не может стать ROOT
-    // Self-organizing включен по умолчанию, NODE автоматически найдёт и подключится к mesh AP
-
     // Запуск mesh
     ESP_ERROR_CHECK(esp_mesh_start());
+    
+    // ВАЖНО: Для NODE нужно включить self-organizing ПОСЛЕ esp_mesh_start()
+    // чтобы узел мог найти и подключиться к родителю
+    if (s_config.mode == MESH_MODE_NODE) {
+        ESP_ERROR_CHECK(esp_mesh_set_self_organized(true, true));
+        ESP_LOGI(TAG, "✅ Self-organizing enabled for NODE after mesh_start (will search for parent)");
+    }
 
     // Запуск задачи приема данных (увеличен stack в 4 раза для безопасности: 4096 → 16384)
     xTaskCreate(mesh_recv_task, "mesh_recv", 16384, NULL, 5, NULL);
@@ -321,7 +339,7 @@ esp_err_t mesh_manager_configure_softap(const char *ssid,
 
 esp_err_t mesh_manager_send(const uint8_t *dest_addr, const uint8_t *data, size_t len) {
     if (!s_is_mesh_connected) {
-        ESP_LOGW(TAG, "Mesh not connected, cannot send");
+        ESP_LOGW(TAG, "📤 [MESH_SEND] Mesh not connected, cannot send (len=%d)", len);
         return ESP_ERR_MESH_NOT_START;
     }
 
@@ -338,16 +356,26 @@ esp_err_t mesh_manager_send(const uint8_t *dest_addr, const uint8_t *data, size_
         // Отправка на ROOT (TODS - To Distribution System)
         memset(&addr, 0, sizeof(addr));
         flag = MESH_DATA_TODS;  // ← Флаг для отправки к ROOT
+        ESP_LOGI(TAG, "📤 [MESH_SEND] Sending to ROOT (TODS): %d bytes", len);
     } else {
         // Отправка конкретному узлу (P2P)
         memcpy(addr.addr, dest_addr, 6);
         flag = MESH_DATA_P2P;   // ← Флаг для P2P
+        ESP_LOGI(TAG, "📤 [MESH_SEND] Sending P2P to " MACSTR ": %d bytes", MAC2STR(addr.addr), len);
+    }
+
+    if (len < 100) {
+        char preview[101] = {0};
+        memcpy(preview, data, len > 100 ? 100 : len);
+        ESP_LOGI(TAG, "   Preview: %s", preview);
     }
 
     esp_err_t err = esp_mesh_send(&addr, &mesh_data, flag, NULL, 0);
     
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Mesh send failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "❌ [MESH_SEND] Failed: %s (flag=%d, len=%d)", esp_err_to_name(err), flag, len);
+    } else {
+        ESP_LOGI(TAG, "✅ [MESH_SEND] Success");
     }
 
     return err;
@@ -476,23 +504,49 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
 static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     mesh_event_id_t event = (mesh_event_id_t)event_id;
 
+    ESP_LOGI(TAG, "🔵 [MESH_EVENT] Event ID: %d (%s), mode=%s", 
+             event, 
+             event == MESH_EVENT_STARTED ? "STARTED" :
+             event == MESH_EVENT_STOPPED ? "STOPPED" :
+             event == MESH_EVENT_PARENT_CONNECTED ? "PARENT_CONNECTED" :
+             event == MESH_EVENT_PARENT_DISCONNECTED ? "PARENT_DISCONNECTED" :
+             event == MESH_EVENT_ROOT_FIXED ? "ROOT_FIXED" :
+             event == MESH_EVENT_CHILD_CONNECTED ? "CHILD_CONNECTED" :
+             event == MESH_EVENT_CHILD_DISCONNECTED ? "CHILD_DISCONNECTED" :
+             event == MESH_EVENT_NO_PARENT_FOUND ? "NO_PARENT_FOUND" :
+             event == MESH_EVENT_NETWORK_STATE ? "NETWORK_STATE" : "UNKNOWN",
+             s_config.mode == MESH_MODE_ROOT ? "ROOT" : "NODE");
+
     switch (event) {
         case MESH_EVENT_STARTED:
-            ESP_LOGI(TAG, "Mesh started");
+            ESP_LOGI(TAG, "✅ [MESH_EVENT] Mesh started (mode=%s, channel=%d, mesh_id=%02X:%02X:%02X:%02X:%02X:%02X)",
+                     s_config.mode == MESH_MODE_ROOT ? "ROOT" : "NODE",
+                     s_config.channel,
+                     s_config.mesh_id[0], s_config.mesh_id[1], s_config.mesh_id[2],
+                     s_config.mesh_id[3], s_config.mesh_id[4], s_config.mesh_id[5]);
+            if (s_config.mode == MESH_MODE_ROOT) {
+                bool is_root = esp_mesh_is_root();
+                ESP_LOGI(TAG, "   ROOT status: is_root=%d", is_root);
+            }
             break;
 
         case MESH_EVENT_STOPPED:
-            ESP_LOGI(TAG, "Mesh stopped");
+            ESP_LOGI(TAG, "🛑 [MESH_EVENT] Mesh stopped");
             s_is_mesh_connected = false;
             break;
 
         case MESH_EVENT_PARENT_CONNECTED: {
             mesh_event_connected_t *connected = (mesh_event_connected_t *)event_data;
             ESP_LOGI(TAG, "========================================");
-            ESP_LOGI(TAG, "✓ MESH Parent connected!");
+            ESP_LOGI(TAG, "✅ [MESH_EVENT] MESH Parent connected!");
             ESP_LOGI(TAG, "  Layer: %d", connected->self_layer);
-            ESP_LOGI(TAG, "  Parent BSSID: %02x:%02x:%02x:%02x:%02x:%02x",
-                     MAC2STR(connected->connected.bssid));
+            ESP_LOGI(TAG, "  Parent BSSID: " MACSTR, MAC2STR(connected->connected.bssid));
+            ESP_LOGI(TAG, "  Parent SSID: %.*s", connected->connected.ssid_len, connected->connected.ssid);
+            ESP_LOGI(TAG, "  Current mesh_id: %02X:%02X:%02X:%02X:%02X:%02X",
+                     s_config.mesh_id[0], s_config.mesh_id[1], s_config.mesh_id[2],
+                     s_config.mesh_id[3], s_config.mesh_id[4], s_config.mesh_id[5]);
+            bool is_root = esp_mesh_is_root();
+            ESP_LOGI(TAG, "  Is root: %d", is_root);
             ESP_LOGI(TAG, "========================================");
             s_is_mesh_connected = true;
             
@@ -515,12 +569,14 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         case MESH_EVENT_PARENT_DISCONNECTED:
             if (event_data) {
                 mesh_event_disconnected_t *disconnected = (mesh_event_disconnected_t *)event_data;
-                ESP_LOGW(TAG,
-                         "Parent disconnected: reason=%d rssi=%d",
-                         disconnected->reason,
-                         disconnected->rssi);
+                ESP_LOGW(TAG, "❌ [MESH_EVENT] Parent disconnected:");
+                ESP_LOGW(TAG, "   Reason: %d (0x%02X)", disconnected->reason, disconnected->reason);
+                ESP_LOGW(TAG, "   RSSI: %d", disconnected->rssi);
+                ESP_LOGW(TAG, "   Current mesh_id: %02X:%02X:%02X:%02X:%02X:%02X",
+                         s_config.mesh_id[0], s_config.mesh_id[1], s_config.mesh_id[2],
+                         s_config.mesh_id[3], s_config.mesh_id[4], s_config.mesh_id[5]);
             } else {
-                ESP_LOGW(TAG, "Parent disconnected (no context)");
+                ESP_LOGW(TAG, "❌ [MESH_EVENT] Parent disconnected (no context)");
             }
             s_is_mesh_connected = false;
             break;
@@ -540,13 +596,14 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
         case MESH_EVENT_CHILD_CONNECTED: {
             mesh_event_child_connected_t *child = (mesh_event_child_connected_t *)event_data;
-            ESP_LOGI(TAG,
-                     "Child connected: " MACSTR " aid=%d mesh_child=%d",
-                     MAC2STR(child->mac),
-                     child->aid,
-                     child->is_mesh_child);
+            ESP_LOGI(TAG, "👶 [MESH_EVENT] Child connected:");
+            ESP_LOGI(TAG, "   MAC: " MACSTR, MAC2STR(child->mac));
+            ESP_LOGI(TAG, "   AID: %d", child->aid);
+            ESP_LOGI(TAG, "   Is mesh child: %d", child->is_mesh_child);
+            int total_nodes = esp_mesh_get_total_node_num();
+            ESP_LOGI(TAG, "   Total nodes in mesh: %d", total_nodes);
             if (s_config.mode == MESH_MODE_ROOT && !s_is_mesh_connected) {
-                ESP_LOGI(TAG, "Mesh marked as connected (child joined isolated root)");
+                ESP_LOGI(TAG, "✅ Mesh marked as connected (child joined isolated root)");
                 s_is_mesh_connected = true;
             }
             break;
@@ -554,19 +611,24 @@ static void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
         case MESH_EVENT_CHILD_DISCONNECTED: {
             mesh_event_child_disconnected_t *child = (mesh_event_child_disconnected_t *)event_data;
-            ESP_LOGW(TAG,
-                     "Child disconnected: " MACSTR " reason=%d mesh_child=%d",
-                     MAC2STR(child->mac),
-                     child->reason,
-                     child->is_mesh_child);
+            ESP_LOGW(TAG, "👶❌ [MESH_EVENT] Child disconnected:");
+            ESP_LOGW(TAG, "   MAC: " MACSTR, MAC2STR(child->mac));
+            ESP_LOGW(TAG, "   Reason: %d", child->reason);
+            ESP_LOGW(TAG, "   Is mesh child: %d", child->is_mesh_child);
+            int total_nodes = esp_mesh_get_total_node_num();
+            ESP_LOGI(TAG, "   Total nodes in mesh: %d", total_nodes);
             break;
         }
 
         case MESH_EVENT_NO_PARENT_FOUND: {
             mesh_event_no_parent_found_t *npf = (mesh_event_no_parent_found_t *)event_data;
-            ESP_LOGW(TAG,
-                     "No parent found: scan_times=%d",
-                     npf ? npf->scan_times : -1);
+            ESP_LOGW(TAG, "🔍 [MESH_EVENT] No parent found:");
+            ESP_LOGW(TAG, "   Scan times: %d", npf ? npf->scan_times : -1);
+            ESP_LOGW(TAG, "   Current mesh_id: %02X:%02X:%02X:%02X:%02X:%02X",
+                     s_config.mesh_id[0], s_config.mesh_id[1], s_config.mesh_id[2],
+                     s_config.mesh_id[3], s_config.mesh_id[4], s_config.mesh_id[5]);
+            ESP_LOGW(TAG, "   Mesh_id_str: %s", s_config.mesh_id_str ? s_config.mesh_id_str : "NULL");
+            ESP_LOGW(TAG, "   Channel: %d", s_config.channel);
             break;
         }
 
@@ -596,7 +658,8 @@ static void mesh_recv_task(void *arg) {
         return;
     }
 
-    ESP_LOGI(TAG, "mesh_recv_task started, waiting for data...");
+    ESP_LOGI(TAG, "📥 [MESH_RECV] Task started, waiting for data... (mode=%s)", 
+             s_config.mode == MESH_MODE_ROOT ? "ROOT" : "NODE");
     
     while (true) {
         // ВАЖНО: Сбрасываем data.size перед каждым приёмом!
@@ -605,25 +668,40 @@ static void mesh_recv_task(void *arg) {
         esp_err_t err = esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0);
         
         if (err == ESP_OK) {
-            ESP_LOGI(TAG, "✓ Mesh data received: %d bytes from "MACSTR" (flag=%d)", 
-                     data.size, MAC2STR(from.addr), flag);
+            const char *flag_str = (flag & MESH_DATA_TODS) ? "TODS" :
+                                   (flag & MESH_DATA_P2P) ? "P2P" :
+                                   (flag & MESH_DATA_FROMDS) ? "FROMDS" : "UNKNOWN";
+            ESP_LOGI(TAG, "📨 [MESH_RECV] Data received:");
+            ESP_LOGI(TAG, "   Size: %d bytes", data.size);
+            ESP_LOGI(TAG, "   From: " MACSTR, MAC2STR(from.addr));
+            ESP_LOGI(TAG, "   Flag: %d (%s)", flag, flag_str);
+            ESP_LOGI(TAG, "   Proto: %d", data.proto);
+            ESP_LOGI(TAG, "   TOS: %d", data.tos);
             
-            // DEBUG: Вывести первые 100 байт данных
-            ESP_LOG_BUFFER_HEXDUMP(TAG, data.data, (data.size > 100 ? 100 : data.size), ESP_LOG_INFO);
+            // Вывести первые 200 байт данных как текст (если это JSON)
+            if (data.size > 0 && data.size < 200) {
+                char *text_preview = calloc(1, data.size + 1);
+                if (text_preview) {
+                    memcpy(text_preview, data.data, data.size);
+                    ESP_LOGI(TAG, "   Preview: %s", text_preview);
+                    free(text_preview);
+                }
+            }
+            ESP_LOG_BUFFER_HEXDUMP(TAG, data.data, (data.size > 100 ? 100 : data.size), ESP_LOG_DEBUG);
             
             if (s_recv_cb != NULL) {
-                ESP_LOGI(TAG, "Calling recv_cb...");
+                ESP_LOGI(TAG, "   → Calling recv_cb (0x%p)...", (void*)s_recv_cb);
                 s_recv_cb(from.addr, data.data, data.size);
-                ESP_LOGI(TAG, "recv_cb returned");
+                ESP_LOGI(TAG, "   ← recv_cb returned");
             } else {
-                ESP_LOGW(TAG, "⚠️ No recv callback registered - data dropped!");
+                ESP_LOGW(TAG, "   ⚠️ No recv callback registered - data dropped!");
             }
         } else {
             if (err == ESP_ERR_MESH_NOT_START || err == ESP_ERR_MESH_NOT_INIT) {
-                ESP_LOGW(TAG, "Mesh recv stopping: mesh not running (%s)", esp_err_to_name(err));
+                ESP_LOGW(TAG, "🛑 [MESH_RECV] Stopping: mesh not running (%s)", esp_err_to_name(err));
                 break;
             }
-            ESP_LOGE(TAG, "Mesh recv failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "❌ [MESH_RECV] Failed: %s", esp_err_to_name(err));
             vTaskDelay(pdMS_TO_TICKS(100));
         }
 

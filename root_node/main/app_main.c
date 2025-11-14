@@ -566,16 +566,28 @@ static esp_err_t node_pairing_send_write_config(const root_config_t *root_cfg)
 
 static void node_pairing_mesh_recv_cb(const uint8_t *src_addr, const uint8_t *data, size_t len)
 {
+    ESP_LOGI(TAG, "🔵 [ROOT_PAIRING] Received mesh data:");
+    if (src_addr) {
+        ESP_LOGI(TAG, "   From: " MACSTR, MAC2STR(src_addr));
+    } else {
+        ESP_LOGI(TAG, "   From: NULL");
+    }
+    ESP_LOGI(TAG, "   Length: %d bytes", len);
+    
     if (!data || len == 0) {
+        ESP_LOGW(TAG, "   ⚠️ Empty data, ignoring");
         return;
     }
 
     char *json_copy = calloc(1, len + 1);
     if (!json_copy) {
-        ESP_LOGE(TAG, "Pairing: not enough memory for packet copy");
+        ESP_LOGE(TAG, "   ❌ Not enough memory for packet copy");
         return;
     }
     memcpy(json_copy, data, len);
+    json_copy[len] = '\0';
+    
+    ESP_LOGI(TAG, "   Data: %s", json_copy);
 
     mesh_message_t msg = {0};
     if (!mesh_protocol_parse(json_copy, &msg)) {
@@ -866,13 +878,15 @@ static void run_node_pairing_mode(void)
     }
     root_log_config_state("PAIRING-ROOTCFG");
 
+    // В pairing режиме ROOT работает только как SoftAP, без подключения к роутеру
+    // Это предотвращает конфликты каналов и ошибки аутентификации
     mesh_manager_config_t mesh_config = {
         .mode = MESH_MODE_ROOT,
         .mesh_password = MESH_NETWORK_PASSWORD,
         .channel = NODE_PAIRING_SOFTAP_CHANNEL,
         .max_connection = ROOT_MAX_MESH_CONNECTIONS,
-        .router_ssid = s_pairing_ctx.router_ssid[0] ? s_pairing_ctx.router_ssid : NULL,
-        .router_password = s_pairing_ctx.router_password[0] ? s_pairing_ctx.router_password : NULL,
+        .router_ssid = NULL,  // Отключаем подключение к роутеру в pairing режиме
+        .router_password = NULL,
         .router_bssid = NULL,
     };
     memcpy(mesh_config.mesh_id, s_pairing_ctx.mesh_id_bytes, sizeof(mesh_config.mesh_id));
