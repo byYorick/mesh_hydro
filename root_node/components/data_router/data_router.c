@@ -125,6 +125,9 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
         case MESH_MSG_TELEMETRY:
             ESP_LOGI(TAG, "📊 Telemetry from %s → MQTT", msg.node_id);
             
+            // Обновление типа последнего сообщения
+            node_registry_update_msg_type(msg.node_id, NODE_MSG_TELEMETRY);
+            
             // Обновление данных в реестре
             node_registry_update_data(msg.node_id, msg.data);
             
@@ -151,6 +154,9 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
 
         case MESH_MSG_EVENT:
             ESP_LOGI(TAG, "🔔 Event from %s → MQTT", msg.node_id);
+            
+            // Обновление типа последнего сообщения
+            node_registry_update_msg_type(msg.node_id, NODE_MSG_EVENT);
             
             if (mqtt_client_manager_is_connected()) {
                 char topic[192];
@@ -181,6 +187,9 @@ void data_router_handle_mesh_data(const uint8_t *src_addr, const uint8_t *data, 
 
         case MESH_MSG_HEARTBEAT:
             ESP_LOGI(TAG, "💓 Heartbeat from %s → MQTT", msg.node_id);
+            
+            // Обновление типа последнего сообщения
+            node_registry_update_msg_type(msg.node_id, NODE_MSG_HEARTBEAT);
             
             // Heartbeat обновляет только реестр (уже сделано выше)
             // Отправка в MQTT с использованием mesh_topic_format

@@ -21,7 +21,7 @@
 #define OLED_BYTES_PER_PAGE(width)  (width)
 #define OLED_PAGE_COUNT(height)     ((height) / 8U)
 
-#define OLED_MAX_LINES              6
+#define OLED_MAX_LINES              8
 #define OLED_MAX_TEMPLATE_LEN       64
 #define OLED_MAX_LINE_TEXT_LEN      32
 #define OLED_MAX_KV_PAIRS           12
@@ -443,6 +443,69 @@ static void ssd1306_clear_framebuffer(void)
     memset(s_ctx.framebuffer, 0, ssd1306_buffer_size());
 }
 
+// Функция для отрисовки строки крупным шрифтом (2x) - занимает 2 строки
+static void ssd1306_draw_line_2x(size_t line_index, const char *text)
+{
+    if (line_index >= OLED_PAGE_COUNT(s_ctx.cfg.height) - 1) {
+        return; // Нужно минимум 2 строки для двойного размера
+    }
+    
+    size_t offset_upper = line_index * s_ctx.cfg.width;
+    size_t offset_lower = (line_index + 1) * s_ctx.cfg.width;
+    
+    // Очищаем обе строки
+    memset(&s_ctx.framebuffer[offset_upper], 0x00, s_ctx.cfg.width);
+    memset(&s_ctx.framebuffer[offset_lower], 0x00, s_ctx.cfg.width);
+    
+    if (!text) {
+        return;
+    }
+    
+    // Крупный шрифт: каждый символ занимает 2x ширину и 2x высоту
+    size_t max_chars = s_ctx.cfg.width / (OLED_FONT_WIDTH * 2);
+    size_t length = strnlen(text, max_chars);
+    size_t x_pos = 0;
+    
+    for (size_t i = 0; i < length && x_pos + (OLED_FONT_WIDTH * 2) <= s_ctx.cfg.width; ++i) {
+        unsigned char c = (unsigned char)text[i];
+        if (c < 0x20 || c > 0x7F) {
+            c = 0x20;
+        }
+        
+        const uint8_t *glyph = s_font5x7[c - 0x20];
+        
+        // Отрисовка символа в двойном размере: каждый пиксель становится 2x2
+        for (size_t col = 0; col < OLED_FONT_DATA_WIDTH; ++col) {
+            uint8_t glyph_col = glyph[col];
+            size_t x = x_pos + (col * 2);
+            
+            if (x + 1 < s_ctx.cfg.width) {
+                // Масштабируем колонку: каждый бит становится 2 бита (2 пикселя по вертикали)
+                // Для верхней строки (line_index)
+                uint8_t upper_byte = 0;
+                // Для нижней строки (line_index + 1) - дублируем верхнюю
+                uint8_t lower_byte = 0;
+                
+                for (int bit = 0; bit < 7; ++bit) {  // 7 бит для высоты символа
+                    if (glyph_col & (1 << bit)) {
+                        // Каждый пиксель становится 2 пикселя по вертикали
+                        upper_byte |= (1 << bit);
+                        lower_byte |= (1 << bit);
+                    }
+                }
+                
+                // Дублируем по горизонтали (2 колонки)
+                s_ctx.framebuffer[offset_upper + x] = upper_byte;
+                s_ctx.framebuffer[offset_upper + x + 1] = upper_byte;
+                s_ctx.framebuffer[offset_lower + x] = lower_byte;
+                s_ctx.framebuffer[offset_lower + x + 1] = lower_byte;
+            }
+        }
+        
+        x_pos += OLED_FONT_WIDTH * 2; // Двойная ширина символа
+    }
+}
+
 static void ssd1306_draw_line(size_t line_index, const char *text)
 {
     if (line_index >= OLED_PAGE_COUNT(s_ctx.cfg.height)) {
@@ -480,7 +543,9 @@ static void ssd1306_draw_line(size_t line_index, const char *text)
 static void ssd1306_render_lines(void)
 {
     for (size_t line = 0; line < s_ctx.line_count; ++line) {
-        ssd1306_draw_line(line, s_ctx.rendered_lines[line]);
+        const char *rendered = s_ctx.rendered_lines[line];
+        // Обычная отрисовка (крупный шрифт отключен)
+        ssd1306_draw_line(line, rendered);
     }
 }
 

@@ -246,6 +246,7 @@ static void main_task(void *arg) {
     
     TickType_t last_telemetry = 0;
     TickType_t last_control = 0;
+    TickType_t last_display_update = 0;
     
     while (1) {
         TickType_t now = xTaskGetTickCount();
@@ -266,6 +267,14 @@ static void main_task(void *arg) {
         if (now - last_telemetry >= pdMS_TO_TICKS(30000)) {
             send_telemetry();
             last_telemetry = now;
+        }
+        
+        // Обновление дисплея каждые 1 секунду
+        if (now - last_display_update >= pdMS_TO_TICKS(1000)) {
+            bool mesh_connected = mesh_manager_is_connected();
+            int8_t rssi = mesh_connected ? get_rssi_to_parent() : 0;
+            ph_display_update(s_current_ph, mesh_connected, rssi);
+            last_display_update = now;
         }
         
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -652,7 +661,7 @@ static void ph_display_init_once(void)
         .i2c_address = PH_OLED_I2C_ADDR,
         .width = 128,
         .height = 64,
-        .line_count = 4,
+        .line_count = 8,  // Используем весь экран (64 пикселя / 8 = 8 строк)
     };
 
     // Пытаемся инициализировать OLED (может быть уже инициализирован в app_main)
@@ -686,14 +695,17 @@ static void ph_display_init_once(void)
         ESP_LOGI(TAG, "   ✅ Task start OK");
     }
 
-    // Устанавливаем шаблоны для нормального режима работы
-    // Это должно работать даже если OLED был инициализирован в app_main
-    ESP_LOGI(TAG, "   Setting templates for normal mode...");
-    oled_display_set_template(0, "{node} {zone}");
-    oled_display_set_template(1, "pH {ph} -> {target}");
-    oled_display_set_template(2, "Pump {pump_up}/{pump_down}ml");
-    oled_display_set_template(3, "{mode} Mesh {mesh} {rssi}");
-    ESP_LOGI(TAG, "   ✅ Templates set");
+    // Устанавливаем шаблоны для нормального режима работы (мини-дашборд на весь экран)
+    ESP_LOGI(TAG, "   Setting templates for normal mode (8 lines dashboard)...");
+    oled_display_set_template(0, "{node} | {zone}");
+    oled_display_set_template(1, "pH: {ph} -> {target} {pump_arrow}");
+    oled_display_set_template(2, "Mesh: {mesh} RSSI: {rssi} | {sensor_status}");
+    oled_display_set_template(3, "PID Zone: {pid_zone} | Err: {error}");
+    oled_display_set_template(4, "PID Kp: {pid_kp} Ki: {pid_ki} Kd: {pid_kd}");
+    oled_display_set_template(5, "Pump UP: {pump_up}ml {pump_up_arrow}");
+    oled_display_set_template(6, "Pump DOWN: {pump_down}ml {pump_down_arrow}");
+    oled_display_set_template(7, "Mode: {mode} | Uptime: {uptime}");
+    ESP_LOGI(TAG, "   ✅ Templates set (8 lines)");
 
     // Помечаем дисплей как готовый (OLED инициализирован и шаблоны установлены)
     s_display_ready = true;
@@ -723,31 +735,99 @@ static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
     char mode_str[8];
     char mesh_str[12];
     char rssi_str[16];
+    char pid_zone_str[16];
+    char uptime_str[16];
+    char error_str[16];
+    char pump_arrow_str[4];      // Стрелка для активного насоса (↑ или ↓)
+    char pump_up_arrow_str[4];   // Стрелка для насоса UP
+    char pump_down_arrow_str[4]; // Стрелка для насоса DOWN
+    char sensor_status_str[16]; // Статус датчика
+    char pid_kp_str[16];
+    char pid_ki_str[16];
+    char pid_kd_str[16];
 
+    // pH значение
     snprintf(ph_str, sizeof(ph_str), "%.2f", ph_value);
     float target = s_config ? s_config->ph_target : 0.0f;
     snprintf(target_str, sizeof(target_str), "%.2f", target);
 
+    // Статистика насосов
     uint32_t pump_up = pump_controller_get_total_ml(PUMP_PH_UP);
     uint32_t pump_down = pump_controller_get_total_ml(PUMP_PH_DOWN);
     snprintf(pump_up_str, sizeof(pump_up_str), "%lu", (unsigned long)pump_up);
     snprintf(pump_down_str, sizeof(pump_down_str), "%lu", (unsigned long)pump_down);
 
+    // Проверка активности насосов
+    bool pump_up_running = pump_controller_is_running(PUMP_PH_UP);
+    bool pump_down_running = pump_controller_is_running(PUMP_PH_DOWN);
+    
+    // Стрелки для насосов
+    strlcpy(pump_up_arrow_str, pump_up_running ? "↑" : " ", sizeof(pump_up_arrow_str));
+    strlcpy(pump_down_arrow_str, pump_down_running ? "↓" : " ", sizeof(pump_down_arrow_str));
+    
+    // Общая стрелка для pH строки (приоритет UP, затем DOWN)
+    if (pump_up_running) {
+        strlcpy(pump_arrow_str, "↑", sizeof(pump_arrow_str));
+    } else if (pump_down_running) {
+        strlcpy(pump_arrow_str, "↓", sizeof(pump_arrow_str));
+    } else {
+        strlcpy(pump_arrow_str, " ", sizeof(pump_arrow_str));
+    }
+
+    // Режим работы
     const char *mode = s_emergency_mode ? "EMR" : (s_autonomous_mode ? "AUTO" : "RUN");
     strlcpy(mode_str, mode, sizeof(mode_str));
-    strlcpy(mesh_str, mesh_connected ? "ONLINE" : "OFFLINE", sizeof(mesh_str));
+    
+    // Статус mesh
+    strlcpy(mesh_str, mesh_connected ? "ON" : "OFF", sizeof(mesh_str));
     if (mesh_connected && rssi != 0) {
-        snprintf(rssi_str, sizeof(rssi_str), "%ddBm", rssi);
+        snprintf(rssi_str, sizeof(rssi_str), "%d", rssi);
     } else {
         strlcpy(rssi_str, "--", sizeof(rssi_str));
     }
 
+    // Статус датчика
+    bool sensor_connected = ph_sensor_is_connected();
+    bool sensor_mock = ph_sensor_is_mock_mode();
+    if (sensor_connected) {
+        snprintf(sensor_status_str, sizeof(sensor_status_str), "%s", sensor_mock ? "MOCK" : "REAL");
+    } else {
+        strlcpy(sensor_status_str, "NO", sizeof(sensor_status_str));
+    }
+
+    // PID данные
+    pid_zone_t zone = adaptive_pid_get_zone(&s_pid_ph_up);
+    const char *zone_name = adaptive_pid_zone_to_str(zone);
+    strlcpy(pid_zone_str, zone_name ? zone_name : "N/A", sizeof(pid_zone_str));
+    
+    // PID коэффициенты (используем коэффициенты активной зоны)
+    pid_coeffs_t *coeffs = (zone == ZONE_DEAD) ? &s_pid_ph_up.coeffs_dead :
+                           (zone == ZONE_CLOSE) ? &s_pid_ph_up.coeffs_close :
+                           &s_pid_ph_up.coeffs_far;
+    snprintf(pid_kp_str, sizeof(pid_kp_str), "%.2f", coeffs->kp);
+    snprintf(pid_ki_str, sizeof(pid_ki_str), "%.2f", coeffs->ki);
+    snprintf(pid_kd_str, sizeof(pid_kd_str), "%.2f", coeffs->kd);
+
+    // Вычисляем ошибку
+    float error = target - ph_value;
+    snprintf(error_str, sizeof(error_str), "%.2f", error);
+
+    // Вычисляем uptime
+    uint32_t uptime_sec = (uint32_t)(time(NULL) - s_boot_time);
+    uint32_t uptime_hours = uptime_sec / 3600;
+    uint32_t uptime_mins = (uptime_sec % 3600) / 60;
+    if (uptime_hours > 0) {
+        snprintf(uptime_str, sizeof(uptime_str), "%luh%lum", (unsigned long)uptime_hours, (unsigned long)uptime_mins);
+    } else {
+        snprintf(uptime_str, sizeof(uptime_str), "%lum", (unsigned long)uptime_mins);
+    }
+
     const char *node_id = (s_config && s_config->base.node_id[0]) ? s_config->base.node_id : "ph";
-    const char *zone = (s_config && s_config->base.zone[0]) ? s_config->base.zone : "Zone";
+    const char *zone_name_display = (s_config && s_config->base.zone[0]) ? s_config->base.zone : "Zone";
 
     oled_display_kv_t values[] = {
         {.key = "node", .value = node_id},
-        {.key = "zone", .value = zone},
+        {.key = "zone", .value = zone_name_display},
         {.key = "ph", .value = ph_str},
         {.key = "target", .value = target_str},
         {.key = "pump_up", .value = pump_up_str},
@@ -755,6 +835,16 @@ static void ph_display_update(float ph_value, bool mesh_connected, int8_t rssi)
         {.key = "mode", .value = mode_str},
         {.key = "mesh", .value = mesh_str},
         {.key = "rssi", .value = rssi_str},
+        {.key = "pid_zone", .value = pid_zone_str},
+        {.key = "pid_kp", .value = pid_kp_str},
+        {.key = "pid_ki", .value = pid_ki_str},
+        {.key = "pid_kd", .value = pid_kd_str},
+        {.key = "uptime", .value = uptime_str},
+        {.key = "error", .value = error_str},
+        {.key = "pump_arrow", .value = pump_arrow_str},
+        {.key = "pump_up_arrow", .value = pump_up_arrow_str},
+        {.key = "pump_down_arrow", .value = pump_down_arrow_str},
+        {.key = "sensor_status", .value = sensor_status_str},
     };
 
     // Логируем только первые несколько раз и при ошибках, чтобы не засорять логи

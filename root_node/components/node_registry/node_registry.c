@@ -48,6 +48,8 @@ void node_registry_update_last_seen(const char *node_id, const uint8_t *mac_addr
         strncpy(node->node_id, node_id, sizeof(node->node_id) - 1);
         memcpy(node->mac_addr, mac_addr, 6);
         node->last_data = NULL;
+        node->last_msg_type = NODE_MSG_NONE;
+        node->last_msg_time_ms = 0;  // Инициализируем нулем
 
         ESP_LOGI(TAG, "New node added: %s ("MACSTR")", 
                  node_id, MAC2STR(mac_addr));
@@ -92,6 +94,21 @@ void node_registry_update_data(const char *node_id, cJSON *data) {
     if (zone && cJSON_IsString(zone)) {
         strncpy(node->zone, zone->valuestring, sizeof(node->zone) - 1);
     }
+}
+
+void node_registry_update_msg_type(const char *node_id, node_msg_type_t msg_type) {
+    if (!node_id) {
+        return;
+    }
+
+    node_info_t *node = node_registry_get(node_id);
+    if (!node) {
+        ESP_LOGW(TAG, "Cannot update msg_type: node %s not found", node_id);
+        return;
+    }
+
+    node->last_msg_type = msg_type;
+    node->last_msg_time_ms = esp_timer_get_time() / 1000;  // Сохраняем время получения сообщения
 }
 
 void node_registry_check_timeouts(void) {

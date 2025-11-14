@@ -175,17 +175,20 @@ static void root_display_init(const root_config_t *cfg) {
     root_display_configure_normal((cfg && cfg->mesh_network_id[0]) ? cfg->mesh_network_id : NULL);
 }
 
+static const char* get_node_short_name(const node_info_t *node);
+static const char* get_msg_type_icon(node_msg_type_t msg_type);
+
 static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *mesh_id,
                                 bool router_connected, bool mqtt_connected) {
     if (!s_root_display_ready) {
         return;
     }
 
-    char wifi_buf[16];
+    char wifi_buf[12];
     if (router_connected && wifi_rssi <= 0) {
-        snprintf(wifi_buf, sizeof(wifi_buf), "%ddBm", wifi_rssi);
+        snprintf(wifi_buf, sizeof(wifi_buf), "%d", wifi_rssi);
     } else if (router_connected) {
-        snprintf(wifi_buf, sizeof(wifi_buf), "%ddBm", wifi_rssi);
+        snprintf(wifi_buf, sizeof(wifi_buf), "%d", wifi_rssi);
     } else {
         strlcpy(wifi_buf, "--", sizeof(wifi_buf));
     }
@@ -193,13 +196,51 @@ static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *
     char nodes_buf[12];
     snprintf(nodes_buf, sizeof(nodes_buf), "%d", online_nodes);
 
-    char router_buf[8];
-    strlcpy(router_buf, router_connected ? "OK" : "ERR", sizeof(router_buf));
+    char router_buf[4];
+    strlcpy(router_buf, router_connected ? "OK" : "NO", sizeof(router_buf));
 
-    char mqtt_buf[8];
-    strlcpy(mqtt_buf, mqtt_connected ? "OK" : "ERR", sizeof(mqtt_buf));
+    char mqtt_buf[4];
+    strlcpy(mqtt_buf, mqtt_connected ? "OK" : "NO", sizeof(mqtt_buf));
 
     const char *mesh_value = (mesh_id && mesh_id[0]) ? mesh_id : "UNSET";
+
+    // Получаем список всех онлайн нод
+    node_info_t nodes[MAX_NODES];
+    int node_count = node_registry_get_all(nodes);
+    
+    // Текущее время для проверки сброса иконок (0.5 сек = 500 мс)
+    uint64_t now_ms = esp_timer_get_time() / 1000;
+    const uint64_t MSG_ICON_TIMEOUT_MS = 500;  // 0.5 секунды
+    
+    // Формируем строки для нод (максимум 5 строк: 3-7)
+    char node_lines[5][21] = {0};  // 21 символ для строки на OLED 128x64
+    for (int i = 0; i < 5 && i < node_count; i++) {
+        const char *short_name = get_node_short_name(&nodes[i]);
+        
+        // Проверяем, прошло ли больше 0.5 сек с последнего сообщения
+        node_msg_type_t display_msg_type = NODE_MSG_NONE;
+        if (nodes[i].last_msg_type != NODE_MSG_NONE) {
+            // Всегда показываем иконку, если есть тип сообщения
+            // Проверяем время только для сброса
+            bool show_icon = true;
+            if (nodes[i].last_msg_time_ms > 0) {
+                uint64_t elapsed = now_ms - nodes[i].last_msg_time_ms;
+                // Проверяем на переполнение (если now_ms < last_msg_time_ms, значит произошло переполнение)
+                if (now_ms >= nodes[i].last_msg_time_ms && elapsed > MSG_ICON_TIMEOUT_MS) {
+                    show_icon = false;  // Прошло больше 0.5 сек - скрываем
+                }
+            }
+            if (show_icon) {
+                display_msg_type = nodes[i].last_msg_type;
+            }
+            ESP_LOGD(TAG, "Node %s: last_msg_type=%d, last_msg_time_ms=%llu, now_ms=%llu, show_icon=%d, display_msg_type=%d",
+                     short_name, nodes[i].last_msg_type, nodes[i].last_msg_time_ms, now_ms, show_icon, display_msg_type);
+        }
+        
+        const char *icon = get_msg_type_icon(display_msg_type);
+        // Формат: "ph H" или "climate T" (короткое имя + иконка)
+        snprintf(node_lines[i], sizeof(node_lines[i]), "%.12s %s", short_name, icon);
+    }
 
     oled_display_kv_t values[] = {
         {.key = "mesh", .value = mesh_value},
@@ -207,6 +248,11 @@ static void root_display_update(int8_t wifi_rssi, int online_nodes, const char *
         {.key = "nodes", .value = nodes_buf},
         {.key = "router", .value = router_buf},
         {.key = "mqtt", .value = mqtt_buf},
+        {.key = "node3", .value = node_count > 0 ? node_lines[0] : ""},
+        {.key = "node4", .value = node_count > 1 ? node_lines[1] : ""},
+        {.key = "node5", .value = node_count > 2 ? node_lines[2] : ""},
+        {.key = "node6", .value = node_count > 3 ? node_lines[3] : ""},
+        {.key = "node7", .value = node_count > 4 ? node_lines[4] : ""},
     };
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 
@@ -434,15 +480,56 @@ static void root_log_config_state(const char *stage)
              esp_err_to_name(router_err));
 }
 
+static const char* get_node_short_name(const node_info_t *node) {
+    if (!node) {
+        return "?";
+    }
+    // Используем node_type если есть, иначе берем часть node_id до первого подчеркивания
+    if (node->node_type[0] != '\0') {
+        return node->node_type;
+    }
+    // Ищем первое подчеркивание в node_id
+    const char *underscore = strchr(node->node_id, '_');
+    if (underscore) {
+        static char short_name[16];
+        size_t len = underscore - node->node_id;
+        if (len > 0 && len < sizeof(short_name)) {
+            strncpy(short_name, node->node_id, len);
+            short_name[len] = '\0';
+            return short_name;
+        }
+    }
+    return node->node_id;
+}
+
+static const char* get_msg_type_icon(node_msg_type_t msg_type) {
+    switch (msg_type) {
+        case NODE_MSG_HEARTBEAT:
+            return "H";
+        case NODE_MSG_TELEMETRY:
+            return "T";
+        case NODE_MSG_COMMAND:
+            return "C";
+        case NODE_MSG_EVENT:
+            return "E";
+        default:
+            return "-";
+    }
+}
+
 static void root_display_configure_normal(const char *mesh_id) {
     if (!s_root_display_ready) {
         return;
     }
 
     oled_display_set_template(0, "Mesh {mesh}");
-    oled_display_set_template(1, "WiFi {wifi}");
+    oled_display_set_template(1, "W:{wifi} R:{router} M:{mqtt}");
     oled_display_set_template(2, "Nodes {nodes}");
-    oled_display_set_template(3, "R:{router} M:{mqtt}");
+    oled_display_set_template(3, "{node3}");
+    oled_display_set_template(4, "{node4}");
+    oled_display_set_template(5, "{node5}");
+    oled_display_set_template(6, "{node6}");
+    oled_display_set_template(7, "{node7}");
 
     oled_display_kv_t values[] = {
         {.key = "mesh", .value = (mesh_id && mesh_id[0]) ? mesh_id : "UNSET"},
@@ -450,6 +537,11 @@ static void root_display_configure_normal(const char *mesh_id) {
         {.key = "nodes", .value = "0"},
         {.key = "router", .value = "WAIT"},
         {.key = "mqtt", .value = "WAIT"},
+        {.key = "node3", .value = ""},
+        {.key = "node4", .value = ""},
+        {.key = "node5", .value = ""},
+        {.key = "node6", .value = ""},
+        {.key = "node7", .value = ""},
     };
     oled_display_queue_render(values, sizeof(values) / sizeof(values[0]), 0);
 }
@@ -807,7 +899,7 @@ static void root_monitoring_task(void *arg) {
             last_log_ms = now_ms;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(5000));  // Проверка каждые 5 сек
+        vTaskDelay(pdMS_TO_TICKS(500));  // Обновление дисплея каждые 0.5 сек для корректного сброса иконок
     }
 }
 

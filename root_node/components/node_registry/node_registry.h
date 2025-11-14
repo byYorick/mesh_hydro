@@ -25,6 +25,14 @@ extern "C" {
 /**
  * @brief Информация об узле
  */
+typedef enum {
+    NODE_MSG_NONE = 0,
+    NODE_MSG_HEARTBEAT,
+    NODE_MSG_TELEMETRY,
+    NODE_MSG_EVENT,
+    NODE_MSG_COMMAND
+} node_msg_type_t;
+
 typedef struct {
     char node_id[32];           ///< ID узла ("ph_ec_001")
     uint8_t mac_addr[6];        ///< MAC адрес
@@ -33,6 +41,8 @@ typedef struct {
     bool online;                ///< Статус онлайн
     uint64_t last_seen_ms;      ///< Время последнего контакта (мс)
     cJSON *last_data;           ///< Последние данные от узла
+    node_msg_type_t last_msg_type; ///< Тип последнего сообщения
+    uint64_t last_msg_time_ms; ///< Время последнего сообщения (мс) для сброса иконки
 } node_info_t;
 
 /**
@@ -59,6 +69,14 @@ void node_registry_update_last_seen(const char *node_id, const uint8_t *mac_addr
  * @param data cJSON объект с данными (будет скопирован)
  */
 void node_registry_update_data(const char *node_id, cJSON *data);
+
+/**
+ * @brief Обновление типа последнего сообщения от узла
+ * 
+ * @param node_id ID узла
+ * @param msg_type Тип сообщения
+ */
+void node_registry_update_msg_type(const char *node_id, node_msg_type_t msg_type);
 
 /**
  * @brief Проверка таймаутов всех узлов
